@@ -23,20 +23,20 @@ addons:
     packages:
       - lcov
       - libyaml-cpp-dev
-      - pkg-config
 install:
   - which $CXX
   - $CXX --version
   - |
     if [ "$TRAVIS_OS_NAME" = linux ]; then
       export PYTHON_DIR="/usr"
+      export YAML_DIR="/usr"
     fi
   - |
     if [ "$TRAVIS_OS_NAME" = osx ]; then
       brew update
       brew install lcov
-      export HDF5_DIR="/usr/local"
       export PYTHON_DIR="/usr/local/Cellar/python/2.7.14/Frameworks/Python.framework/Versions/2.7"
+      export YAML_DIR="/usr/local"
       export PATH="/usr/local/Cellar/python/2.7.14/bin:$PATH"
     fi
   - hash -r
@@ -48,7 +48,7 @@ install:
   - lcov --version
 script:
   - mkdir build && pushd build
-  - cmake -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install" ..
+  - cmake -DCMAKE_CXX_COMPILER="$CXX" -DYAML_CPP_INCLUDE_DIR="$YAML_DIR/include" -DYAML_CPP_LIBRARIES="-L$YAML_DIR/lib -lyaml-cpp" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install" ..
   - make -j2
   # - make -j2 test CTEST_OUTPUT_ON_FAILURE=1
   - make -j2 install
