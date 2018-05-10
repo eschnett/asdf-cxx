@@ -1,0 +1,31 @@
+#ifndef CONFIG_HPP
+#define CONFIG_HPP
+
+#include <string>
+
+namespace ASDF {
+
+#define ASDF_VERSION_MAJOR @ASDF_VERSION_MAJOR@
+#define ASDF_VERSION_MINOR @ASDF_VERSION_MINOR@
+#define ASDF_VERSION_PATCH @ASDF_VERSION_PATCH@
+
+#define ASDF_VERSION                                                           \
+  "@ASDF_VERSION_MAJOR@.@ASDF_VERSION_MINOR@.@ASDF_VERSION_PATCH@"
+
+int versionMajor();
+int versionMinor();
+int versionPatch();
+
+std::string Version();
+
+void checkVersion(const char *header_version);
+
+#define ASDF_CHECK_VERSION (::ASDF::checkVersion(ASDF_VERSION))
+
+} // namespace ASDF
+
+#define CONFIG_HPP_DONE
+#endif // #ifndef CONFIG_HPP
+#ifndef CONFIG_HPP_DONE
+#error "Cyclic include depencency"
+#endif
