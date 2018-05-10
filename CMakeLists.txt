@@ -11,14 +11,13 @@ set(PROJECT_DESCRIPTION
   "asdf-cxx (Advanced Scientific Data Format), C++ implementation")
 set(PROJECT_URL "https://github.com/eschnett/asdf-cxx")
 
-# set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules")
+set(CMAKE_MODULE_PATH
+  ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules")
 
 # Dependencies
 
 # yaml-cpp: A YAML parser and emitter in C++
-message("-- Finding yaml-cpp")
 find_package(yaml-cpp REQUIRED)
-# message("   Found yaml-cpp in ${YAML_CPP_INCLUDE_DIR}")
 include_directories(${YAML_CPP_INCLUDE_DIR})
 set(LIBS ${LIBS} ${YAML_CPP_LIBRARIES})
 

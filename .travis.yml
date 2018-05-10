@@ -48,7 +48,7 @@ install:
   - lcov --version
 script:
   - mkdir build && pushd build
-  - cmake -DCMAKE_CXX_COMPILER="$CXX" -DYAML_CPP_INCLUDE_DIR="$YAML_DIR/include" -DYAML_CPP_LIBRARIES="-L$YAML_DIR/lib -lyaml-cpp" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install" ..
+  - cmake -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install" ..
   - make -j2
   # - make -j2 test CTEST_OUTPUT_ON_FAILURE=1
   - make -j2 install

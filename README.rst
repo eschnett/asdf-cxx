@@ -9,7 +9,7 @@ Build instructions
 ------------------
 
 Building this library and its tools requires a C++17-capable C++
-compiler, the yaml-cpp library, and cmake.
+compiler, the yaml-cpp library, pkg-config, and cmake.
 
 
 
