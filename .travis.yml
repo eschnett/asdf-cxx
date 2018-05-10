@@ -23,6 +23,7 @@ addons:
     packages:
       - lcov
       - libyaml-cpp-dev
+      - pkg-config
 install:
   - which $CXX
   - $CXX --version

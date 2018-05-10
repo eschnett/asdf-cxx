@@ -13,7 +13,7 @@ compiler, the yaml-cpp library, and cmake.
 
 
 
-.. |Build Status| image:: https://travis-ci.org/eschnett/wavetoy7.svg?branch=master
-   :target: https://travis-ci.org/eschnett/wavetoy7
-.. |Coverage Status| image:: https://coveralls.io/repos/github/eschnett/wavetoy7/badge.svg?branch=master
-   :target: https://coveralls.io/github/eschnett/wavetoy7?branch=master
+.. |Build Status| image:: https://travis-ci.org/eschnett/asdf-cxx.svg?branch=master
+   :target: https://travis-ci.org/eschnett/asdf-cxx
+.. |Coverage Status| image:: https://coveralls.io/repos/github/eschnett/asdf-cxx/badge.svg?branch=master
+   :target: https://coveralls.io/github/eschnett/asdf-cxx?branch=master
