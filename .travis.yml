@@ -22,12 +22,14 @@ addons:
   apt:
     packages:
       - cmake
+      - g++-6
       - lcov
 cache:
   directories:
     - $HOME/yaml-cpp-0.6.2
 install:
   - which $CXX
+  - export CXX=g++-6
   - $CXX --version
   - |
     if [ "$TRAVIS_OS_NAME" = linux ]; then
@@ -52,8 +54,22 @@ install:
     if [ "$TRAVIS_OS_NAME" = osx ]; then
       brew update
       brew install lcov
+      export YAML_CPP_DIR="$HOME/yaml-cpp-0.6.2"
+      # Check cache
+      if [ ! -e "$YAML_CPP_DIR/include/yaml-cpp/yaml.h" ]; then
+        (
+          mkdir -p external
+          cd external
+          wget https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.2.tar.gz
+          tar xzf yaml-cpp-0.6.2.tar.gz
+          mkdir yaml-cpp-0.6.2-build
+          cd yaml-cpp-0.6.2-build
+          cmake -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_INSTALL_PREFIX="$YAML_CPP_DIR" ../yaml-cpp-yaml-cpp-0.6.2
+          make -j2
+          make -j2 install
+        )
+      fi
       export PYTHON_DIR="/usr/local/Cellar/python/2.7.14/Frameworks/Python.framework/Versions/2.7"
-      export YAML_CPP_DIR="/usr/local"
       export PATH="/usr/local/Cellar/python/2.7.14/bin:$PATH"
     fi
   - hash -r
