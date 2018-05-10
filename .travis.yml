@@ -1,0 +1,61 @@
+# General settings
+notifications:
+  email: false
+sudo: false
+dist: trusty
+
+# Build matrix
+os:
+  - linux
+  - osx
+language: cpp
+compiler:
+  - clang
+  - gcc
+matrix:
+  exclude:
+    - os: osx
+      compiler: gcc
+
+# Install, build, and test
+addons:
+  apt:
+    packages:
+      - lcov
+      - libyaml-cpp-dev
+install:
+  - which $CXX
+  - $CXX --version
+  - |
+    if [ "$TRAVIS_OS_NAME" = linux ]; then
+      export PYTHON_DIR="/usr"
+    fi
+  - |
+    if [ "$TRAVIS_OS_NAME" = osx ]; then
+      brew update
+      brew install lcov
+      export HDF5_DIR="/usr/local"
+      export PYTHON_DIR="/usr/local/Cellar/python/2.7.14/Frameworks/Python.framework/Versions/2.7"
+      export PATH="/usr/local/Cellar/python/2.7.14/bin:$PATH"
+    fi
+  - hash -r
+  - which python
+  - python --version
+  - pip install --user codecov
+  - gem install coveralls-lcov
+  - which lcov
+  - lcov --version
+script:
+  - mkdir build && pushd build
+  - cmake -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install" ..
+  - make -j2
+  # - make -j2 test CTEST_OUTPUT_ON_FAILURE=1
+  - make -j2 install
+  - popd
+# after_success:
+#   - mkdir -p "$HOME/bin" && ln -s "$(which $GCOV)" "$HOME/bin/gcov" && ls -l "$HOME/bin" && export PATH="$HOME/bin:$PATH" && hash -r
+#   - mkdir build-coveralls && pushd build-coveralls
+#   - cmake -DCMAKE_FIND_ROOT_PATH="$HDF5_DIR;$PYTHON_DIR" -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_BUILD_TYPE=Debug -DCOVERALLS=ON ..
+#   - make -j2
+#   - make -j2 coveralls CTEST_OUTPUT_ON_FAILURE=1
+#   - popd
