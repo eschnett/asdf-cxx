@@ -3,12 +3,14 @@
 
 |Build Status| |Coverage Status|
 
-ASDF - Advanced Scientific Data Format, a C++ implementation
+asdf-cxx: A C++ implementation for ASDF, the Advanced Scientific Data
+Format.
 
 Build instructions
 ------------------
 
 Requirements:
+
 - C++11-capable C++ compiler
 - cmake
 - pkg-config
