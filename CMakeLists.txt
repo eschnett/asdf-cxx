@@ -30,6 +30,15 @@ set(LIBS ${LIBS} ${YAML_CPP_LIBRARIES})
 # include_directories(${YAMLCPP_INCLUDE_DIR})
 # set(LIBS ${LIBS} ${YAMLCPP_LIBRARY})
 
+find_package(zlib)
+if(ZLIB_FOUND)
+  include_directories(${ZLIB_INCLUDE_DIRS})
+  set(LIBS ${LIBS} ${ZLIB_LIBRARIES})
+  set(HAVE_ZLIB 1)
+else()
+  set(HAVE_ZLIB 0)
+endif()
+
 # Main project
 
 set(CMAKE_CXX_STANDARD 11)

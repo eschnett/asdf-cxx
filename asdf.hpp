@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -125,10 +126,8 @@ YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id);
 
 // I/O
 
-class ndarray;
-
 class writer_state {
-  vector<shared_ptr<const ndarray>> ndarrays;
+  vector<function<void(ostream &os)>> tasks;
 
 public:
   writer_state(const writer_state &) = delete;
@@ -137,10 +136,10 @@ public:
   writer_state &operator=(writer_state &&) = delete;
 
   writer_state() = default;
-  ~writer_state() { assert(ndarrays.empty()); }
-  int64_t add_block(const shared_ptr<const ndarray> &ndarray) {
-    ndarrays.push_back(ndarray);
-    return ndarrays.size() - 1;
+  ~writer_state() { assert(tasks.empty()); }
+  int64_t add_task(function<void(ostream &)> &&task) {
+    tasks.push_back(move(task));
+    return tasks.size() - 1;
   }
   void flush(ostream &os);
 };
@@ -155,6 +154,7 @@ public:
 // Multi-dimensional array
 
 enum class block_format_t { block, inline_array };
+enum class compression_t { none, zlib };
 
 template <typename T> struct copy_array {
   void operator()(vector<unsigned char> &dst, const vector<T> &src) const {
@@ -173,11 +173,14 @@ template <> struct copy_array<bool8_t> {
 class ndarray : public enable_shared_from_this<ndarray> {
   vector<unsigned char> data;
   block_format_t block_format;
+  compression_t compression;
   vector<bool> mask;
   scalar_type_id_t scalar_type_id;
   vector<int64_t> shape;
   vector<int64_t> strides;
   int64_t offset;
+
+  void write_block(ostream &os) const;
 
 public:
   ndarray() = delete;
@@ -188,7 +191,8 @@ public:
 
   template <typename T>
   ndarray(const vector<T> &data, block_format_t block_format,
-          const vector<bool> &mask, const vector<int64_t> &shape,
+          compression_t compression, const vector<bool> &mask,
+          const vector<int64_t> &shape,
           const vector<int64_t> &strides = vector<int64_t>(),
           int64_t offset = 0) {
     // type
@@ -206,6 +210,8 @@ public:
     copy_array<T>()(this->data, data);
     // block_format
     this->block_format = block_format;
+    // compression
+    this->compression = compression;
     // mask
     if (!mask.empty())
       assert(mask.size() == npoints);
@@ -230,9 +236,6 @@ public:
   }
 
   virtual YAML::Node to_yaml(writer_state &ws) const;
-
-  const unsigned char *data_ptr() const { return data.data(); }
-  const size_t data_size() const { return data.size(); }
 };
 
 ////////////////////////////////////////////////////////////////////////////////

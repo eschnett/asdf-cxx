@@ -5,10 +5,14 @@
 #include <yaml-cpp/emitterstyle.h>
 #include <yaml-cpp/yaml.h>
 
+#ifdef HAVE_ZLIB
+#include <zlib.h>
+#endif
+
 #include <array>
 #include <cmath>
 #include <complex>
-#include <map>
+#include <limits>
 #include <sstream>
 #include <vector>
 
@@ -19,73 +23,18 @@ const string asdf_standard_version = "1.1.0";
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename T>
-void output(vector<unsigned char> &header, const T &data) {
-  // Always output in big-endian as required for the header
-  for (ptrdiff_t i = sizeof(T) - 1; i >= 0; --i)
-    header.push_back(reinterpret_cast<const unsigned char *>(&data)[i]);
-}
-
-void write_block(ostream &os, const shared_ptr<const ndarray> &arr) {
-  vector<unsigned char> header;
-  // block_magic_token
-  // (This spells "SBLK", with the highest bit of the "S" set to one)
-  const array<unsigned char, 4> block_magic_token{0xd3, 0x42, 0x4c, 0x4b};
-  for (auto ch : block_magic_token)
-    output(header, ch);
-  // header_size (not yet known)
-  auto header_size_pos = header.size();
-  uint16_t unknown_header_size = 0;
-  output(header, unknown_header_size);
-  auto header_prefix_length = header.size();
-  // flags
-  uint32_t flags = 0;
-  output(header, flags);
-  // compression
-  array<unsigned char, 4> compression{0, 0, 0, 0};
-  for (auto ch : compression)
-    output(header, ch);
-  // allocated_space
-  uint64_t allocated_space = arr->data_size();
-  output(header, allocated_space);
-  // used_space
-  uint64_t used_space = allocated_space; // no padding
-  output(header, used_space);
-  // data_space
-  uint64_t data_space = used_space;
-  output(header, data_space);
-  // checksum
-  array<unsigned char, 16> checksum{0, 0, 0, 0, 0, 0, 0, 0,
-                                    0, 0, 0, 0, 0, 0, 0, 0};
-  for (auto ch : checksum)
-    output(header, ch);
-  // fill in header_size
-  uint16_t header_size = header.size() - header_prefix_length;
-  vector<unsigned char> header_size_buf;
-  output(header_size_buf, header_size);
-  for (size_t p = 0; p < header_size_buf.size(); ++p)
-    header.at(header_size_pos + p) = header_size_buf.at(p);
-  // write header
-  os.write(reinterpret_cast<const char *>(header.data()), header.size());
-  // write data
-  os.write(reinterpret_cast<const char *>(arr->data_ptr()), arr->data_size());
-  // write padding
-  vector<char> padding(allocated_space - used_space);
-  os.write(padding.data(), padding.size());
-}
-
 void writer_state::flush(ostream &os) {
-  if (ndarrays.empty())
+  if (tasks.empty())
     return;
   YAML::Emitter index;
   index << YAML::Flow;
   index << YAML::BeginSeq;
-  for (const auto &arr : ndarrays) {
+  for (auto &&task : tasks) {
     index << os.tellp();
-    write_block(os, arr);
+    move(task)(os);
   }
+  tasks.clear();
   index << YAML::EndSeq;
-  ndarrays.clear();
   os << "#ASDF BLOCK INDEX\n"
      << "%YAML 1.1\n"
      << "---\n"
@@ -295,12 +244,110 @@ YAML::Node emit_inline_array(const vector<unsigned char> &data,
   return node;
 }
 
+template <typename T>
+void output(vector<unsigned char> &header, const T &data) {
+  // Always output in big-endian as required for the header
+  for (ptrdiff_t i = sizeof(T) - 1; i >= 0; --i)
+    header.push_back(reinterpret_cast<const unsigned char *>(&data)[i]);
+}
+
+void ndarray::write_block(ostream &os) const {
+  vector<unsigned char> header;
+  // block_magic_token
+  // (This spells "SBLK", with the highest bit of the "S" set to one)
+  const array<unsigned char, 4> block_magic_token{0xd3, 0x42, 0x4c, 0x4b};
+  for (auto ch : block_magic_token)
+    output(header, ch);
+  // header_size (not yet known)
+  auto header_size_pos = header.size();
+  uint16_t unknown_header_size = 0;
+  output(header, unknown_header_size);
+  auto header_prefix_length = header.size();
+  // flags
+  uint32_t flags = 0;
+  output(header, flags);
+  // compression
+  array<unsigned char, 4> comp;
+  vector<unsigned char> outdata;
+  switch (compression) {
+  case compression_t::none:
+    comp = {0, 0, 0, 0};
+    outdata = data; // don't copy
+    break;
+  case compression_t::zlib: {
+#ifdef HAVE_ZLIB
+    comp = {'z', 'l', 'i', 'b'};
+    outdata.resize(6 + data.size() + (data.size() + 16383) / 16384 * 5);
+    const int level = 9;
+    z_stream strm;
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    int iret = deflateInit(&strm, level);
+    assert(iret == Z_OK);
+    assert(data.size() < numeric_limits<uInt>::max());
+    strm.avail_in = data.size();
+    strm.next_in = const_cast<unsigned char *>(data.data());
+    assert(outdata.size() < numeric_limits<uInt>::max());
+    strm.avail_out = outdata.size();
+    strm.next_out = outdata.data();
+    iret = deflate(&strm, Z_FINISH);
+    assert(iret == Z_STREAM_END);
+    assert(strm.total_in == data.size());
+    outdata.resize(strm.total_out);
+    deflateEnd(&strm);
+    if (outdata.size() >= data.size()) {
+      // Skip compression if it does not reduce the size
+      comp = {0, 0, 0, 0};
+      outdata = data;
+    }
+#else
+    comp = {0, 0, 0, 0};
+    outdata = data;
+#endif
+    break;
+  }
+  default:
+    assert(0);
+  }
+  for (auto ch : comp)
+    output(header, ch);
+  // allocated_space
+  uint64_t allocated_space = outdata.size();
+  output(header, allocated_space);
+  // used_space
+  uint64_t used_space = allocated_space; // no padding
+  output(header, used_space);
+  // data_space
+  uint64_t data_space = data.size();
+  output(header, data_space);
+  // checksum
+  array<unsigned char, 16> checksum{0, 0, 0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0};
+  for (auto ch : checksum)
+    output(header, ch);
+  // fill in header_size
+  uint16_t header_size = header.size() - header_prefix_length;
+  vector<unsigned char> header_size_buf;
+  output(header_size_buf, header_size);
+  for (size_t p = 0; p < header_size_buf.size(); ++p)
+    header.at(header_size_pos + p) = header_size_buf.at(p);
+  // write header
+  os.write(reinterpret_cast<const char *>(header.data()), header.size());
+  // write data
+  os.write(reinterpret_cast<const char *>(outdata.data()), outdata.size());
+  // write padding
+  vector<char> padding(allocated_space - used_space);
+  os.write(padding.data(), padding.size());
+}
+
 YAML::Node ndarray::to_yaml(writer_state &ws) const {
   YAML::Node node;
   node.SetTag("core/ndarray-1.0.0");
   if (block_format == block_format_t::block) {
     // source
-    uint64_t idx = ws.add_block(shared_from_this());
+    auto arr = shared_from_this();
+    uint64_t idx = ws.add_task([=](ostream &os) { arr->write_block(os); });
     node["source"] = idx;
   } else {
     // data

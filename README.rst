@@ -8,10 +8,12 @@ ASDF - Advanced Scientific Data Format, a C++ implementation
 Build instructions
 ------------------
 
-Building this library and its tools requires a C++11-capable C++
-compiler, the yaml-cpp library, pkg-config, and cmake.
-
-
+Requirements:
+- C++11-capable C++ compiler
+- cmake
+- pkg-config
+- yaml-cpp library
+- zlib library (optional)
 
 .. |Build Status| image:: https://travis-ci.org/eschnett/asdf-cxx.svg?branch=master
    :target: https://travis-ci.org/eschnett/asdf-cxx

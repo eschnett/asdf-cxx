@@ -24,6 +24,14 @@ void checkVersion(const char *header_version);
 
 #define ASDF_CHECK_VERSION (::ASDF::checkVersion(ASDF_VERSION))
 
+// zlib support
+
+#if @HAVE_ZLIB@
+#define HAVE_ZLIB 1
+#else
+#undef HAVE_ZLIB
+#endif
+
 } // namespace ASDF
 
 #define CONFIG_HPP_DONE
