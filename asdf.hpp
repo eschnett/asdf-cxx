@@ -118,6 +118,10 @@ template <size_t I> struct get_scalar_type {
 };
 template <size_t I> using get_scalar_type_t = typename get_scalar_type<I>::type;
 
+string yaml_encode(scalar_type_id_t scalar_type_id);
+
+YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id);
+
 ////////////////////////////////////////////////////////////////////////////////
 
 // I/O
@@ -125,7 +129,7 @@ template <size_t I> using get_scalar_type_t = typename get_scalar_type<I>::type;
 class ndarray;
 
 class writer_state {
-  vector<shared_ptr<ndarray>> ndarrays;
+  vector<shared_ptr<const ndarray>> ndarrays;
 
 public:
   writer_state(const writer_state &) = delete;
@@ -135,7 +139,7 @@ public:
 
   writer_state() = default;
   ~writer_state() { assert(ndarrays.empty()); }
-  int64_t add_block(const shared_ptr<ndarray> &ndarray) {
+  int64_t add_block(const shared_ptr<const ndarray> &ndarray) {
     ndarrays.push_back(ndarray);
     return ndarrays.size() - 1;
   }
@@ -151,13 +155,15 @@ public:
 
 // Multi-dimensional array
 
-class ndarray {
-  optional<string> name;
+enum class block_format_t { block, inline_array };
+
+class ndarray : public enable_shared_from_this<ndarray> {
   vector<unsigned char> data;
+  block_format_t block_format;
   optional<vector<bool>> mask;
   scalar_type_id_t scalar_type_id;
   vector<int64_t> shape;
-  vector<int64_t> stride;
+  vector<int64_t> strides;
   int64_t offset;
 
 public:
@@ -168,12 +174,11 @@ public:
   ndarray &operator=(ndarray &&) = default;
 
   template <typename T>
-  ndarray(const optional<string> &name, const vector<T> &data,
-          const optional<vector<bool>> &mask, const vector<int64_t> &shape,
-          const vector<int64_t> &stride = vector<int64_t>(),
-          int64_t offset = 0) {
-    // name
-    this->name = name;
+  ndarray(const vector<T> &data, const optional<vector<bool>> &mask,
+          const vector<int64_t> &shape,
+          const vector<int64_t> &strides = vector<int64_t>(),
+          int64_t offset = 0)
+      : block_format(block_format_t::block) {
     // type
     this->scalar_type_id = get_scalar_type_id<T>::value;
     // shape
@@ -192,23 +197,26 @@ public:
     if (mask)
       assert(mask->size() == npoints);
     this->mask = mask;
-    // stride
-    if (stride.empty()) {
+    // strides
+    if (strides.empty()) {
       // Default: contiguous and in C order
-      this->stride.resize(rank);
-      int64_t str = 1;
+      this->strides.resize(rank);
+      int64_t str = sizeof(T);
       for (int d = rank - 1; d >= 0; --d) {
-        this->stride[d] = str;
+        this->strides[d] = str;
         str *= shape[d];
       }
     }
-    assert(stride.size() == rank);
+    assert(this->strides.size() == rank);
     for (int d = 0; d < rank; ++d)
-      assert(stride[d] >= 1 || stride[d] <= -1);
+      assert(this->strides[d] >= 1 || this->strides[d] <= -1);
+    // TODO: check that strides are multiples of the element size
     // offset
     assert(offset >= 0);
     this->offset = offset;
   }
+
+  virtual YAML::Node to_yaml(writer_state &ws) const;
 
   const unsigned char *data_ptr() const { return data.data(); }
   const size_t data_size() const { return data.size(); }
@@ -224,7 +232,7 @@ class column {
   optional<string> description;
 
 public:
-  column() = default;
+  column() = delete;
   column(const column &) = default;
   column(column &&) = default;
   column &operator=(const column &) = default;
@@ -233,6 +241,8 @@ public:
   column(const string &name, const shared_ptr<ndarray> &data,
          const optional<string> &description)
       : name(name), data(data), description(description) {}
+
+  virtual YAML::Node to_yaml(writer_state &ws) const;
 };
 
 // Table
@@ -240,31 +250,37 @@ class table {
   vector<shared_ptr<column>> columns;
 
 public:
-  table() = default;
+  table() = delete;
   table(const table &) = default;
   table(table &&) = default;
   table &operator=(const table &) = default;
   table &operator=(table &&) = default;
 
   table(const vector<shared_ptr<column>> &columns) : columns(columns) {}
-};
-
-////////////////////////////////////////////////////////////////////////////////
-
-class asdf : public writer {
-public:
-  asdf() = default;
-  asdf(const asdf &) = default;
-  asdf(asdf &&) = default;
-  asdf &operator=(const asdf &) = default;
-  asdf &operator=(asdf &&) = default;
 
   virtual YAML::Node to_yaml(writer_state &ws) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void write_asdf(ostream &os, const asdf &objs);
+class asdf : public writer {
+  vector<shared_ptr<table>> tables;
+
+public:
+  asdf() = delete;
+  asdf(const asdf &) = default;
+  asdf(asdf &&) = default;
+  asdf &operator=(const asdf &) = default;
+  asdf &operator=(asdf &&) = default;
+
+  asdf(const vector<shared_ptr<table>> &tables) : tables(tables) {}
+
+  virtual YAML::Node to_yaml(writer_state &ws) const;
+
+  void write(ostream &os) const;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 
 } // namespace ASDF
 

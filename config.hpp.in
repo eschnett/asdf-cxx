@@ -5,6 +5,8 @@
 
 namespace ASDF {
 
+// Software version
+
 #define ASDF_VERSION_MAJOR @asdf-cxx_VERSION_MAJOR@
 #define ASDF_VERSION_MINOR @asdf-cxx_VERSION_MINOR@
 #define ASDF_VERSION_PATCH @asdf-cxx_VERSION_PATCH@

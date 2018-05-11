@@ -1,15 +1,34 @@
 #include "asdf.hpp"
 
+#include <complex>
 #include <fstream>
 #include <iostream>
 
 using namespace std;
+using namespace std::complex_literals;
+using namespace ASDF;
 
 int main(int argc, char **argv) {
   cout << "asdf-demo:\n";
-  ASDF::asdf objs;
+  auto array0d = make_shared<ndarray>(
+      vector<int64_t>{42}, optional<vector<bool>>(), vector<int64_t>{});
+  auto col0 = make_shared<column>("alpha", array0d, optional<string>());
+  auto array1d = make_shared<ndarray>(
+      vector<int64_t>{1, 2, 3}, optional<vector<bool>>(), vector<int64_t>{3});
+  auto col1 = make_shared<column>("beta", array1d, optional<string>());
+  auto array2d =
+      make_shared<ndarray>(vector<float64_t>{1.0, 2.0, 3.0, 4.0},
+                           optional<vector<bool>>(), vector<int64_t>{2, 2});
+  auto col2 = make_shared<column>("gamma", array2d, optional<string>());
+  auto array3d =
+      make_shared<ndarray>(vector<complex128_t>{1, -2, 3i, -4i, 5 + 1i, 6 - 1i},
+                           optional<vector<bool>>(), vector<int64_t>{1, 2, 3});
+  auto col3 = make_shared<column>("delta", array3d, optional<string>());
+  auto tab =
+      make_shared<table>(vector<shared_ptr<column>>{col0, col1, col2, col3});
+  auto project = asdf(vector<shared_ptr<table>>{tab});
   fstream fout("demo.asdf", ios::binary | ios::trunc | ios::out);
-  ASDF::write_asdf(fout, objs);
+  project.write(fout);
   fout.close();
   cout << "Done.\n";
   return 0;

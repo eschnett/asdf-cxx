@@ -22,14 +22,12 @@ addons:
   apt:
     packages:
       - cmake
-      - g++-6
       - lcov
 cache:
   directories:
     - $HOME/yaml-cpp-0.6.2
 install:
   - which $CXX
-  - export CXX=g++-6
   - $CXX --version
   - |
     if [ "$TRAVIS_OS_NAME" = linux ]; then
