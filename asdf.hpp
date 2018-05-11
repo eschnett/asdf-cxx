@@ -118,6 +118,9 @@ template <size_t I> struct get_scalar_type {
 };
 template <size_t I> using get_scalar_type_t = typename get_scalar_type<I>::type;
 
+// Convert an enum id to its type size
+size_t get_scalar_type_size(scalar_type_id_t scalar_type_id);
+
 string yaml_encode(scalar_type_id_t scalar_type_id);
 
 YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id);
@@ -156,22 +159,60 @@ public:
 enum class block_format_t { block, inline_array };
 enum class compression_t { none, bzip2, zlib };
 
-template <typename T> struct copy_array {
-  void operator()(vector<unsigned char> &dst, const vector<T> &src) const {
-    dst.resize(src.size() * sizeof(T));
-    memcpy(dst.data(), src.data(), dst.size());
-  }
+class generic_blob_t {
+
+public:
+  virtual ~generic_blob_t() {}
+
+  virtual const void *ptr() const = 0;
+  virtual void *ptr() = 0;
+  virtual size_t bytes() const = 0;
+  virtual void resize(size_t bytes) = 0;
 };
-template <> struct copy_array<bool8_t> {
-  void operator()(vector<unsigned char> &dst, const vector<bool> &src) const {
-    dst.resize(src.size());
-    for (size_t i = 0; i < dst.size(); ++i)
-      dst[i] = src[i];
+
+template <typename T> class blob_t : public generic_blob_t {
+  vector<T> data;
+
+public:
+  blob_t() = delete;
+  blob_t(const vector<T> &data) : data(data) {}
+  blob_t(vector<T> &&data) : data(move(data)) {}
+
+  virtual ~blob_t() {}
+
+  virtual const void *ptr() const { return data.data(); }
+  virtual void *ptr() { return data.data(); }
+  virtual size_t bytes() const { return data.size() * sizeof(T); }
+  virtual void resize(size_t bytes) {
+    assert(bytes % sizeof(T) == 0);
+    data.resize(bytes / sizeof(T));
   }
 };
 
-class ndarray : public enable_shared_from_this<ndarray> {
+template <> class blob_t<bool> : public generic_blob_t {
   vector<unsigned char> data;
+
+public:
+  blob_t() = delete;
+
+  blob_t(const vector<unsigned char> &data) : data(data) {}
+  blob_t(vector<unsigned char> &&data) : data(move(data)) {}
+  blob_t(const vector<bool> &data) {
+    this->data.resize(data.size());
+    for (size_t i = 0; i < this->data.size(); ++i)
+      this->data[i] = data[i];
+  }
+
+  virtual ~blob_t() {}
+
+  virtual const void *ptr() const { return data.data(); }
+  virtual void *ptr() { return data.data(); }
+  virtual size_t bytes() const { return data.size(); }
+  virtual void resize(size_t bytes) { data.resize(bytes); }
+};
+
+class ndarray {
+  shared_ptr<generic_blob_t> data;
   block_format_t block_format;
   compression_t compression;
   vector<bool> mask;
@@ -189,51 +230,55 @@ public:
   ndarray &operator=(const ndarray &) = default;
   ndarray &operator=(ndarray &&) = default;
 
-  template <typename T>
-  ndarray(const vector<T> &data, block_format_t block_format,
+  ndarray(const shared_ptr<generic_blob_t> &data, block_format_t block_format,
           compression_t compression, const vector<bool> &mask,
-          const vector<int64_t> &shape,
-          const vector<int64_t> &strides = vector<int64_t>(),
-          int64_t offset = 0) {
-    // type
-    this->scalar_type_id = get_scalar_type_id<T>::value;
-    // shape
+          scalar_type_id_t scalar_type_id, const vector<int64_t> &shape,
+          const vector<int64_t> &strides1 = {}, int64_t offset = 0)
+      : data(data), block_format(block_format), compression(compression),
+        mask(mask), scalar_type_id(scalar_type_id), shape(shape),
+        strides(strides1), offset(offset) {
+    // Check shape
     int rank = shape.size();
     for (int d = 0; d < rank; ++d)
       assert(shape[d] >= 0);
-    this->shape = shape;
-    // data
+    // Check data size
     int64_t npoints = 1;
     for (int d = 0; d < rank; ++d)
       npoints *= shape[d];
-    assert(data.size() == npoints);
-    copy_array<T>()(this->data, data);
-    // block_format
-    this->block_format = block_format;
-    // compression
-    this->compression = compression;
-    // mask
+    assert(data->bytes() == npoints * get_scalar_type_size(scalar_type_id));
+    // Check mask
     if (!mask.empty())
       assert(mask.size() == npoints);
-    this->mask = mask;
-    // strides
+    // Check strides
     if (strides.empty()) {
-      // Default: contiguous and in C order
-      this->strides.resize(rank);
-      int64_t str = sizeof(T);
+      strides.resize(rank);
+      int64_t str = 1;
       for (int d = rank - 1; d >= 0; --d) {
-        this->strides[d] = str;
-        str *= shape[d];
+        strides.at(d) = str;
+        str *= shape.at(d);
       }
     }
-    assert(this->strides.size() == rank);
+    assert(strides.size() == rank);
     for (int d = 0; d < rank; ++d)
-      assert(this->strides[d] >= 1 || this->strides[d] <= -1);
+      assert(strides.at(d) >= 1 || strides.at(d) <= -1);
     // TODO: check that strides are multiples of the element size
     // offset
-    assert(offset >= 0);
-    this->offset = offset;
   }
+
+  template <typename T>
+  ndarray(const vector<T> &data, block_format_t block_format,
+          compression_t compression, const vector<bool> &mask,
+          const vector<int64_t> &shape, const vector<int64_t> &strides = {},
+          int64_t offset = 0)
+      : ndarray(make_shared<blob_t<T>>(data), block_format, compression, mask,
+                get_scalar_type_id<T>::value, shape, strides, offset) {}
+  template <typename T>
+  ndarray(vector<T> &&data, block_format_t block_format,
+          compression_t compression, const vector<bool> &mask,
+          const vector<int64_t> &shape, const vector<int64_t> &strides = {},
+          int64_t offset = 0)
+      : ndarray(make_shared<blob_t<T>>(move(data)), block_format, compression,
+                mask, get_scalar_type_id<T>::value, shape, strides, offset) {}
 
   virtual YAML::Node to_yaml(writer_state &ws) const;
 };

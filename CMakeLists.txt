@@ -69,6 +69,9 @@ set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 add_executable(asdf-demo demo.cpp)
 target_link_libraries(asdf-demo asdf-cxx ${LIBS})
 
+add_executable(asdf-large large.cpp)
+target_link_libraries(asdf-large asdf-cxx ${LIBS})
+
 add_executable(asdf-ls ls.cpp)
 target_link_libraries(asdf-ls asdf-cxx ${LIBS})
 

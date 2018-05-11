@@ -13,6 +13,7 @@
 #include <zlib.h>
 #endif
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <complex>
@@ -48,7 +49,7 @@ void writer_state::flush(ostream &os) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// Check consistency between id enum and variant index
+// Check consistency between id enum and tuple element
 static_assert(is_same<get_scalar_type_t<id_bool8>, bool8_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_int8>, int8_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_int16>, int16_t>::value, "");
@@ -81,6 +82,40 @@ static_assert(get_scalar_type_id<complex64_t>::value == id_complex64, "");
 static_assert(get_scalar_type_id<complex128_t>::value == id_complex128, "");
 static_assert(get_scalar_type_id<ascii_t>::value == id_ascii, "");
 static_assert(get_scalar_type_id<ucs4_t>::value == id_ucs4, "");
+
+size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
+  switch (scalar_type_id) {
+  case id_bool8:
+    return sizeof(bool8_t);
+  case id_int8:
+    return sizeof(int8_t);
+  case id_int16:
+    return sizeof(int16_t);
+  case id_int32:
+    return sizeof(int32_t);
+  case id_int64:
+    return sizeof(int64_t);
+  case id_uint8:
+    return sizeof(uint8_t);
+  case id_uint16:
+    return sizeof(uint16_t);
+  case id_uint32:
+    return sizeof(uint32_t);
+  case id_uint64:
+    return sizeof(uint64_t);
+  case id_float32:
+    return sizeof(float32_t);
+  case id_float64:
+    return sizeof(float64_t);
+  case id_complex64:
+    return sizeof(complex64_t);
+  case id_complex128:
+    return sizeof(complex128_t);
+    // case id_ascii
+    // case id_ucs4
+  }
+  assert(0);
+}
 
 string yaml_encode(scalar_type_id_t scalar_type_id) {
   switch (scalar_type_id) {
@@ -210,10 +245,10 @@ byteorder_t host_byteorder() {
   assert(0);
 }
 
-YAML::Node emit_inline_array(const vector<unsigned char> &data,
+YAML::Node emit_inline_array(const unsigned char *data,
                              scalar_type_id_t scalar_type_id,
                              const vector<int64_t> &shape,
-                             const vector<int64_t> &strides, int64_t offset) {
+                             const vector<int64_t> &strides) {
   size_t rank = shape.size();
   assert(strides.size() == rank);
   if (rank == 0) {
@@ -221,7 +256,7 @@ YAML::Node emit_inline_array(const vector<unsigned char> &data,
     YAML::Node node;
     node.SetStyle(YAML::EmitterStyle::Flow);
     // node[0] = data.at(offset);
-    node[0] = emit_scalar(&data[offset], scalar_type_id);
+    node[0] = emit_scalar(data, scalar_type_id);
     return node;
   }
   if (rank == 1) {
@@ -229,8 +264,7 @@ YAML::Node emit_inline_array(const vector<unsigned char> &data,
     YAML::Node node;
     node.SetStyle(YAML::EmitterStyle::Flow);
     for (size_t i = 0; i < shape.at(0); ++i)
-      // node[i] = data.at(offset + i * strides.at(0));
-      node[i] = emit_scalar(&data[offset + i * strides.at(0)], scalar_type_id);
+      node[i] = emit_scalar(data + i * strides.at(0), scalar_type_id);
     return node;
   }
   // multi-dimensional array
@@ -243,8 +277,8 @@ YAML::Node emit_inline_array(const vector<unsigned char> &data,
   for (size_t d = 0; d < rank - 1; ++d)
     strides1.at(d) = strides.at(d + 1);
   for (size_t i = 0; i < shape.at(0); ++i)
-    node[i] = emit_inline_array(data, scalar_type_id, shape1, strides1,
-                                offset + i * strides.at(0));
+    node[i] = emit_inline_array(data + i * strides.at(0), scalar_type_id,
+                                shape1, strides1);
   return node;
 }
 
@@ -255,10 +289,13 @@ void output(vector<unsigned char> &header, const T &data) {
     header.push_back(reinterpret_cast<const unsigned char *>(&data)[i]);
 }
 
+// TODO: stream the block (e.g. when compressing), then write the
+// correct header later
 void ndarray::write_block(ostream &os) const {
   vector<unsigned char> header;
   // block_magic_token
-  // (This spells "SBLK", with the highest bit of the "S" set to one)
+  // (Incidentally, this spells "SBLK", with the highest bit of the
+  // "S" set to one)
   const array<unsigned char, 4> block_magic_token{0xd3, 0x42, 0x4c, 0x4b};
   for (auto ch : block_magic_token)
     output(header, ch);
@@ -272,31 +309,52 @@ void ndarray::write_block(ostream &os) const {
   output(header, flags);
   // compression
   array<unsigned char, 4> comp;
-  vector<unsigned char> outdata;
+  shared_ptr<generic_blob_t> outdata;
   switch (compression) {
   case compression_t::none:
     comp = {0, 0, 0, 0};
-    outdata = data; // don't copy
+    outdata = data;
     break;
   case compression_t::bzip2: {
 #ifdef HAVE_BZIP2
     comp = {'b', 'z', 'p', '2'};
-    outdata.resize(600 + data.size() + (data.size() + 99) / 100);
+    // Allocate 600 bytes plus 1% more
+    outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
+        600 + data->bytes() + (data->bytes() + 99) / 100));
     const int level = 9;
-    assert(outdata.size() < numeric_limits<unsigned int>::max());
-    assert(data.size() < numeric_limits<unsigned int>::max());
-    unsigned int destLen = outdata.size();
-    int iret = BZ2_bzBuffToBuffCompress(
-        reinterpret_cast<char *>(outdata.data()), &destLen,
-        reinterpret_cast<char *>(const_cast<unsigned char *>(data.data())),
-        data.size(), level, 0, 0);
-    outdata.resize(destLen);
-    if (outdata.size() >= data.size()) {
+    bz_stream strm;
+    strm.bzalloc = NULL;
+    strm.bzfree = NULL;
+    strm.opaque = NULL;
+    BZ2_bzCompressInit(&strm, level, 0, 0);
+    strm.next_in = reinterpret_cast<char *>(const_cast<void *>(data->ptr()));
+    strm.next_out = reinterpret_cast<char *>(outdata->ptr());
+    uint64_t avail_in = data->bytes();
+    uint64_t avail_out = outdata->bytes();
+    for (;;) {
+      uint64_t this_avail_in =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_in);
+      uint64_t this_avail_out =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_out);
+      strm.avail_in = this_avail_in;
+      strm.avail_out = this_avail_out;
+      auto state = this_avail_in < avail_in ? BZ_RUN : BZ_FINISH;
+      int iret = BZ2_bzCompress(&strm, state);
+      avail_in -= this_avail_in - strm.avail_in;
+      avail_out -= this_avail_out - strm.avail_out;
+      if (iret == BZ_STREAM_END)
+        break;
+      assert(iret == BZ_RUN_OK);
+    }
+    assert(avail_in == 0);
+    outdata->resize(outdata->bytes() - avail_out);
+    if (outdata->bytes() >= data->bytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
       outdata = data;
     }
 #else
+    // Fall back to no compression if bzip2 is not available
     comp = {0, 0, 0, 0};
     outdata = data;
 #endif
@@ -305,7 +363,9 @@ void ndarray::write_block(ostream &os) const {
   case compression_t::zlib: {
 #ifdef HAVE_ZLIB
     comp = {'z', 'l', 'i', 'b'};
-    outdata.resize(6 + data.size() + (data.size() + 16383) / 16384 * 5);
+    // Allocate 6 bytes plus 5 bytes per 16 kByte more
+    outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
+        (6 + data->bytes() + (data->bytes() + 16383) / 16384 * 5)));
     const int level = 9;
     z_stream strm;
     strm.zalloc = Z_NULL;
@@ -313,23 +373,49 @@ void ndarray::write_block(ostream &os) const {
     strm.opaque = Z_NULL;
     int iret = deflateInit(&strm, level);
     assert(iret == Z_OK);
-    assert(data.size() < numeric_limits<uInt>::max());
-    strm.avail_in = data.size();
-    strm.next_in = const_cast<unsigned char *>(data.data());
-    assert(outdata.size() < numeric_limits<uInt>::max());
-    strm.avail_out = outdata.size();
-    strm.next_out = outdata.data();
+    strm.next_in =
+        reinterpret_cast<unsigned char *>(const_cast<void *>(data->ptr()));
+    strm.next_out = reinterpret_cast<unsigned char *>(outdata->ptr());
+    uint64_t avail_in = data->bytes();
+    uint64_t avail_out = outdata->bytes();
+    for (;;) {
+      uint64_t this_avail_in =
+          min(uint64_t(numeric_limits<uInt>::max()), avail_in);
+      uint64_t this_avail_out =
+          min(uint64_t(numeric_limits<uInt>::max()), avail_out);
+      strm.avail_in = this_avail_in;
+      strm.avail_out = this_avail_out;
+      auto state = this_avail_in < avail_in ? Z_NO_FLUSH : Z_FINISH;
+      int iret = deflate(&strm, state);
+      avail_in -= this_avail_in - strm.avail_in;
+      avail_out -= this_avail_out - strm.avail_out;
+      if (iret == Z_STREAM_END)
+        break;
+      assert(iret == Z_OK);
+    }
+    assert(avail_in == 0);
+    outdata->resize(outdata->bytes() - avail_out);
+#if 0
+    assert(data->bytes() < numeric_limits<uInt>::max());
+    strm.avail_in = data->bytes();
+    strm.next_in =
+        reinterpret_cast<unsigned char *>(const_cast<void *>(data->ptr()));
+    assert(outdata->bytes() < numeric_limits<uInt>::max());
+    strm.avail_out = outdata->bytes();
+    strm.next_out = reinterpret_cast<unsigned char *>(outdata->ptr());
     iret = deflate(&strm, Z_FINISH);
     assert(iret == Z_STREAM_END);
-    assert(strm.total_in == data.size());
-    outdata.resize(strm.total_out);
+    assert(strm.total_in == data->bytes());
+    outdata->resize(strm.total_out);
     deflateEnd(&strm);
-    if (outdata.size() >= data.size()) {
+#endif
+    if (outdata->bytes() >= data->bytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
       outdata = data;
     }
 #else
+    // Fall back to no compression if zlib is not available
     comp = {0, 0, 0, 0};
     outdata = data;
 #endif
@@ -341,13 +427,13 @@ void ndarray::write_block(ostream &os) const {
   for (auto ch : comp)
     output(header, ch);
   // allocated_space
-  uint64_t allocated_space = outdata.size();
+  uint64_t allocated_space = outdata->bytes();
   output(header, allocated_space);
   // used_space
   uint64_t used_space = allocated_space; // no padding
   output(header, used_space);
   // data_space
-  uint64_t data_space = data.size();
+  uint64_t data_space = data->bytes();
   output(header, data_space);
   // checksum
   array<unsigned char, 16> checksum{0, 0, 0, 0, 0, 0, 0, 0,
@@ -363,7 +449,7 @@ void ndarray::write_block(ostream &os) const {
   // write header
   os.write(reinterpret_cast<const char *>(header.data()), header.size());
   // write data
-  os.write(reinterpret_cast<const char *>(outdata.data()), outdata.size());
+  os.write(reinterpret_cast<const char *>(outdata->ptr()), outdata->bytes());
   // write padding
   vector<char> padding(allocated_space - used_space);
   os.write(padding.data(), padding.size());
@@ -374,13 +460,14 @@ YAML::Node ndarray::to_yaml(writer_state &ws) const {
   node.SetTag("core/ndarray-1.0.0");
   if (block_format == block_format_t::block) {
     // source
-    auto arr = shared_from_this();
-    uint64_t idx = ws.add_task([=](ostream &os) { arr->write_block(os); });
+    const auto &self = *this;
+    uint64_t idx = ws.add_task([=](ostream &os) { self.write_block(os); });
     node["source"] = idx;
   } else {
     // data
-    node["data"] =
-        emit_inline_array(data, scalar_type_id, shape, strides, offset);
+    node["data"] = emit_inline_array(
+        static_cast<const unsigned char *>(data->ptr()) + offset,
+        scalar_type_id, shape, strides);
   }
   // mask
   assert(mask.empty());
