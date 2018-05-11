@@ -10,9 +10,8 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
-#include <optional>
 #include <string>
-#include <variant>
+#include <tuple>
 #include <vector>
 
 namespace ASDF {
@@ -106,15 +105,15 @@ template <> struct get_scalar_type_id<ucs4_t> {
   constexpr static scalar_type_id_t value = id_ucs4;
 };
 
-// A variant that can hold a valur of each type
-typedef variant<bool8_t, int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t,
-                uint32_t, uint64_t, float32_t, float64_t, complex64_t,
-                complex128_t, ascii_t, ucs4_t>
-    scalar_type_t;
+// A tuple that can hold a value of each type
+typedef tuple<bool8_t, int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t,
+              uint32_t, uint64_t, float32_t, float64_t, complex64_t,
+              complex128_t, ascii_t, ucs4_t>
+    fake_scalar_type_t;
 
 // Convert an enum id to its type
 template <size_t I> struct get_scalar_type {
-  typedef variant_alternative_t<I, scalar_type_t> type;
+  typedef typename tuple_element<I, fake_scalar_type_t>::type type;
 };
 template <size_t I> using get_scalar_type_t = typename get_scalar_type<I>::type;
 
@@ -174,7 +173,7 @@ template <> struct copy_array<bool8_t> {
 class ndarray : public enable_shared_from_this<ndarray> {
   vector<unsigned char> data;
   block_format_t block_format;
-  optional<vector<bool>> mask;
+  vector<bool> mask;
   scalar_type_id_t scalar_type_id;
   vector<int64_t> shape;
   vector<int64_t> strides;
@@ -189,7 +188,7 @@ public:
 
   template <typename T>
   ndarray(const vector<T> &data, block_format_t block_format,
-          const optional<vector<bool>> &mask, const vector<int64_t> &shape,
+          const vector<bool> &mask, const vector<int64_t> &shape,
           const vector<int64_t> &strides = vector<int64_t>(),
           int64_t offset = 0) {
     // type
@@ -208,8 +207,8 @@ public:
     // block_format
     this->block_format = block_format;
     // mask
-    if (mask)
-      assert(mask->size() == npoints);
+    if (!mask.empty())
+      assert(mask.size() == npoints);
     this->mask = mask;
     // strides
     if (strides.empty()) {
@@ -243,7 +242,7 @@ public:
 class column {
   string name;
   shared_ptr<ndarray> data;
-  optional<string> description;
+  string description;
 
 public:
   column() = delete;
@@ -253,8 +252,11 @@ public:
   column &operator=(column &&) = default;
 
   column(const string &name, const shared_ptr<ndarray> &data,
-         const optional<string> &description)
-      : name(name), data(data), description(description) {}
+         const string &description)
+      : name(name), data(data), description(description) {
+    assert(!name.empty());
+    assert(data);
+  }
 
   virtual YAML::Node to_yaml(writer_state &ws) const;
 };

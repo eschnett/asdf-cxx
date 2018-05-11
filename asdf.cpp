@@ -307,7 +307,7 @@ YAML::Node ndarray::to_yaml(writer_state &ws) const {
         emit_inline_array(data, scalar_type_id, shape, strides, offset);
   }
   // mask
-  assert(!mask);
+  assert(mask.empty());
   // datatype
   node["datatype"] = yaml_encode(scalar_type_id);
   if (block_format == block_format_t::block) {
@@ -334,8 +334,8 @@ YAML::Node column::to_yaml(writer_state &ws) const {
   node.SetTag("core/column-1.0.0");
   node["name"] = name;
   node["data"] = data->to_yaml(ws);
-  if (description)
-    node["description"] = *description;
+  if (!description.empty())
+    node["description"] = description;
   return node;
 }
 
@@ -351,15 +351,17 @@ YAML::Node table::to_yaml(writer_state &ws) const {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-YAML::Node software(const string &name, const optional<string> &author,
-                    const optional<string> &homepage, const string &version) {
+YAML::Node software(const string &name, const string &author,
+                    const string &homepage, const string &version) {
   YAML::Node node;
   node.SetTag("core/software-1.0.0");
+  assert(!name.empty());
   node[name] = name;
-  if (author)
-    node["author"] = *author;
-  if (homepage)
-    node["homepage"] = *homepage;
+  if (!author.empty())
+    node["author"] = author;
+  if (!homepage.empty())
+    node["homepage"] = homepage;
+  assert(!version.empty());
   node["version"] = version;
   return node;
 }
