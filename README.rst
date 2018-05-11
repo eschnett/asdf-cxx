@@ -1,5 +1,5 @@
-`asdf-cxx <https://github.com/eschnett/asdf-cxx>`__
-===================================================
+`asdf-cxx <https://github.com/eschnett/asdf-cxx>`_
+==================================================
 
 |Build Status| |Coverage Status|
 
@@ -12,12 +12,12 @@ Build instructions
 Requirements:
 
 - C++11-capable C++ compiler
-- `cmake <https://cmake.org>`
-- `pkg-config <https://www.freedesktop.org/wiki/Software/pkg-config/>`
-- `yaml-cpp <https://github.com/jbeder/yaml-cpp>` library
-- `bzip2 <http://bzip.org>` library (optional, for compression)
-- `OpenSSL <https://www.openssl.org>` (optional, for MD5 checksums)
-- `zlib <http://zlib.net>` library (optional, for compression)
+- `cmake <https://cmake.org>`_
+- `pkg-config <https://www.freedesktop.org/wiki/Software/pkg-config/>`_
+- `yaml-cpp <https://github.com/jbeder/yaml-cpp>`_ library
+- `bzip2 <http://bzip.org>`_ library (optional, for compression)
+- `OpenSSL <https://www.openssl.org>`_ (optional, for MD5 checksums)
+- `zlib <http://zlib.net>`_ library (optional, for compression)
 
 .. |Build Status| image:: https://travis-ci.org/eschnett/asdf-cxx.svg?branch=master
    :target: https://travis-ci.org/eschnett/asdf-cxx
