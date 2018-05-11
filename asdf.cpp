@@ -96,37 +96,38 @@ void writer_state::flush(ostream &os) {
 ////////////////////////////////////////////////////////////////////////////////
 
 // Check consistency between id enum and variant index
-static_assert(is_same<get_scalar_type_t<id_bool8>, bool8_t>::value);
-static_assert(is_same<get_scalar_type_t<id_int8>, int8_t>::value);
-static_assert(is_same<get_scalar_type_t<id_int16>, int16_t>::value);
-static_assert(is_same<get_scalar_type_t<id_int32>, int32_t>::value);
-static_assert(is_same<get_scalar_type_t<id_int64>, int64_t>::value);
-static_assert(is_same<get_scalar_type_t<id_uint8>, uint8_t>::value);
-static_assert(is_same<get_scalar_type_t<id_uint16>, uint16_t>::value);
-static_assert(is_same<get_scalar_type_t<id_uint32>, uint32_t>::value);
-static_assert(is_same<get_scalar_type_t<id_uint64>, uint64_t>::value);
-static_assert(is_same<get_scalar_type_t<id_float32>, float32_t>::value);
-static_assert(is_same<get_scalar_type_t<id_float64>, float64_t>::value);
-static_assert(is_same<get_scalar_type_t<id_complex64>, complex64_t>::value);
-static_assert(is_same<get_scalar_type_t<id_complex128>, complex128_t>::value);
-static_assert(is_same<get_scalar_type_t<id_ascii>, ascii_t>::value);
-static_assert(is_same<get_scalar_type_t<id_ucs4>, ucs4_t>::value);
+static_assert(is_same<get_scalar_type_t<id_bool8>, bool8_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_int8>, int8_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_int16>, int16_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_int32>, int32_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_int64>, int64_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_uint8>, uint8_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_uint16>, uint16_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_uint32>, uint32_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_uint64>, uint64_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_float32>, float32_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_float64>, float64_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_complex64>, complex64_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_complex128>, complex128_t>::value,
+              "");
+static_assert(is_same<get_scalar_type_t<id_ascii>, ascii_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_ucs4>, ucs4_t>::value, "");
 
-static_assert(get_scalar_type_id<bool8_t>::value == id_bool8);
-static_assert(get_scalar_type_id<int8_t>::value == id_int8);
-static_assert(get_scalar_type_id<int16_t>::value == id_int16);
-static_assert(get_scalar_type_id<int32_t>::value == id_int32);
-static_assert(get_scalar_type_id<int64_t>::value == id_int64);
-static_assert(get_scalar_type_id<uint8_t>::value == id_uint8);
-static_assert(get_scalar_type_id<uint16_t>::value == id_uint16);
-static_assert(get_scalar_type_id<uint32_t>::value == id_uint32);
-static_assert(get_scalar_type_id<uint64_t>::value == id_uint64);
-static_assert(get_scalar_type_id<float32_t>::value == id_float32);
-static_assert(get_scalar_type_id<float64_t>::value == id_float64);
-static_assert(get_scalar_type_id<complex64_t>::value == id_complex64);
-static_assert(get_scalar_type_id<complex128_t>::value == id_complex128);
-static_assert(get_scalar_type_id<ascii_t>::value == id_ascii);
-static_assert(get_scalar_type_id<ucs4_t>::value == id_ucs4);
+static_assert(get_scalar_type_id<bool8_t>::value == id_bool8, "");
+static_assert(get_scalar_type_id<int8_t>::value == id_int8, "");
+static_assert(get_scalar_type_id<int16_t>::value == id_int16, "");
+static_assert(get_scalar_type_id<int32_t>::value == id_int32, "");
+static_assert(get_scalar_type_id<int64_t>::value == id_int64, "");
+static_assert(get_scalar_type_id<uint8_t>::value == id_uint8, "");
+static_assert(get_scalar_type_id<uint16_t>::value == id_uint16, "");
+static_assert(get_scalar_type_id<uint32_t>::value == id_uint32, "");
+static_assert(get_scalar_type_id<uint64_t>::value == id_uint64, "");
+static_assert(get_scalar_type_id<float32_t>::value == id_float32, "");
+static_assert(get_scalar_type_id<float64_t>::value == id_float64, "");
+static_assert(get_scalar_type_id<complex64_t>::value == id_complex64, "");
+static_assert(get_scalar_type_id<complex128_t>::value == id_complex128, "");
+static_assert(get_scalar_type_id<ascii_t>::value == id_ascii, "");
+static_assert(get_scalar_type_id<ucs4_t>::value == id_ucs4, "");
 
 string yaml_encode(scalar_type_id_t scalar_type_id) {
   switch (scalar_type_id) {
