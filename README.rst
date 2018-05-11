@@ -15,8 +15,9 @@ Requirements:
 - cmake
 - pkg-config
 - yaml-cpp library
-- bzip2 library (optional)
-- zlib library (optional)
+- bzip2 library (optional, for compression)
+- OpenSSL (optional, for MD5 checksums)
+- zlib library (optional, for compression)
 
 .. |Build Status| image:: https://travis-ci.org/eschnett/asdf-cxx.svg?branch=master
    :target: https://travis-ci.org/eschnett/asdf-cxx

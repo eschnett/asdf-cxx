@@ -32,6 +32,14 @@ void checkVersion(const char *header_version);
 #undef HAVE_BZIP2
 #endif
 
+// OpenSSL support
+
+#if @HAVE_OPENSSL@
+#define HAVE_OPENSSL 1
+#else
+#undef HAVE_OPENSSL
+#endif
+
 // zlib support
 
 #if @HAVE_ZLIB@

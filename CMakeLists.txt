@@ -25,6 +25,15 @@ else()
   set(HAVE_BZIP2 0)
 endif()
 
+find_package(OpenSSL)
+if(OPENSSL_FOUND)
+  include_directories(${OPENSSL_INCLUDE_DIR})
+  set(LIBS ${LIBS} ${OPENSSL_CRYPTO_LIBRARY})
+  set(HAVE_OPENSSL 1)
+else()
+  set(HAVE_OPENSSL 0)
+endif()
+
 # yaml-cpp: A YAML parser and emitter in C++
 find_package(yaml-cpp REQUIRED)
 include_directories(${YAML_CPP_INCLUDE_DIR})

@@ -9,6 +9,10 @@
 #include <bzlib.h>
 #endif
 
+#ifdef HAVE_OPENSSL
+#include <openssl/md5.h>
+#endif
+
 #ifdef HAVE_ZLIB
 #include <zlib.h>
 #endif
@@ -436,8 +440,15 @@ void ndarray::write_block(ostream &os) const {
   uint64_t data_space = data->bytes();
   output(header, data_space);
   // checksum
-  array<unsigned char, 16> checksum{0, 0, 0, 0, 0, 0, 0, 0,
-                                    0, 0, 0, 0, 0, 0, 0, 0};
+  array<unsigned char, 16> checksum;
+#if HAVE_OPENSSL
+  MD5_CTX ctx;
+  MD5_Init(&ctx);
+  MD5_Update(&ctx, outdata->ptr(), outdata->bytes());
+  MD5_Final(checksum.data(), &ctx);
+#else
+  checksum = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+#endif
   for (auto ch : checksum)
     output(header, ch);
   // fill in header_size
