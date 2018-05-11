@@ -12,12 +12,12 @@ Build instructions
 Requirements:
 
 - C++11-capable C++ compiler
-- cmake
-- pkg-config
-- yaml-cpp library
-- bzip2 library (optional, for compression)
-- OpenSSL (optional, for MD5 checksums)
-- zlib library (optional, for compression)
+- cmake <https://cmake.org>
+- pkg-config <https://www.freedesktop.org/wiki/Software/pkg-config/>
+- yaml-cpp library <https://github.com/jbeder/yaml-cpp>
+- bzip2 library (optional, for compression) <http://bzip.org>
+- OpenSSL (optional, for MD5 checksums) <https://www.openssl.org>
+- zlib library (optional, for compression) <http://zlib.net>
 
 .. |Build Status| image:: https://travis-ci.org/eschnett/asdf-cxx.svg?branch=master
    :target: https://travis-ci.org/eschnett/asdf-cxx
