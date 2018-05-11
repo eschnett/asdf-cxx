@@ -154,7 +154,7 @@ public:
 // Multi-dimensional array
 
 enum class block_format_t { block, inline_array };
-enum class compression_t { none, zlib };
+enum class compression_t { none, bzip2, zlib };
 
 template <typename T> struct copy_array {
   void operator()(vector<unsigned char> &dst, const vector<T> &src) const {

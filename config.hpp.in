@@ -24,6 +24,14 @@ void checkVersion(const char *header_version);
 
 #define ASDF_CHECK_VERSION (::ASDF::checkVersion(ASDF_VERSION))
 
+// bzip2 support
+
+#if @HAVE_BZIP2@
+#define HAVE_BZIP2 1
+#else
+#undef HAVE_BZIP2
+#endif
+
 // zlib support
 
 #if @HAVE_ZLIB@

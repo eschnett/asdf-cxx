@@ -13,6 +13,7 @@ Requirements:
 - cmake
 - pkg-config
 - yaml-cpp library
+- bzip2 library (optional)
 - zlib library (optional)
 
 .. |Build Status| image:: https://travis-ci.org/eschnett/asdf-cxx.svg?branch=master

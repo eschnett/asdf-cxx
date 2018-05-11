@@ -5,6 +5,10 @@
 #include <yaml-cpp/emitterstyle.h>
 #include <yaml-cpp/yaml.h>
 
+#ifdef HAVE_BZIP2
+#include <bzlib.h>
+#endif
+
 #ifdef HAVE_ZLIB
 #include <zlib.h>
 #endif
@@ -274,6 +278,30 @@ void ndarray::write_block(ostream &os) const {
     comp = {0, 0, 0, 0};
     outdata = data; // don't copy
     break;
+  case compression_t::bzip2: {
+#ifdef HAVE_BZIP2
+    comp = {'b', 'z', 'p', '2'};
+    outdata.resize(600 + data.size() + (data.size() + 99) / 100);
+    const int level = 9;
+    assert(outdata.size() < numeric_limits<unsigned int>::max());
+    assert(data.size() < numeric_limits<unsigned int>::max());
+    unsigned int destLen = outdata.size();
+    int iret = BZ2_bzBuffToBuffCompress(
+        reinterpret_cast<char *>(outdata.data()), &destLen,
+        reinterpret_cast<char *>(const_cast<unsigned char *>(data.data())),
+        data.size(), level, 0, 0);
+    outdata.resize(destLen);
+    if (outdata.size() >= data.size()) {
+      // Skip compression if it does not reduce the size
+      comp = {0, 0, 0, 0};
+      outdata = data;
+    }
+#else
+    comp = {0, 0, 0, 0};
+    outdata = data;
+#endif
+    break;
+  }
   case compression_t::zlib: {
 #ifdef HAVE_ZLIB
     comp = {'z', 'l', 'i', 'b'};

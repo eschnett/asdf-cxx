@@ -16,6 +16,15 @@ set(CMAKE_MODULE_PATH
 
 # Dependencies
 
+find_package(bzip2)
+if(BZIP2_FOUND)
+  include_directories(${BZIP2_INCLUDE_DIR})
+  set(LIBS ${LIBS} ${BZIP2_LIBRARIES})
+  set(HAVE_BZIP2 1)
+else()
+  set(HAVE_BZIP2 0)
+endif()
+
 # yaml-cpp: A YAML parser and emitter in C++
 find_package(yaml-cpp REQUIRED)
 include_directories(${YAML_CPP_INCLUDE_DIR})
