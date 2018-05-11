@@ -157,6 +157,20 @@ public:
 
 enum class block_format_t { block, inline_array };
 
+template <typename T> struct copy_array {
+  void operator()(vector<unsigned char> &dst, const vector<T> &src) const {
+    dst.resize(src.size() * sizeof(T));
+    memcpy(dst.data(), src.data(), dst.size());
+  }
+};
+template <> struct copy_array<bool8_t> {
+  void operator()(vector<unsigned char> &dst, const vector<bool> &src) const {
+    dst.resize(src.size());
+    for (size_t i = 0; i < dst.size(); ++i)
+      dst[i] = src[i];
+  }
+};
+
 class ndarray : public enable_shared_from_this<ndarray> {
   vector<unsigned char> data;
   block_format_t block_format;
@@ -174,11 +188,10 @@ public:
   ndarray &operator=(ndarray &&) = default;
 
   template <typename T>
-  ndarray(const vector<T> &data, const optional<vector<bool>> &mask,
-          const vector<int64_t> &shape,
+  ndarray(const vector<T> &data, block_format_t block_format,
+          const optional<vector<bool>> &mask, const vector<int64_t> &shape,
           const vector<int64_t> &strides = vector<int64_t>(),
-          int64_t offset = 0)
-      : block_format(block_format_t::block) {
+          int64_t offset = 0) {
     // type
     this->scalar_type_id = get_scalar_type_id<T>::value;
     // shape
@@ -191,8 +204,9 @@ public:
     for (int d = 0; d < rank; ++d)
       npoints *= shape[d];
     assert(data.size() == npoints);
-    this->data.resize(npoints * sizeof(T));
-    memcpy(this->data.data(), data.data(), npoints * sizeof(T));
+    copy_array<T>()(this->data, data);
+    // block_format
+    this->block_format = block_format;
     // mask
     if (mask)
       assert(mask->size() == npoints);

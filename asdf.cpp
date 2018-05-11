@@ -281,6 +281,7 @@ YAML::Node emit_inline_array(const vector<unsigned char> &data,
   }
   // multi-dimensional array
   YAML::Node node;
+  // TODO: Try emitting these as Flow, with a Newline at the end
   vector<int64_t> shape1(rank - 1);
   for (size_t d = 0; d < rank - 1; ++d)
     shape1.at(d) = shape.at(d + 1);
@@ -366,7 +367,7 @@ YAML::Node software(const string &name, const optional<string> &author,
 YAML::Node asdf::to_yaml(writer_state &ws) const {
   const auto &asdf_library =
       software("asdf-cxx", "Erik Schnetter",
-               "https://github.com/eschnett/asdf-cpp", ASDF_VERSION);
+               "https://github.com/eschnett/asdf-cxx", ASDF_VERSION);
   YAML::Node tabs;
   for (size_t i = 0; i < tables.size(); ++i)
     tabs[i] = tables[i]->to_yaml(ws);
@@ -381,6 +382,7 @@ YAML::Node asdf::to_yaml(writer_state &ws) const {
 
 void asdf::write(ostream &os) const {
   writer_state ws;
+  // TODO: Use YAML::Emitter(os) instead
   const auto &node = to_yaml(ws);
   os << "#ASDF " << asdf_format_version << "\n"
      << "#ASDF_STANDARD " << asdf_standard_version << "\n"
