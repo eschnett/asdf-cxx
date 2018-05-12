@@ -12,7 +12,6 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <tuple>
 #include <vector>
 
 namespace ASDF {
@@ -106,16 +105,25 @@ template <> struct get_scalar_type_id<ucs4_t> {
   constexpr static scalar_type_id_t value = id_ucs4;
 };
 
-// A tuple that can hold a value of each type
-typedef tuple<bool8_t, int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t,
-              uint32_t, uint64_t, float32_t, float64_t, complex64_t,
-              complex128_t, ascii_t, ucs4_t>
-    fake_scalar_type_t;
-
-// Convert an enum id to its type
-template <size_t I> struct get_scalar_type {
-  typedef typename tuple_element<I, fake_scalar_type_t>::type type;
+// Convert an enum id to its type size
+template <size_t> struct get_scalar_type;
+template <> struct get_scalar_type<id_bool8> { typedef bool8_t type; };
+template <> struct get_scalar_type<id_int8> { typedef int8_t type; };
+template <> struct get_scalar_type<id_int16> { typedef int16_t type; };
+template <> struct get_scalar_type<id_int32> { typedef int32_t type; };
+template <> struct get_scalar_type<id_int64> { typedef int64_t type; };
+template <> struct get_scalar_type<id_uint8> { typedef uint8_t type; };
+template <> struct get_scalar_type<id_uint16> { typedef uint16_t type; };
+template <> struct get_scalar_type<id_uint32> { typedef uint32_t type; };
+template <> struct get_scalar_type<id_uint64> { typedef uint64_t type; };
+template <> struct get_scalar_type<id_float32> { typedef float32_t type; };
+template <> struct get_scalar_type<id_float64> { typedef float64_t type; };
+template <> struct get_scalar_type<id_complex64> { typedef complex64_t type; };
+template <> struct get_scalar_type<id_complex128> {
+  typedef complex128_t type;
 };
+template <> struct get_scalar_type<id_ascii> { typedef ascii_t type; };
+template <> struct get_scalar_type<id_ucs4> { typedef ucs4_t type; };
 template <size_t I> using get_scalar_type_t = typename get_scalar_type<I>::type;
 
 // Convert an enum id to its type size
