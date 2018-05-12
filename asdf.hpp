@@ -147,11 +147,6 @@ public:
   void flush(ostream &os);
 };
 
-class writer {
-public:
-  virtual YAML::Node to_yaml(writer_state &ws) const = 0;
-};
-
 ////////////////////////////////////////////////////////////////////////////////
 
 // Multi-dimensional array
@@ -280,7 +275,7 @@ public:
       : ndarray(make_shared<blob_t<T>>(move(data)), block_format, compression,
                 mask, get_scalar_type_id<T>::value, shape, strides, offset) {}
 
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  YAML::Node to_yaml(writer_state &ws) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -306,7 +301,7 @@ public:
     assert(data);
   }
 
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  YAML::Node to_yaml(writer_state &ws) const;
 };
 
 // Table
@@ -322,12 +317,12 @@ public:
 
   table(const vector<shared_ptr<column>> &columns) : columns(columns) {}
 
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  YAML::Node to_yaml(writer_state &ws) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
-class asdf : public writer {
+class asdf {
   vector<shared_ptr<table>> tables;
 
 public:
@@ -339,7 +334,7 @@ public:
 
   asdf(const vector<shared_ptr<table>> &tables) : tables(tables) {}
 
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  YAML::Node to_yaml(writer_state &ws) const;
 
   void write(ostream &os) const;
 };
