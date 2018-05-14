@@ -1,3 +1,5 @@
+#include "asdf.hpp"
+
 #include <yaml-cpp/yaml.h>
 
 #include <fstream>
@@ -10,6 +12,7 @@ using namespace std;
 int main(int argc, char **argv) {
   cout << "asdf-ls:\n";
   fstream fin("demo.asdf", ios::binary | ios::in);
+  // TODO: stream the file instead
   ostringstream doc;
   for (;;) {
     string line;
@@ -18,9 +21,11 @@ int main(int argc, char **argv) {
     if (line == "...")
       break;
   }
-  fin.close();
   YAML::Node node = YAML::Load(doc.str());
   cout << node << "\n";
+  ASDF::reader_state rs(fin);
+  ASDF::asdf(rs, node);
+  fin.close();
   cout << "Done.\n";
   return 0;
 }

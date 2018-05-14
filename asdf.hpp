@@ -10,6 +10,8 @@
 #include <cstring>
 #include <functional>
 #include <iostream>
+#include <istream>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -129,13 +131,105 @@ template <size_t I> using get_scalar_type_t = typename get_scalar_type<I>::type;
 // Convert an enum id to its type size
 size_t get_scalar_type_size(scalar_type_id_t scalar_type_id);
 
-string yaml_encode(scalar_type_id_t scalar_type_id);
+void yaml_decode(const YAML::Node &node, scalar_type_id_t &scalar_type_id);
+YAML::Node yaml_encode(scalar_type_id_t scalar_type_id);
+
+void yaml_decode(const YAML::Node &node, bool8_t &val);
+void yaml_decode(const YAML::Node &node, int8_t &val);
+void yaml_decode(const YAML::Node &node, int16_t &val);
+void yaml_decode(const YAML::Node &node, int32_t &val);
+void yaml_decode(const YAML::Node &node, int64_t &val);
+void yaml_decode(const YAML::Node &node, uint8_t &val);
+void yaml_decode(const YAML::Node &node, uint16_t &val);
+void yaml_decode(const YAML::Node &node, uint32_t &val);
+void yaml_decode(const YAML::Node &node, uint64_t &val);
+void yaml_decode(const YAML::Node &node, float32_t &val);
+void yaml_decode(const YAML::Node &node, float64_t &val);
+template <typename T> void yaml_decode(const YAML::Node &node, complex<T> &val);
+
+YAML::Node yaml_encode(bool8_t val);
+YAML::Node yaml_encode(int8_t val);
+YAML::Node yaml_encode(int16_t val);
+YAML::Node yaml_encode(int32_t val);
+YAML::Node yaml_encode(int64_t val);
+YAML::Node yaml_encode(uint8_t val);
+YAML::Node yaml_encode(uint16_t val);
+YAML::Node yaml_encode(uint32_t val);
+YAML::Node yaml_encode(uint64_t val);
+YAML::Node yaml_encode(float32_t val);
+YAML::Node yaml_encode(float64_t val);
+template <typename T> YAML::Node yaml_encode(const complex<T> &val);
 
 YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id);
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// STL
+
+template <typename T>
+void yaml_decode(const YAML::Node &node, vector<T> &data) {
+  // data.resize(node.size());
+  // for (size_t i = 0; i < node.size(); ++i)
+  //   yaml_decode(node[i], data[i]);
+  data.reserve(node.size());
+  for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni) {
+    T value;
+    yaml_decode(*ni, value);
+    data.push_back(move(value));
+  }
+}
+
+template <typename T> YAML::Node yaml_encode(const vector<T> &data) {
+  YAML::Node node;
+  node.SetStyle(YAML::EmitterStyle::Flow);
+  node = data;
+  node.SetStyle(YAML::EmitterStyle::Flow);
+  return node;
+}
+
+template <typename K, typename T>
+void yaml_decode(const YAML::Node &node, map<K, T> &data) {
+  for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni) {
+    K key;
+    yaml_decode(ni->first, key);
+    T value;
+    yaml_decode(ni->second, value);
+    data[move(key)] = move(value);
+  }
+}
+
+template <typename K, typename T>
+YAML::Node yaml_encode(const map<K, T> &data) {
+  YAML::Node node;
+  node = data;
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 // I/O
+
+class generic_blob_t;
+shared_ptr<generic_blob_t> read_block(istream &is);
+
+class reader_state {
+  // TODO: Store only the file position
+  vector<shared_ptr<generic_blob_t>> blocks;
+
+public:
+  reader_state() = delete;
+  reader_state(const reader_state &) = delete;
+  reader_state(reader_state &&) = delete;
+  reader_state &operator=(const reader_state &) = delete;
+  reader_state &operator=(reader_state &&) = delete;
+
+  reader_state(istream &is);
+
+  shared_ptr<generic_blob_t> get_block(int64_t index) const {
+    assert(index >= 0);
+    return blocks.at(index);
+  }
+};
 
 class writer_state {
   vector<function<void(ostream &os)>> tasks;
@@ -214,11 +308,14 @@ public:
   virtual void resize(size_t bytes) { data.resize(bytes); }
 };
 
+shared_ptr<generic_blob_t> read_block(istream &is);
+
 class ndarray {
   shared_ptr<generic_blob_t> data;
   block_format_t block_format;
   compression_t compression;
   vector<bool> mask;
+  // TODO: allow general datatypes
   scalar_type_id_t scalar_type_id;
   vector<int64_t> shape;
   vector<int64_t> strides;
@@ -283,6 +380,7 @@ public:
       : ndarray(make_shared<blob_t<T>>(move(data)), block_format, compression,
                 mask, get_scalar_type_id<T>::value, shape, strides, offset) {}
 
+  ndarray(const reader_state &rs, const YAML::Node &node);
   YAML::Node to_yaml(writer_state &ws) const;
 };
 
@@ -309,6 +407,7 @@ public:
     assert(data);
   }
 
+  column(const reader_state &rs, const YAML::Node &node);
   YAML::Node to_yaml(writer_state &ws) const;
 };
 
@@ -325,6 +424,7 @@ public:
 
   table(const vector<shared_ptr<column>> &columns) : columns(columns) {}
 
+  table(const reader_state &rs, const YAML::Node &node);
   YAML::Node to_yaml(writer_state &ws) const;
 };
 
@@ -342,6 +442,7 @@ public:
 
   asdf(const vector<shared_ptr<table>> &tables) : tables(tables) {}
 
+  asdf(const reader_state &rs, const YAML::Node &node);
   YAML::Node to_yaml(writer_state &ws) const;
 
   void write(ostream &os) const;

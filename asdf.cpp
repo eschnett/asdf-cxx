@@ -3,6 +3,7 @@
 
 #include <yaml-cpp/emittermanip.h>
 #include <yaml-cpp/emitterstyle.h>
+#include <yaml-cpp/node/type.h>
 #include <yaml-cpp/yaml.h>
 
 #ifdef HAVE_BZIP2
@@ -21,7 +22,9 @@
 #include <array>
 #include <cmath>
 #include <complex>
+#include <istream>
 #include <limits>
+#include <ostream>
 #include <sstream>
 #include <vector>
 
@@ -31,6 +34,15 @@ const string asdf_format_version = "1.0.0";
 const string asdf_standard_version = "1.1.0";
 
 ////////////////////////////////////////////////////////////////////////////////
+
+reader_state::reader_state(istream &is) {
+  for (;;) {
+    const auto &block = read_block(is);
+    if (!block)
+      break;
+    blocks.push_back(move(block));
+  }
+}
 
 void writer_state::flush(ostream &os) {
   if (tasks.empty())
@@ -121,41 +133,185 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
   assert(0);
 }
 
-string yaml_encode(scalar_type_id_t scalar_type_id) {
-  switch (scalar_type_id) {
-  case id_bool8:
-    return "bool8";
-  case id_int8:
-    return "int8";
-  case id_int16:
-    return "int16";
-  case id_int32:
-    return "int32";
-  case id_int64:
-    return "int64";
-  case id_uint8:
-    return "uint8";
-  case id_uint16:
-    return "uint16";
-  case id_uint32:
-    return "uint32";
-  case id_uint64:
-    return "uint64";
-  case id_float32:
-    return "float32";
-  case id_float64:
-    return "float64";
-  case id_complex64:
-    return "complex64";
-  case id_complex128:
-    return "complex128";
+void yaml_decode(const YAML::Node &node,
+                 ASDF::scalar_type_id_t &scalar_type_id) {
+  string str = node.Scalar();
+  if (str == "bool8")
+    scalar_type_id = id_bool8;
+  else if (str == "int8")
+    scalar_type_id = id_int8;
+  else if (str == "int16")
+    scalar_type_id = id_int16;
+  else if (str == "int32")
+    scalar_type_id = id_int32;
+  else if (str == "int64")
+    scalar_type_id = id_int64;
+  else if (str == "uint8")
+    scalar_type_id = id_uint8;
+  else if (str == "uint16")
+    scalar_type_id = id_uint16;
+  else if (str == "uint32")
+    scalar_type_id = id_uint32;
+  else if (str == "uint64")
+    scalar_type_id = id_uint64;
+  else if (str == "float32")
+    scalar_type_id = id_float32;
+  else if (str == "float64")
+    scalar_type_id = id_float64;
+  else if (str == "complex64")
+    scalar_type_id = id_complex64;
+  else if (str == "complex128")
+    scalar_type_id = id_complex128;
+  else
     // case id_ascii
     // case id_ucs4
+    assert(0);
+}
+
+YAML::Node yaml_encode(scalar_type_id_t scalar_type_id) {
+  YAML::Node node;
+  switch (scalar_type_id) {
+  case id_bool8:
+    node = "bool8";
+    break;
+  case id_int8:
+    node = "int8";
+    break;
+  case id_int16:
+    node = "int16";
+    break;
+  case id_int32:
+    node = "int32";
+    break;
+  case id_int64:
+    node = "int64";
+    break;
+  case id_uint8:
+    node = "uint8";
+    break;
+  case id_uint16:
+    node = "uint16";
+    break;
+  case id_uint32:
+    node = "uint32";
+    break;
+  case id_uint64:
+    node = "uint64";
+    break;
+  case id_float32:
+    node = "float32";
+    break;
+  case id_float64:
+    node = "float64";
+    break;
+  case id_complex64:
+    node = "complex64";
+    break;
+  case id_complex128:
+    node = "complex128";
+    break;
+    // case id_ascii
+    // case id_ucs4
+  default:
+    assert(0);
   }
+  return node;
+}
+
+void yaml_decode(const YAML::Node &node, bool8_t &val) {
+  val = node.as<bool8_t>();
+}
+void yaml_decode(const YAML::Node &node, int8_t &val) {
+  val = node.as<int8_t>();
+}
+void yaml_decode(const YAML::Node &node, int16_t &val) {
+  val = node.as<int16_t>();
+}
+void yaml_decode(const YAML::Node &node, int32_t &val) {
+  val = node.as<int32_t>();
+}
+void yaml_decode(const YAML::Node &node, int64_t &val) {
+  val = node.as<int64_t>();
+}
+void yaml_decode(const YAML::Node &node, uint8_t &val) {
+  val = node.as<uint8_t>();
+}
+void yaml_decode(const YAML::Node &node, uint16_t &val) {
+  val = node.as<uint16_t>();
+}
+void yaml_decode(const YAML::Node &node, uint32_t &val) {
+  val = node.as<uint32_t>();
+}
+void yaml_decode(const YAML::Node &node, uint64_t &val) {
+  val = node.as<uint64_t>();
+}
+void yaml_decode(const YAML::Node &node, float32_t &val) {
+  val = node.as<float32_t>();
+}
+void yaml_decode(const YAML::Node &node, float64_t &val) {
+  val = node.as<float64_t>();
+}
+template <typename T>
+void yaml_decode(const YAML::Node &node, complex<T> &val) {
   assert(0);
 }
 
-template <typename T> string yaml_encode(const complex<T> &val) {
+YAML::Node yaml_encode(bool8_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(int8_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(int16_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(int32_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(int64_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(uint8_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(uint16_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(uint32_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(uint64_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(float32_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+YAML::Node yaml_encode(float64_t val) {
+  YAML::Node node;
+  node = val;
+  return node;
+}
+template <typename T> YAML::Node yaml_encode(const complex<T> &val) {
   YAML::Emitter re;
   re << val.real();
   YAML::Emitter im;
@@ -165,7 +321,9 @@ template <typename T> string yaml_encode(const complex<T> &val) {
   if (im.c_str()[0] != '-')
     buf << "+";
   buf << im.c_str() << "i";
-  return buf.str();
+  YAML::Node node;
+  node = buf.str();
+  return node;
 }
 
 YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id) {
@@ -226,15 +384,30 @@ YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id) {
 
 enum class byteorder_t { big, little };
 
-string yaml_encode(byteorder_t byteorder) {
+void yaml_decode(const YAML::Node &node, byteorder_t &byteorder) {
+  string str = node.Scalar();
+  if (str == "big")
+    byteorder = byteorder_t::big;
+  else if (str == "little")
+    byteorder = byteorder_t::little;
+  else
+    assert(0);
+}
+
+YAML::Node yaml_encode(byteorder_t byteorder) {
+  YAML::Node node;
   switch (byteorder) {
   case byteorder_t::big:
-    return "big";
+    node = "big";
+    break;
   case byteorder_t::little:
-    return "little";
+    node = "little";
+    break;
+  default:
+    assert(0);
   }
-  assert(0);
-};
+  return node;
+}
 
 byteorder_t host_byteorder() {
   const uint64_t magic{0x0102030405060708};
@@ -286,6 +459,163 @@ YAML::Node emit_inline_array(const unsigned char *data,
   return node;
 }
 
+// (Incidentally, this spells "SBLK", with the highest bit of the "S" set to
+// one)
+constexpr array<unsigned char, 4> block_magic_token{0xd3, 0x42, 0x4c, 0x4b};
+
+template <typename T> void input(istream &is, T &data) {
+  // Always input in big-endian as required for the header
+  for (ptrdiff_t i = sizeof(T) - 1; i >= 0; --i) {
+    unsigned char ch;
+    is.read(reinterpret_cast<char *>(&ch), 1);
+    reinterpret_cast<unsigned char *>(&data)[i] = ch;
+  }
+}
+
+shared_ptr<generic_blob_t> read_block(istream &is) {
+  // block_magic_token
+  array<unsigned char, 4> token;
+  for (auto &ch : token)
+    input(is, ch);
+  if (token != block_magic_token) {
+    is.seekg(-int64_t(token.size()), ios_base::cur);
+    return nullptr;
+  }
+  // header_size
+  uint16_t header_size;
+  input(is, header_size);
+  auto header_prefix_end = is.tellg();
+  // flags
+  uint32_t flags;
+  input(is, flags);
+  assert(flags == 0);
+  // compression
+  array<unsigned char, 4> comp;
+  for (auto &ch : comp)
+    input(is, ch);
+  compression_t compression;
+  if ((comp == array<unsigned char, 4>{0, 0, 0, 0}))
+    compression = compression_t::none;
+  else if ((comp == array<unsigned char, 4>{'b', 'z', 'p', '2'}))
+    compression = compression_t::bzip2;
+  else if ((comp == array<unsigned char, 4>{'z', 'l', 'i', 'b'}))
+    compression = compression_t::zlib;
+  else
+    assert(0);
+  if (compression == compression_t::none)
+    cout << "  compression=none\n";
+  else if (compression == compression_t::bzip2)
+    cout << "  compression=bzip2\n";
+  else if (compression == compression_t::zlib)
+    cout << "  compression=zlib\n";
+  else
+    assert(0);
+  // allocated_space
+  uint64_t allocated_space;
+  input(is, allocated_space);
+  // used_space
+  uint64_t used_space;
+  input(is, used_space);
+  assert(used_space >= allocated_space);
+  // data_space
+  uint64_t data_space;
+  input(is, data_space);
+  // checksum
+  array<unsigned char, 16> checksum;
+  for (auto &ch : checksum)
+    input(is, ch);
+  // finish reading header
+  auto header_end = is.tellg();
+  int64_t header_read = header_end - header_prefix_end;
+  assert(header_read <= header_size);
+  if (header_read < header_size)
+    is.seekg(header_size - header_read, ios_base::cur);
+  // read data
+  vector<unsigned char> indata(allocated_space);
+  is.read(reinterpret_cast<char *>(indata.data()), indata.size());
+  // TODO: check checksum
+  // decompress data
+  vector<unsigned char> data;
+  switch (compression) {
+  case compression_t::none:
+    assert(data_space == allocated_space);
+    data = move(indata);
+    break;
+#ifdef HAVE_BZIP2
+  case compression_t::bzip2: {
+    data.resize(data_space);
+    bz_stream strm;
+    strm.bzalloc = NULL;
+    strm.bzfree = NULL;
+    strm.opaque = NULL;
+    BZ2_bzDecompressInit(&strm, 0, 0);
+    strm.next_in =
+        reinterpret_cast<char *>(const_cast<unsigned char *>(indata.data()));
+    strm.next_out = reinterpret_cast<char *>(data.data());
+    uint64_t avail_in = indata.size();
+    uint64_t avail_out = data.size();
+    for (;;) {
+      uint64_t this_avail_in =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_in);
+      uint64_t this_avail_out =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_out);
+      strm.avail_in = this_avail_in;
+      strm.avail_out = this_avail_out;
+      int iret = BZ2_bzDecompress(&strm);
+      avail_in -= this_avail_in - strm.avail_in;
+      avail_out -= this_avail_out - strm.avail_out;
+      if (iret == BZ_STREAM_END)
+        break;
+      assert(iret == BZ_OK);
+    }
+    BZ2_bzDecompressEnd(&strm);
+    assert(avail_in == 0);
+    assert(avail_out == 0);
+    break;
+  }
+#endif
+#ifdef HAVE_ZLIB
+  case compression_t::zlib: {
+    data.resize(data_space);
+    z_stream strm;
+    strm.zalloc = NULL;
+    strm.zfree = NULL;
+    strm.opaque = NULL;
+    inflateInit(&strm);
+    strm.next_in = const_cast<unsigned char *>(indata.data());
+    strm.next_out = data.data();
+    uint64_t avail_in = indata.size();
+    uint64_t avail_out = data.size();
+    for (;;) {
+      uint64_t this_avail_in =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_in);
+      uint64_t this_avail_out =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_out);
+      strm.avail_in = this_avail_in;
+      strm.avail_out = this_avail_out;
+      int iret = inflate(&strm, Z_NO_FLUSH);
+      avail_in -= this_avail_in - strm.avail_in;
+      avail_out -= this_avail_out - strm.avail_out;
+      if (iret == Z_STREAM_END)
+        break;
+      assert(iret == Z_OK);
+    }
+    inflateEnd(&strm);
+    assert(avail_in == 0);
+    assert(avail_out == 0);
+    break;
+  }
+#endif
+  default:
+    assert(0);
+  }
+
+  // skip padding
+  if (used_space > allocated_space)
+    is.seekg(used_space - allocated_space, ios_base::cur);
+  return make_shared<blob_t<unsigned char>>(move(data));
+}
+
 template <typename T>
 void output(vector<unsigned char> &header, const T &data) {
   // Always output in big-endian as required for the header
@@ -298,9 +628,6 @@ void output(vector<unsigned char> &header, const T &data) {
 void ndarray::write_block(ostream &os) const {
   vector<unsigned char> header;
   // block_magic_token
-  // (Incidentally, this spells "SBLK", with the highest bit of the
-  // "S" set to one)
-  const array<unsigned char, 4> block_magic_token{0xd3, 0x42, 0x4c, 0x4b};
   for (auto ch : block_magic_token)
     output(header, ch);
   // header_size (not yet known)
@@ -466,6 +793,67 @@ void ndarray::write_block(ostream &os) const {
   os.write(padding.data(), padding.size());
 }
 
+ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
+  cout << "Reading ndarray\n";
+  try {
+    node["source"];
+    block_format = block_format_t::block;
+  } catch (const YAML::RepresentationException &ex) {
+    try {
+      node["data"];
+      block_format = block_format_t::inline_array;
+    } catch (const YAML::RepresentationException &ex) {
+      assert(0);
+    }
+  }
+  switch (block_format) {
+  case block_format_t::block: {
+    cout << "  reading block\n";
+    int64_t source;
+    yaml_decode(node["source"], source);
+    cout << "    source is " << yaml_encode(source) << "\n";
+    yaml_decode(node["datatype"], scalar_type_id);
+    cout << "    datatype is " << yaml_encode(scalar_type_id) << "\n";
+    byteorder_t byteorder;
+    yaml_decode(node["byteorder"], byteorder);
+    cout << "    byteorder is " << yaml_encode(byteorder) << "\n";
+    assert(byteorder == host_byteorder());
+    yaml_decode(node["shape"], shape);
+    cout << "    shape is " << yaml_encode(shape) << "\n";
+    try {
+      yaml_decode(node["offset"], offset);
+    } catch (const YAML::RepresentationException &ex) {
+      offset = 0;
+    }
+    cout << "    offset is " << yaml_encode(offset) << "\n";
+    try {
+      yaml_decode(node["strides"], strides);
+    } catch (const YAML::RepresentationException &ex) {
+      int rank = shape.size();
+      strides.resize(rank);
+      int64_t str = 1;
+      for (int d = rank - 1; d >= 0; --d) {
+        strides.at(d) = str;
+        str *= shape.at(d);
+      }
+    }
+    cout << "    strides is " << yaml_encode(strides) << "\n";
+    data = rs.get_block(source);
+    break;
+  }
+  case block_format_t::inline_array: {
+    cout << "  reading inline array\n";
+    // not implemented
+    assert(0);
+    node["datatype"];
+    node["shape"];
+    break;
+  }
+  default:
+    assert(0);
+  }
+}
+
 YAML::Node ndarray::to_yaml(writer_state &ws) const {
   YAML::Node node;
   node.SetTag("core/ndarray-1.0.0");
@@ -503,6 +891,19 @@ YAML::Node ndarray::to_yaml(writer_state &ws) const {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+column::column(const reader_state &rs, const YAML::Node &node) {
+  cout << "Reading column\n";
+  name = node["name"].Scalar();
+  cout << "  name: " << name << "\n";
+  data = make_shared<ndarray>(rs, node["data"]);
+  try {
+    description = node["description"].Scalar();
+    cout << "  description: " << description << "\n";
+  } catch (const YAML::RepresentationException &ex) {
+    // do nothing
+  }
+}
+
 YAML::Node column::to_yaml(writer_state &ws) const {
   YAML::Node node;
   node.SetTag("core/column-1.0.0");
@@ -511,6 +912,12 @@ YAML::Node column::to_yaml(writer_state &ws) const {
   if (!description.empty())
     node["description"] = description;
   return node;
+}
+
+table::table(const reader_state &rs, const YAML::Node &node) {
+  cout << "Reading table\n";
+  for (const auto &col : node["columns"])
+    columns.push_back(make_shared<column>(rs, col));
 }
 
 YAML::Node table::to_yaml(writer_state &ws) const {
@@ -538,6 +945,39 @@ YAML::Node software(const string &name, const string &author,
   assert(!version.empty());
   node["version"] = version;
   return node;
+}
+
+#if 0
+asdf::asdf(const YAML::Node &node) {
+  cout << "Reading asdf\n";
+  switch (node.Type()) {
+  case YAML::NodeType::Null:
+    cout << "  type is null\n";
+    break;
+  case YAML::NodeType::Scalar:
+    cout << "  type is scalar\n";
+    cout << "    value is " << node.Scalar() << "\n";
+    break;
+  case YAML::NodeType::Sequence:
+    cout << "  type is sequence\n";
+    for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni)
+      std::cout << "    - " << *ni << "\n";
+    break;
+  case YAML::NodeType::Map:
+    for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni)
+      std::cout << "    " << ni->first << ": " << ni->second << "\n";
+    break;
+  default:
+    assert(0);
+  }
+  assert(0);
+}
+#endif
+
+asdf::asdf(const reader_state &rs, const YAML::Node &node) {
+  cout << "Reading asdf\n";
+  for (const auto &tab : node["tables"])
+    tables.push_back(make_shared<table>(rs, tab));
 }
 
 YAML::Node asdf::to_yaml(writer_state &ws) const {
