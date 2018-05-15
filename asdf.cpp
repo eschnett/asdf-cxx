@@ -1,5 +1,5 @@
 #include "asdf.hpp"
-#include "config.hpp"
+#include "asdf-config.hpp"
 
 #include <yaml-cpp/emittermanip.h>
 #include <yaml-cpp/emitterstyle.h>
@@ -970,6 +970,23 @@ YAML::Node asdf::to_yaml(writer_state &ws) const {
   node.SetTag("core/asdf-1.0.0");
   node["asdf_library"] = asdf_library;
   return node;
+}
+
+asdf::asdf(istream &is) {
+  // TODO: stream the file instead
+  ostringstream doc;
+  for (;;) {
+    string line;
+    getline(is, line);
+    doc << line << "\n";
+    if (line == "...")
+      break;
+  }
+  YAML::Node node = YAML::Load(doc.str());
+  reader_state rs(is);
+  auto project = asdf(rs, node);
+  tab = move(project.tab);
+  grp = move(project.grp);
 }
 
 void asdf::write(ostream &os) const {

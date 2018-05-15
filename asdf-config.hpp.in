@@ -1,5 +1,5 @@
-#ifndef CONFIG_HPP
-#define CONFIG_HPP
+#ifndef ASDF_CONFIG_HPP
+#define ASDF_CONFIG_HPP
 
 #include <string>
 
@@ -50,8 +50,8 @@ void checkVersion(const char *header_version);
 
 } // namespace ASDF
 
-#define CONFIG_HPP_DONE
-#endif // #ifndef CONFIG_HPP
-#ifndef CONFIG_HPP_DONE
+#define ASDF_CONFIG_HPP_DONE
+#endif // #ifndef ASDF_CONFIG_HPP
+#ifndef ASDF_CONFIG_HPP_DONE
 #error "Cyclic include depencency"
 #endif

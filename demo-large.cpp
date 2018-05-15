@@ -8,7 +8,7 @@ using namespace std;
 using namespace ASDF;
 
 int main(int argc, char **argv) {
-  cout << "asdf-large:\n";
+  cout << "asdf-demo-large: Create a large ASDF file\n";
 
   int64_t ni = 1000, nj = 1000, nk = 500;
   auto getidx = [&](int64_t i, int64_t j, int64_t k) {
@@ -38,14 +38,14 @@ int main(int argc, char **argv) {
   // auto tab = make_shared<table>(vector<shared_ptr<column>>{col3});
   // auto project = asdf(tab);
   auto ent = make_shared<entry>("rho", array3d, string());
-  auto grp = make_shared<group>(map<string,shared_ptr<entry>>{{"rho",ent}});
+  auto grp = make_shared<group>(map<string, shared_ptr<entry>>{{"rho", ent}});
   auto project = asdf(grp);
   cout << "\n";
 
   cout << "  writing project..." << flush;
-  fstream fout("large.asdf", ios::binary | ios::trunc | ios::out);
-  project.write(fout);
-  fout.close();
+  fstream os("large.asdf", ios::binary | ios::trunc | ios::out);
+  project.write(os);
+  os.close();
   cout << "\n";
 
   cout << "Done.\n";

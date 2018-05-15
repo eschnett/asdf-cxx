@@ -540,6 +540,7 @@ public:
   asdf(const reader_state &rs, const YAML::Node &node);
   virtual YAML::Node to_yaml(writer_state &ws) const;
 
+  asdf(istream&is);
   void write(ostream &os) const;
 };
 

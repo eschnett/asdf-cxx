@@ -15,7 +15,7 @@ int main(int argc, char **argv) {
   cout << "Syntax: " << argv[0] << " {filename}\n";
   for (int arg = 1; arg < argc; ++arg) {
     string filename = argv[arg];
-assert(!filename.empty());
+    assert(!filename.empty());
     fstream is(filename, ios::binary | ios::in);
     // TODO: stream the file instead
     ostringstream doc;
