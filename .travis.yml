@@ -87,7 +87,7 @@ script:
 after_success:
   - mkdir -p "$HOME/bin" && ln -s "$(which $GCOV)" "$HOME/bin/gcov" && ls -l "$HOME/bin" && export PATH="$HOME/bin:$PATH" && hash -r
   - mkdir build-coveralls && pushd build-coveralls
-  - cmake -DCMAKE_FIND_ROOT_PATH="$HDF5_DIR;$PYTHON_DIR" -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_BUILD_TYPE=Debug -DCOVERALLS=ON ..
+  - cmake -DCMAKE_PREFIX_PATH="$YAML_CPP_DIR" -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_BUILD_TYPE=Debug -DCOVERALLS=ON ..
   - make -j2
   - make -j2 coveralls CTEST_OUTPUT_ON_FAILURE=1
   - popd
