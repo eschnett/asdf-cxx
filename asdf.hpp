@@ -168,23 +168,12 @@ YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id);
 
 template <typename T>
 void yaml_decode(const YAML::Node &node, vector<T> &data) {
-  // data.resize(node.size());
-  // for (size_t i = 0; i < node.size(); ++i)
-  //   yaml_decode(node[i], data[i]);
   data.reserve(node.size());
   for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni) {
     T value;
     yaml_decode(*ni, value);
     data.push_back(move(value));
   }
-}
-
-template <typename T> YAML::Node yaml_encode(const vector<T> &data) {
-  YAML::Node node;
-  node.SetStyle(YAML::EmitterStyle::Flow);
-  node = data;
-  node.SetStyle(YAML::EmitterStyle::Flow);
-  return node;
 }
 
 template <typename K, typename T>
@@ -196,6 +185,14 @@ void yaml_decode(const YAML::Node &node, map<K, T> &data) {
     yaml_decode(ni->second, value);
     data[move(key)] = move(value);
   }
+}
+
+template <typename T> YAML::Node yaml_encode(const vector<T> &data) {
+  YAML::Node node;
+  node.SetStyle(YAML::EmitterStyle::Flow);
+  node = data;
+  node.SetStyle(YAML::EmitterStyle::Flow);
+  return node;
 }
 
 template <typename K, typename T>
@@ -249,6 +246,33 @@ public:
   void flush(ostream &os);
 };
 
+// TODO: remove this class
+class writable_t {
+public:
+  virtual ~writable_t() {}
+  virtual YAML::Node to_yaml(writer_state &ws) const = 0;
+};
+
+template <typename T> struct writable_vector : writable_t {
+  vector<T> data;
+  virtual YAML::Node to_yaml(writer_state &ws) const {
+    YAML::Node node;
+    for (const auto &v : data)
+      node.push_back(make_yaml(ws, v));
+    return node;
+  }
+};
+
+template <typename K, typename T> struct writable_map : writable_t {
+  map<K, T> data;
+  YAML::Node to_yaml(writer_state &ws) const {
+    YAML::Node node;
+    for (const auto &kv : data)
+      node[kv.first] = make_yaml(ws, kv.second);
+    return node;
+  }
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 // Multi-dimensional array
@@ -258,8 +282,13 @@ enum class compression_t { none, bzip2, zlib };
 
 class generic_blob_t {
 
+  compression_t compression;
+
 public:
+  generic_blob_t(compression_t compression) : compression(compression) {}
   virtual ~generic_blob_t() {}
+
+  compression_t get_compression() const { return compression; }
 
   virtual const void *ptr() const = 0;
   virtual void *ptr() = 0;
@@ -272,8 +301,10 @@ template <typename T> class blob_t : public generic_blob_t {
 
 public:
   blob_t() = delete;
-  blob_t(const vector<T> &data) : data(data) {}
-  blob_t(vector<T> &&data) : data(move(data)) {}
+  blob_t(compression_t compression, const vector<T> &data)
+      : generic_blob_t(compression), data(data) {}
+  blob_t(compression_t compression, vector<T> &&data)
+      : generic_blob_t(compression), data(move(data)) {}
 
   virtual ~blob_t() {}
 
@@ -292,9 +323,12 @@ template <> class blob_t<bool> : public generic_blob_t {
 public:
   blob_t() = delete;
 
-  blob_t(const vector<unsigned char> &data) : data(data) {}
-  blob_t(vector<unsigned char> &&data) : data(move(data)) {}
-  blob_t(const vector<bool> &data) {
+  blob_t(compression_t compression, const vector<unsigned char> &data)
+      : generic_blob_t(compression), data(data) {}
+  blob_t(compression_t compression, vector<unsigned char> &&data)
+      : generic_blob_t(compression), data(move(data)) {}
+  blob_t(compression_t compression, const vector<bool> &data)
+      : generic_blob_t(compression) {
     this->data.resize(data.size());
     for (size_t i = 0; i < this->data.size(); ++i)
       this->data[i] = data[i];
@@ -310,10 +344,10 @@ public:
 
 shared_ptr<generic_blob_t> read_block(istream &is);
 
-class ndarray {
+class ndarray : writable_t {
   shared_ptr<generic_blob_t> data;
   block_format_t block_format;
-  compression_t compression;
+  // compression_t compression;
   vector<bool> mask;
   // TODO: allow general datatypes
   scalar_type_id_t scalar_type_id;
@@ -331,10 +365,12 @@ public:
   ndarray &operator=(ndarray &&) = default;
 
   ndarray(const shared_ptr<generic_blob_t> &data, block_format_t block_format,
-          compression_t compression, const vector<bool> &mask,
-          scalar_type_id_t scalar_type_id, const vector<int64_t> &shape,
-          const vector<int64_t> &strides1 = {}, int64_t offset = 0)
-      : data(data), block_format(block_format), compression(compression),
+          // compression_t compression,
+          const vector<bool> &mask, scalar_type_id_t scalar_type_id,
+          const vector<int64_t> &shape, const vector<int64_t> &strides1 = {},
+          int64_t offset = 0)
+      : data(data), block_format(block_format),
+        // compression(compression),
         mask(mask), scalar_type_id(scalar_type_id), shape(shape),
         strides(strides1), offset(offset) {
     // Check shape
@@ -370,25 +406,29 @@ public:
           compression_t compression, const vector<bool> &mask,
           const vector<int64_t> &shape, const vector<int64_t> &strides = {},
           int64_t offset = 0)
-      : ndarray(make_shared<blob_t<T>>(data), block_format, compression, mask,
+      : ndarray(make_shared<blob_t<T>>(compression, data), block_format, mask,
                 get_scalar_type_id<T>::value, shape, strides, offset) {}
   template <typename T>
   ndarray(vector<T> &&data, block_format_t block_format,
           compression_t compression, const vector<bool> &mask,
           const vector<int64_t> &shape, const vector<int64_t> &strides = {},
           int64_t offset = 0)
-      : ndarray(make_shared<blob_t<T>>(move(data)), block_format, compression,
+      : ndarray(make_shared<blob_t<T>>(compression, move(data)), block_format,
                 mask, get_scalar_type_id<T>::value, shape, strides, offset) {}
 
   ndarray(const reader_state &rs, const YAML::Node &node);
-  YAML::Node to_yaml(writer_state &ws) const;
+  virtual YAML::Node to_yaml(writer_state &ws) const;
 };
+
+inline YAML::Node make_yaml(writer_state &ws, const ndarray &arr) {
+  return arr.to_yaml(ws);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
 // Column
 
-class column {
+class column : writable_t {
   string name;
   shared_ptr<ndarray> data;
   string description;
@@ -408,11 +448,11 @@ public:
   }
 
   column(const reader_state &rs, const YAML::Node &node);
-  YAML::Node to_yaml(writer_state &ws) const;
+  virtual YAML::Node to_yaml(writer_state &ws) const;
 };
 
 // Table
-class table {
+class table : writable_t {
   vector<shared_ptr<column>> columns;
 
 public:
@@ -425,25 +465,80 @@ public:
   table(const vector<shared_ptr<column>> &columns) : columns(columns) {}
 
   table(const reader_state &rs, const YAML::Node &node);
-  YAML::Node to_yaml(writer_state &ws) const;
+  virtual YAML::Node to_yaml(writer_state &ws) const;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+// Entry
+
+class group;
+
+class entry {
+  string name;
+  shared_ptr<group> grp;
+  shared_ptr<ndarray> arr;
+  string description;
+
+public:
+  entry() = delete;
+  entry(const entry &) = default;
+  entry(entry &&) = default;
+  entry &operator=(const entry &) = default;
+  entry &operator=(entry &&) = default;
+
+  entry(const string &name, const shared_ptr<ndarray> &arr,
+        const string &description)
+      : name(name), arr(arr), description(description) {
+    assert(!name.empty());
+    assert(arr);
+  }
+  entry(const string &name, const shared_ptr<group> &grp,
+        const string &description)
+      : name(name), grp(grp), description(description) {
+    assert(!name.empty());
+    assert(grp);
+  }
+
+  entry(const reader_state &rs, const YAML::Node &node);
+  virtual YAML::Node to_yaml(writer_state &ws) const;
+};
+
+// Group
+class group {
+  map<string, shared_ptr<entry>> entries;
+
+public:
+  group() = default;
+  group(const group &) = default;
+  group(group &&) = default;
+  group &operator=(const group &) = default;
+  group &operator=(group &&) = default;
+
+  group(const map<string, shared_ptr<entry>> &entries) : entries(entries) {}
+
+  group(const reader_state &rs, const YAML::Node &node);
+  virtual YAML::Node to_yaml(writer_state &ws) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
 class asdf {
-  vector<shared_ptr<table>> tables;
+  shared_ptr<table> tab;
+  shared_ptr<group> grp;
 
 public:
-  asdf() = delete;
+  asdf() = default;
   asdf(const asdf &) = default;
   asdf(asdf &&) = default;
   asdf &operator=(const asdf &) = default;
   asdf &operator=(asdf &&) = default;
 
-  asdf(const vector<shared_ptr<table>> &tables) : tables(tables) {}
+  asdf(const shared_ptr<table> &tab) : tab(tab) { assert(tab); }
+  asdf(const shared_ptr<group> &grp) : grp(grp) { assert(grp); }
 
   asdf(const reader_state &rs, const YAML::Node &node);
-  YAML::Node to_yaml(writer_state &ws) const;
+  virtual YAML::Node to_yaml(writer_state &ws) const;
 
   void write(ostream &os) const;
 };

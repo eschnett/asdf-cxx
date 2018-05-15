@@ -75,6 +75,9 @@ include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
 add_library(asdf-cxx asdf.cpp config.cpp)
 set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
+add_executable(asdf-copy copy.cpp)
+target_link_libraries(asdf-copy asdf-cxx ${LIBS})
+
 add_executable(asdf-demo demo.cpp)
 target_link_libraries(asdf-demo asdf-cxx ${LIBS})
 
@@ -83,6 +86,14 @@ target_link_libraries(asdf-large asdf-cxx ${LIBS})
 
 add_executable(asdf-ls ls.cpp)
 target_link_libraries(asdf-ls asdf-cxx ${LIBS})
+
+# Tests
+
+enable_testing()
+add_test(NAME demo COMMAND ./asdf-demo)
+add_test(NAME ls COMMAND ./asdf-ls demo.asdf)
+add_test(NAME copy COMMAND ./asdf-copy demo.asdf demo2.asdf)
+add_test(NAME ls2 COMMAND ./asdf-ls demo2.asdf)
 
 # Install
 

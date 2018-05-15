@@ -614,6 +614,7 @@ shared_ptr<generic_blob_t> read_block(istream &is) {
   if (used_space > allocated_space)
     is.seekg(used_space - allocated_space, ios_base::cur);
   return make_shared<blob_t<unsigned char>>(move(data));
+  return make_shared<blob_t<unsigned char>>(compression, move(data));
 }
 
 template <typename T>
@@ -641,7 +642,7 @@ void ndarray::write_block(ostream &os) const {
   // compression
   array<unsigned char, 4> comp;
   shared_ptr<generic_blob_t> outdata;
-  switch (compression) {
+  switch (data->get_compression()) {
   case compression_t::none:
     comp = {0, 0, 0, 0};
     outdata = data;
@@ -650,8 +651,10 @@ void ndarray::write_block(ostream &os) const {
 #ifdef HAVE_BZIP2
     comp = {'b', 'z', 'p', '2'};
     // Allocate 600 bytes plus 1% more
-    outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
-        600 + data->bytes() + (data->bytes() + 99) / 100));
+    outdata = make_shared<blob_t<unsigned char>>(
+        data->get_compression(),
+        vector<unsigned char>(600 + data->bytes() +
+                              (data->bytes() + 99) / 100));
     const int level = 9;
     bz_stream strm;
     strm.bzalloc = NULL;
@@ -695,8 +698,10 @@ void ndarray::write_block(ostream &os) const {
 #ifdef HAVE_ZLIB
     comp = {'z', 'l', 'i', 'b'};
     // Allocate 6 bytes plus 5 bytes per 16 kByte more
-    outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
-        (6 + data->bytes() + (data->bytes() + 16383) / 16384 * 5)));
+    outdata = make_shared<blob_t<unsigned char>>(
+        data->get_compression(),
+        vector<unsigned char>(
+            (6 + data->bytes() + (data->bytes() + 16383) / 16384 * 5)));
     const int level = 9;
     z_stream strm;
     strm.zalloc = Z_NULL;
@@ -726,20 +731,6 @@ void ndarray::write_block(ostream &os) const {
     }
     assert(avail_in == 0);
     outdata->resize(outdata->bytes() - avail_out);
-#if 0
-    assert(data->bytes() < numeric_limits<uInt>::max());
-    strm.avail_in = data->bytes();
-    strm.next_in =
-        reinterpret_cast<unsigned char *>(const_cast<void *>(data->ptr()));
-    assert(outdata->bytes() < numeric_limits<uInt>::max());
-    strm.avail_out = outdata->bytes();
-    strm.next_out = reinterpret_cast<unsigned char *>(outdata->ptr());
-    iret = deflate(&strm, Z_FINISH);
-    assert(iret == Z_STREAM_END);
-    assert(strm.total_in == data->bytes());
-    outdata->resize(strm.total_out);
-    deflateEnd(&strm);
-#endif
     if (outdata->bytes() >= data->bytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
@@ -794,41 +785,29 @@ void ndarray::write_block(ostream &os) const {
 }
 
 ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
-  cout << "Reading ndarray\n";
-  try {
-    node["source"];
+  if (node["source"].IsDefined())
     block_format = block_format_t::block;
-  } catch (const YAML::RepresentationException &ex) {
-    try {
-      node["data"];
-      block_format = block_format_t::inline_array;
-    } catch (const YAML::RepresentationException &ex) {
-      assert(0);
-    }
-  }
+  else if (node["data"].IsDefined())
+    block_format = block_format_t::inline_array;
+  else
+    assert(0);
   switch (block_format) {
   case block_format_t::block: {
-    cout << "  reading block\n";
     int64_t source;
     yaml_decode(node["source"], source);
-    cout << "    source is " << yaml_encode(source) << "\n";
+    // compression = compression_t::none;
     yaml_decode(node["datatype"], scalar_type_id);
-    cout << "    datatype is " << yaml_encode(scalar_type_id) << "\n";
     byteorder_t byteorder;
     yaml_decode(node["byteorder"], byteorder);
-    cout << "    byteorder is " << yaml_encode(byteorder) << "\n";
     assert(byteorder == host_byteorder());
     yaml_decode(node["shape"], shape);
-    cout << "    shape is " << yaml_encode(shape) << "\n";
-    try {
+    if (node["offset"].IsDefined())
       yaml_decode(node["offset"], offset);
-    } catch (const YAML::RepresentationException &ex) {
+    else
       offset = 0;
-    }
-    cout << "    offset is " << yaml_encode(offset) << "\n";
-    try {
+    if (node["strides"].IsDefined()) {
       yaml_decode(node["strides"], strides);
-    } catch (const YAML::RepresentationException &ex) {
+    } else {
       int rank = shape.size();
       strides.resize(rank);
       int64_t str = 1;
@@ -837,13 +816,11 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
         str *= shape.at(d);
       }
     }
-    cout << "    strides is " << yaml_encode(strides) << "\n";
     data = rs.get_block(source);
     break;
   }
   case block_format_t::inline_array: {
-    cout << "  reading inline array\n";
-    // not implemented
+    // not yet implemented
     assert(0);
     node["datatype"];
     node["shape"];
@@ -892,16 +869,10 @@ YAML::Node ndarray::to_yaml(writer_state &ws) const {
 ////////////////////////////////////////////////////////////////////////////////
 
 column::column(const reader_state &rs, const YAML::Node &node) {
-  cout << "Reading column\n";
   name = node["name"].Scalar();
-  cout << "  name: " << name << "\n";
   data = make_shared<ndarray>(rs, node["data"]);
-  try {
+  if (node["description"].IsDefined())
     description = node["description"].Scalar();
-    cout << "  description: " << description << "\n";
-  } catch (const YAML::RepresentationException &ex) {
-    // do nothing
-  }
 }
 
 YAML::Node column::to_yaml(writer_state &ws) const {
@@ -915,7 +886,6 @@ YAML::Node column::to_yaml(writer_state &ws) const {
 }
 
 table::table(const reader_state &rs, const YAML::Node &node) {
-  cout << "Reading table\n";
   for (const auto &col : node["columns"])
     columns.push_back(make_shared<column>(rs, col));
 }
@@ -926,7 +896,46 @@ YAML::Node table::to_yaml(writer_state &ws) const {
     cols[i] = columns[i]->to_yaml(ws);
   YAML::Node node;
   node.SetTag("core/table-1.0.0");
-  node["columns"] = cols;
+  node["columns"] = move(cols);
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+entry::entry(const reader_state &rs, const YAML::Node &node) {
+  name = node["name"].Scalar();
+  if (node["group"].IsDefined())
+    grp = make_shared<group>(rs, node["group"]);
+  if (node["data"].IsDefined())
+    arr = make_shared<ndarray>(rs, node["data"]);
+  assert(bool(grp) + bool(arr) == 1);
+  if (node["description"].IsDefined())
+    description = node["description"].Scalar();
+}
+
+YAML::Node entry::to_yaml(writer_state &ws) const {
+  YAML::Node node;
+  node.SetTag("tag:github.com/eschnett/asdf-cxx/core/entry-1.0.0");
+  node["name"] = name;
+  if (grp)
+    node["group"] = grp->to_yaml(ws);
+  if (arr)
+    node["data"] = arr->to_yaml(ws);
+  if (!description.empty())
+    node["description"] = description;
+  return node;
+}
+
+group::group(const reader_state &rs, const YAML::Node &node) {
+  for (const auto &ent : node)
+    entries[ent.first.Scalar()] = make_shared<entry>(rs, ent.second);
+}
+
+YAML::Node group::to_yaml(writer_state &ws) const {
+  YAML::Node node;
+  node.SetTag("tag:github.com/eschnett/asdf-cxx/core/group-1.0.0");
+  for (const auto &kv : entries)
+    node[kv.first] = kv.second->to_yaml(ws);
   return node;
 }
 
@@ -947,52 +956,28 @@ YAML::Node software(const string &name, const string &author,
   return node;
 }
 
-#if 0
-asdf::asdf(const YAML::Node &node) {
-  cout << "Reading asdf\n";
-  switch (node.Type()) {
-  case YAML::NodeType::Null:
-    cout << "  type is null\n";
-    break;
-  case YAML::NodeType::Scalar:
-    cout << "  type is scalar\n";
-    cout << "    value is " << node.Scalar() << "\n";
-    break;
-  case YAML::NodeType::Sequence:
-    cout << "  type is sequence\n";
-    for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni)
-      std::cout << "    - " << *ni << "\n";
-    break;
-  case YAML::NodeType::Map:
-    for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni)
-      std::cout << "    " << ni->first << ": " << ni->second << "\n";
-    break;
-  default:
-    assert(0);
-  }
-  assert(0);
-}
-#endif
-
 asdf::asdf(const reader_state &rs, const YAML::Node &node) {
-  cout << "Reading asdf\n";
-  for (const auto &tab : node["tables"])
-    tables.push_back(make_shared<table>(rs, tab));
+  // TODO: read software
+  if (node["table"].IsDefined())
+    tab = make_shared<table>(rs, node["table"]);
+  if (node["group"].IsDefined())
+    grp = make_shared<group>(rs, node["group"]);
+  assert(bool(tab) + bool(grp) <= 1);
 }
 
 YAML::Node asdf::to_yaml(writer_state &ws) const {
   const auto &asdf_library =
       software("asdf-cxx", "Erik Schnetter",
                "https://github.com/eschnett/asdf-cxx", ASDF_VERSION);
-  YAML::Node tabs;
-  for (size_t i = 0; i < tables.size(); ++i)
-    tabs[i] = tables[i]->to_yaml(ws);
   YAML::Node node;
+  if (tab)
+    node["table"] = tab->to_yaml(ws);
+  if (grp)
+    node["group"] = grp->to_yaml(ws);
   // node.SetStyle(YAML::EmitterStyle::BeginDoc);
   // node.SetStyle(YAML::EmitterStyle::EndDoc);
   node.SetTag("core/asdf-1.0.0");
   node["asdf_library"] = asdf_library;
-  node["tables"] = tabs;
   return node;
 }
 
