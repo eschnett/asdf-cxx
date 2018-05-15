@@ -502,14 +502,6 @@ shared_ptr<generic_blob_t> read_block(istream &is) {
     compression = compression_t::zlib;
   else
     assert(0);
-  if (compression == compression_t::none)
-    cout << "  compression=none\n";
-  else if (compression == compression_t::bzip2)
-    cout << "  compression=bzip2\n";
-  else if (compression == compression_t::zlib)
-    cout << "  compression=zlib\n";
-  else
-    assert(0);
   // allocated_space
   uint64_t allocated_space;
   input(is, allocated_space);
@@ -613,7 +605,6 @@ shared_ptr<generic_blob_t> read_block(istream &is) {
   // skip padding
   if (used_space > allocated_space)
     is.seekg(used_space - allocated_space, ios_base::cur);
-  return make_shared<blob_t<unsigned char>>(move(data));
   return make_shared<blob_t<unsigned char>>(compression, move(data));
 }
 
