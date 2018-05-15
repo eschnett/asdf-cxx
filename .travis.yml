@@ -88,7 +88,7 @@ after_success:
   - mkdir -p "$HOME/bin" && ln -s "$(which $GCOV)" "$HOME/bin/gcov" && ls -l "$HOME/bin" && export PATH="$HOME/bin:$PATH" && hash -r
   - mkdir build-coveralls && pushd build-coveralls
   - export COVERALLS_SERVICE_NAME=travis-ci
-  # - export COVERALLS_REPO_TOKEN=abc12345
+  - export COVERALLS_REPO_TOKEN=abc12345
   - cmake -DCMAKE_PREFIX_PATH="$YAML_CPP_DIR" -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_BUILD_TYPE=Debug -DCOVERALLS=ON ..
   - make -j2
   - make -j2 coveralls CTEST_OUTPUT_ON_FAILURE=1
