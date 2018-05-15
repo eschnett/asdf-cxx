@@ -66,13 +66,13 @@ string(REPLACE "-DNDEBUG" ""
   CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 
 configure_file(
-  "${PROJECT_SOURCE_DIR}/config.hpp.in"
-  "${PROJECT_BINARY_DIR}/config.hpp"
+  "${PROJECT_SOURCE_DIR}/asdf-config.hpp.in"
+  "${PROJECT_BINARY_DIR}/asdf-config.hpp"
   )
 
 include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
 
-add_library(asdf-cxx asdf.cpp config.cpp)
+add_library(asdf-cxx asdf.cpp asdf-config.cpp)
 set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 add_executable(asdf-copy copy.cpp)
@@ -81,8 +81,8 @@ target_link_libraries(asdf-copy asdf-cxx ${LIBS})
 add_executable(asdf-demo demo.cpp)
 target_link_libraries(asdf-demo asdf-cxx ${LIBS})
 
-add_executable(asdf-large large.cpp)
-target_link_libraries(asdf-large asdf-cxx ${LIBS})
+add_executable(asdf-demo-large demo-large.cpp)
+target_link_libraries(asdf-demo-large asdf-cxx ${LIBS})
 
 add_executable(asdf-ls ls.cpp)
 target_link_libraries(asdf-ls asdf-cxx ${LIBS})
@@ -95,10 +95,25 @@ add_test(NAME ls COMMAND ./asdf-ls demo.asdf)
 add_test(NAME copy COMMAND ./asdf-copy demo.asdf demo2.asdf)
 add_test(NAME ls2 COMMAND ./asdf-ls demo2.asdf)
 
+# Coverage
+
+# We don't want this to run on every build
+option(COVERALLS "Generate coveralls data" OFF)
+if (COVERALLS)
+  include(Coveralls)
+  coveralls_turn_on_coverage()
+  coveralls_setup(asdf.cpp asdf-config.cpp copy.cpp demo.cpp ls.cpp ON)
+endif()
+
 # Install
 
+install(FILES asdf.hpp DESTINATION include)
+install(FILES "${PROJECT_BINARY_DIR}/asdf-config.hpp" DESTINATION include)
+install(TARGETS asdf-cxx DESTINATION lib)
+install(TARGETS asdf-copy asdf-demo asdf-demo-large asdf-ls DESTINATION bin)
+
 set(PKG_CONFIG_REQUIRES "yaml-cpp")
-set(PKG_CONFIG_INCLUDEDIR "\${prefix}/include/ASDF")
+set(PKG_CONFIG_INCLUDEDIR "\${prefix}/include")
 set(PKG_CONFIG_LIBDIR "\${prefix}/lib")
 set(PKG_CONFIG_CFLAGS "-I\${includedir}")
 set(PKG_CONFIG_LIBS "-L\${libdir} -lasdf-cxx")
@@ -108,4 +123,5 @@ configure_file(
   "${PROJECT_BINARY_DIR}/${PROJECT_NAME}.pc"
 )
 
-install(FILES "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.pc" DESTINATION lib/pkgconfig)
+install(FILES "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.pc"
+  DESTINATION lib/pkgconfig)
