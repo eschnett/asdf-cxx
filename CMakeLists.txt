@@ -102,7 +102,8 @@ option(COVERALLS "Generate coveralls data" OFF)
 if (COVERALLS)
   include(Coveralls)
   coveralls_turn_on_coverage()
-  coveralls_setup("asdf.cpp asdf-config.cpp copy.cpp demo.cpp ls.cpp" ON)
+  set(COVERAGE_SRCS asdf.cpp asdf-config.cpp copy.cpp demo.cpp ls.cpp)
+  coveralls_setup("${COVERAGE_SRCS}" ON)
 endif()
 
 # Install
