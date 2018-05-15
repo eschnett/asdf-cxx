@@ -16,7 +16,7 @@ set(CMAKE_MODULE_PATH
 
 # Dependencies
 
-find_package(bzip2)
+find_package(BZip2)
 if(BZIP2_FOUND)
   include_directories(${BZIP2_INCLUDE_DIR})
   set(LIBS ${LIBS} ${BZIP2_LIBRARIES})
@@ -48,7 +48,7 @@ set(LIBS ${LIBS} ${YAML_CPP_LIBRARIES})
 # include_directories(${YAMLCPP_INCLUDE_DIR})
 # set(LIBS ${LIBS} ${YAMLCPP_LIBRARY})
 
-find_package(zlib)
+find_package(ZLIB)
 if(ZLIB_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})
   set(LIBS ${LIBS} ${ZLIB_LIBRARIES})
