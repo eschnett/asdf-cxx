@@ -265,7 +265,7 @@ void yaml_decode(const YAML::Node &node, complex<T> &val) {
   // TODO: Either re or im might be absent
   is >> re >> im >> ch;
   assert(ch == 'i' || ch == 'I' || ch == 'j' || ch == 'J');
-  return {re, im};
+  val = {re, im};
 }
 
 YAML::Node yaml_encode(bool8_t val) {
