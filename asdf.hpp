@@ -519,8 +519,11 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 class asdf {
-  shared_ptr<table> tab;
-  shared_ptr<group> grp;
+  shared_ptr<ndarray> data;
+  // fits
+  // wcs
+  // shared_ptr<table> tab;
+  shared_ptr<group> grp;        // SimulationIO
 
 public:
   asdf() = default;
@@ -529,7 +532,8 @@ public:
   asdf &operator=(const asdf &) = default;
   asdf &operator=(asdf &&) = default;
 
-  asdf(const shared_ptr<table> &tab) : tab(tab) { assert(tab); }
+  asdf(const shared_ptr<ndarray> &data) : data(data) { assert(data); }
+  // asdf(const shared_ptr<table> &tab) : tab(tab) { assert(tab); }
   asdf(const shared_ptr<group> &grp) : grp(grp) { assert(grp); }
 
   asdf(const reader_state &rs, const YAML::Node &node);

@@ -965,6 +965,7 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
 ndarray::ndarray(const copy_state &cs, const ndarray &arr) : ndarray(arr) {
   if (cs.set_block_format)
     block_format = cs.block_format;
+  // TODO: handle this
   // if (cs.set_compression)
   //   compression = cs.compression;
 }
@@ -1118,16 +1119,19 @@ YAML::Node software(const string &name, const string &author,
 
 asdf::asdf(const reader_state &rs, const YAML::Node &node) {
   // TODO: read software
-  if (node["table"].IsDefined())
-    tab = make_shared<table>(rs, node["table"]);
+  if (node["data"].IsDefined())
+    data = make_shared<ndarray>(rs, node["data"]);
+  // if (node["table"].IsDefined())
+  //   tab = make_shared<table>(rs, node["table"]);
   if (node["group"].IsDefined())
     grp = make_shared<group>(rs, node["group"]);
-  assert(bool(tab) + bool(grp) <= 1);
 }
 
 asdf::asdf(const copy_state &cs, const asdf &project) {
-  if (project.tab)
-    tab = make_shared<table>(cs, *project.tab);
+  if (project.data)
+    data = make_shared<ndarray>(cs, *project.data);
+  // if (project.tab)
+  //   tab = make_shared<table>(cs, *project.tab);
   if (project.grp)
     grp = make_shared<group>(cs, *project.grp);
 }
@@ -1137,8 +1141,10 @@ YAML::Node asdf::to_yaml(writer_state &ws) const {
       software("asdf-cxx", "Erik Schnetter",
                "https://github.com/eschnett/asdf-cxx", ASDF_VERSION);
   YAML::Node node;
-  if (tab)
-    node["table"] = tab->to_yaml(ws);
+  if (data)
+    node["data"] = data->to_yaml(ws);
+  // if (tab)
+  //   node["table"] = tab->to_yaml(ws);
   if (grp)
     node["group"] = grp->to_yaml(ws);
   // node.SetStyle(YAML::EmitterStyle::BeginDoc);
@@ -1161,7 +1167,8 @@ asdf::asdf(istream &is) {
   YAML::Node node = YAML::Load(doc.str());
   reader_state rs(is);
   auto project = asdf(rs, node);
-  tab = move(project.tab);
+  data = move(project.data);
+  // tab = move(project.tab);
   grp = move(project.grp);
 }
 
