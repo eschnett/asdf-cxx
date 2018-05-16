@@ -45,6 +45,10 @@ reader_state::reader_state(istream &is) {
   }
 }
 
+writer_state::writer_state() {}
+
+writer_state::~writer_state() { assert(tasks.empty()); }
+
 void writer_state::flush(ostream &os) {
   if (tasks.empty())
     return;

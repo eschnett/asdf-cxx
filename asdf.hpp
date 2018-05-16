@@ -207,6 +207,9 @@ YAML::Node yaml_encode(const map<K, T> &data) {
 
 // I/O
 
+enum class block_format_t { block, inline_array };
+enum class compression_t { none, bzip2, zlib };
+
 class generic_blob_t;
 shared_ptr<generic_blob_t> read_block(istream &is);
 
@@ -229,7 +232,15 @@ public:
   }
 };
 
+struct copy_state {
+  bool set_block_format;
+  block_format_t block_format;
+  bool set_compression;
+  compression_t compression;
+};
+
 class writer_state {
+
   vector<function<void(ostream &os)>> tasks;
 
 public:
@@ -238,48 +249,20 @@ public:
   writer_state &operator=(const writer_state &) = delete;
   writer_state &operator=(writer_state &&) = delete;
 
-  writer_state() = default;
-  ~writer_state() { assert(tasks.empty()); }
+  writer_state();
+  ~writer_state();
+
   int64_t add_task(function<void(ostream &)> &&task) {
     tasks.push_back(move(task));
     return tasks.size() - 1;
   }
+
   void flush(ostream &os);
-};
-
-// TODO: remove this class
-class writable_t {
-public:
-  virtual ~writable_t() {}
-  virtual YAML::Node to_yaml(writer_state &ws) const = 0;
-};
-
-template <typename T> struct writable_vector : writable_t {
-  vector<T> data;
-  virtual YAML::Node to_yaml(writer_state &ws) const {
-    YAML::Node node;
-    for (const auto &v : data)
-      node.push_back(make_yaml(ws, v));
-    return node;
-  }
-};
-
-template <typename K, typename T> struct writable_map : writable_t {
-  map<K, T> data;
-  YAML::Node to_yaml(writer_state &ws) const {
-    YAML::Node node;
-    for (const auto &kv : data)
-      node[kv.first] = make_yaml(ws, kv.second);
-    return node;
-  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
 // Multi-dimensional array
-
-enum class block_format_t { block, inline_array };
-enum class compression_t { none, bzip2, zlib };
 
 class generic_blob_t {
 
@@ -351,7 +334,7 @@ public:
 
 shared_ptr<generic_blob_t> read_block(istream &is);
 
-class ndarray : writable_t {
+class ndarray {
   shared_ptr<generic_blob_t> data;
   block_format_t block_format;
   // compression_t compression;
@@ -435,7 +418,7 @@ inline YAML::Node make_yaml(writer_state &ws, const ndarray &arr) {
 
 // Column
 
-class column : writable_t {
+class column {
   string name;
   shared_ptr<ndarray> data;
   string description;
@@ -459,7 +442,7 @@ public:
 };
 
 // Table
-class table : writable_t {
+class table {
   vector<shared_ptr<column>> columns;
 
 public:
