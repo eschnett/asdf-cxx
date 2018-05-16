@@ -22,6 +22,7 @@
 #include <array>
 #include <cmath>
 #include <complex>
+#include <cstring>
 #include <istream>
 #include <limits>
 #include <ostream>
@@ -253,7 +254,14 @@ void yaml_decode(const YAML::Node &node, float64_t &val) {
 }
 template <typename T>
 void yaml_decode(const YAML::Node &node, complex<T> &val) {
-  assert(0);
+  assert(node.Tag() == "core/complex-1.0.0");
+  istringstream is(node.Scalar());
+  T re, im;
+  char ch;
+  // TODO: Either re or im might be absent
+  is >> re >> im >> ch;
+  assert(ch == 'i' || ch == 'I' || ch == 'j' || ch == 'J');
+  return {re, im};
 }
 
 YAML::Node yaml_encode(bool8_t val) {
@@ -322,56 +330,102 @@ template <typename T> YAML::Node yaml_encode(const complex<T> &val) {
     buf << "+";
   buf << im.c_str() << "i";
   YAML::Node node;
+  node.SetTag("core/complex-1.0.0");
   node = buf.str();
   return node;
+}
+
+void parse_scalar(const YAML::Node &node, void *data,
+                  scalar_type_id_t scalar_type_id) {
+  switch (scalar_type_id) {
+  case id_bool8:
+    yaml_decode(node, *reinterpret_cast<bool8_t *>(data));
+    break;
+  case id_int8:
+    yaml_decode(node, *reinterpret_cast<int8_t *>(data));
+    break;
+  case id_int16:
+    yaml_decode(node, *reinterpret_cast<int16_t *>(data));
+    break;
+  case id_int32:
+    yaml_decode(node, *reinterpret_cast<int32_t *>(data));
+    break;
+  case id_int64:
+    yaml_decode(node, *reinterpret_cast<int64_t *>(data));
+    break;
+  case id_uint8:
+    yaml_decode(node, *reinterpret_cast<uint8_t *>(data));
+    break;
+  case id_uint16:
+    yaml_decode(node, *reinterpret_cast<uint16_t *>(data));
+    break;
+  case id_uint32:
+    yaml_decode(node, *reinterpret_cast<uint32_t *>(data));
+    break;
+  case id_uint64:
+    yaml_decode(node, *reinterpret_cast<uint64_t *>(data));
+    break;
+  case id_float32:
+    yaml_decode(node, *reinterpret_cast<float32_t *>(data));
+    break;
+  case id_float64:
+    yaml_decode(node, *reinterpret_cast<float64_t *>(data));
+    break;
+  case id_complex64:
+    yaml_decode(node, *reinterpret_cast<float32_t *>(data));
+    break;
+  case id_complex128:
+    yaml_decode(node, *reinterpret_cast<float64_t *>(data));
+    break;
+  // case id_ascii
+  // case id_ucs4
+  default:
+    assert(0);
+  }
 }
 
 YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id) {
   YAML::Node node;
   switch (scalar_type_id) {
   case id_bool8:
-    node = *reinterpret_cast<const bool8_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const bool8_t *>(data));
     break;
   case id_int8:
-    node = *reinterpret_cast<const int8_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const int8_t *>(data));
     break;
   case id_int16:
-    node = *reinterpret_cast<const int16_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const int16_t *>(data));
     break;
   case id_int32:
-    node = *reinterpret_cast<const int32_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const int32_t *>(data));
     break;
   case id_int64:
-    node = *reinterpret_cast<const int64_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const int64_t *>(data));
     break;
   case id_uint8:
-    node = *reinterpret_cast<const uint8_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const uint8_t *>(data));
     break;
   case id_uint16:
-    node = *reinterpret_cast<const uint16_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const uint16_t *>(data));
     break;
   case id_uint32:
-    node = *reinterpret_cast<const uint32_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const uint32_t *>(data));
     break;
   case id_uint64:
-    node = *reinterpret_cast<const uint64_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const uint64_t *>(data));
     break;
   case id_float32:
-    node = *reinterpret_cast<const float32_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const float32_t *>(data));
     break;
   case id_float64:
-    node = *reinterpret_cast<const float64_t *>(data);
+    node = yaml_encode(*reinterpret_cast<const float64_t *>(data));
     break;
-  case id_complex64: {
-    node.SetTag("core/complex-1.0.0");
+  case id_complex64:
     node = yaml_encode(*reinterpret_cast<const complex64_t *>(data));
     break;
-  }
-  case id_complex128: {
-    node.SetTag("core/complex-1.0.0");
+  case id_complex128:
     node = yaml_encode(*reinterpret_cast<const complex128_t *>(data));
     break;
-  }
   // case id_ascii
   // case id_ucs4
   default:
@@ -409,17 +463,85 @@ YAML::Node yaml_encode(byteorder_t byteorder) {
   return node;
 }
 
-byteorder_t host_byteorder() {
-  const uint64_t magic{0x0102030405060708};
-  const array<unsigned char, 8> magic_big{0x01, 0x02, 0x03, 0x04,
-                                          0x05, 0x06, 0x07, 0x08};
-  const array<unsigned char, 8> magic_little{0x08, 0x07, 0x06, 0x05,
-                                             0x04, 0x03, 0x02, 0x01};
-  if (memcmp(&magic, &magic_big, 8) == 0)
-    return byteorder_t::big;
-  if (memcmp(&magic, &magic_little, 8) == 0)
-    return byteorder_t::little;
-  assert(0);
+constexpr uint64_t byteorder_magic{0x0102030405060708};
+constexpr array<unsigned char, 8> byteorder_magic_big{0x01, 0x02, 0x03, 0x04,
+                                                      0x05, 0x06, 0x07, 0x08};
+constexpr array<unsigned char, 8> byteorder_magic_little{
+    0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01};
+constexpr byteorder_t host_byteorder() {
+  return memcmp(&byteorder_magic, &byteorder_magic_big, 8) == 0
+             ? byteorder_t::big
+             : memcmp(&byteorder_magic, &byteorder_magic_little, 8) == 0
+                   ? byteorder_t::little
+                   : (assert(0), byteorder_t());
+}
+
+void parse_inline_array_nd(const YAML::Node &node,
+                           scalar_type_id_t scalar_type_id,
+                           const vector<int64_t> &shape, int rank,
+                           vector<unsigned char> &data) {
+  assert(rank >= 0);
+  assert(shape.size() >= rank);
+  if (rank == 0) {
+    assert(node.IsScalar());
+    size_t oldsize = data.size();
+    data.resize(oldsize + get_scalar_type_size(scalar_type_id));
+    parse_scalar(node, &data[oldsize], scalar_type_id);
+    return;
+  }
+  int64_t size = shape.at(rank - 1);
+  assert(node.IsSequence());
+  assert(node.size() == size);
+  for (YAML::const_iterator ni = node.begin(), ne = node.end(); ni != ne; ++ni)
+    parse_inline_array_nd(*ni, scalar_type_id, shape, rank - 1, data);
+}
+
+void parse_inline_array(const YAML::Node &node,
+                        shared_ptr<generic_blob_t> &data,
+                        const bool have_scalar_type_id,
+                        scalar_type_id_t &scalar_type_id, const bool have_shape,
+                        vector<int64_t> &shape) {
+  if (!have_shape) {
+    // determine shape
+    shape.clear();
+    YAML::Node n = node;
+    while (n.IsSequence()) {
+      shape.insert(shape.begin(), n.size());
+      // This method does not work if the array size is zero in one dimension
+      if (shape[0] == 0)
+        break;
+      n = n[0];
+    }
+    assert(n.IsScalar());
+  }
+  int64_t npoints = 1;
+  for (size_t d = 0; d < shape.size(); ++d)
+    npoints *= shape[d];
+  vector<unsigned char> data1;
+  if (!have_scalar_type_id) {
+    // determine while parsing datatype
+    try {
+      scalar_type_id = id_int64;
+      data1.reserve(npoints * get_scalar_type_size(scalar_type_id));
+      parse_inline_array_nd(node, scalar_type_id, shape, shape.size(), data1);
+    } catch (YAML::RepresentationException) {
+      try {
+        scalar_type_id = id_float64;
+        data1.reserve(npoints * get_scalar_type_size(scalar_type_id));
+        parse_inline_array_nd(node, scalar_type_id, shape, shape.size(), data1);
+      } catch (YAML::RepresentationException) {
+        // complex128_t
+        // bool8_t
+        // ucs4_t
+        assert(0);
+      }
+    }
+  } else {
+    // parse data
+    data1.reserve(npoints * get_scalar_type_size(scalar_type_id));
+    parse_inline_array_nd(node, scalar_type_id, shape, shape.size(), data1);
+  }
+  data = make_shared<blob_t<unsigned char>>(compression_t::none, move(data1));
 }
 
 YAML::Node emit_inline_array(const unsigned char *data,
@@ -432,8 +554,8 @@ YAML::Node emit_inline_array(const unsigned char *data,
     // 0-dimensional array
     YAML::Node node;
     node.SetStyle(YAML::EmitterStyle::Flow);
-    // node[0] = data.at(offset);
-    node[0] = emit_scalar(data, scalar_type_id);
+    // node = data.at(offset);
+    node = emit_scalar(data, scalar_type_id);
     return node;
   }
   if (rank == 1) {
@@ -464,7 +586,8 @@ YAML::Node emit_inline_array(const unsigned char *data,
 constexpr array<unsigned char, 4> block_magic_token{0xd3, 0x42, 0x4c, 0x4b};
 
 template <typename T> void input(istream &is, T &data) {
-  // Always input in big-endian as required for the header
+  // Always input in big-endian as required for the
+  // header
   for (ptrdiff_t i = sizeof(T) - 1; i >= 0; --i) {
     unsigned char ch;
     is.read(reinterpret_cast<char *>(&ch), 1);
@@ -615,8 +738,8 @@ void output(vector<unsigned char> &header, const T &data) {
     header.push_back(reinterpret_cast<const unsigned char *>(&data)[i]);
 }
 
-// TODO: stream the block (e.g. when compressing), then write the
-// correct header later
+// TODO: stream the block (e.g. when compressing), then write the correct header
+// later
 void ndarray::write_block(ostream &os) const {
   vector<unsigned char> header;
   // block_magic_token
@@ -801,7 +924,7 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
     } else {
       int rank = shape.size();
       strides.resize(rank);
-      int64_t str = 1;
+      int64_t str = get_scalar_type_size(scalar_type_id);
       for (int d = rank - 1; d >= 0; --d) {
         strides.at(d) = str;
         str *= shape.at(d);
@@ -812,9 +935,22 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
   }
   case block_format_t::inline_array: {
     // not yet implemented
-    assert(0);
-    node["datatype"];
-    node["shape"];
+    bool have_datatype = node["datatype"].IsDefined();
+    if (have_datatype)
+      yaml_decode(node["datatype"], scalar_type_id);
+    bool have_shape = node["shape"].IsDefined();
+    if (have_shape)
+      yaml_decode(node["shape"], shape);
+    parse_inline_array(node["data"], data, have_datatype, scalar_type_id,
+                       have_shape, shape);
+    offset = 0;
+    int rank = shape.size();
+    strides.resize(rank);
+    int64_t str = get_scalar_type_size(scalar_type_id);
+    for (int d = rank - 1; d >= 0; --d) {
+      strides.at(d) = str;
+      str *= shape.at(d);
+    }
     break;
   }
   default:
@@ -906,7 +1042,8 @@ entry::entry(const reader_state &rs, const YAML::Node &node) {
 
 YAML::Node entry::to_yaml(writer_state &ws) const {
   YAML::Node node;
-  node.SetTag("tag:github.com/eschnett/asdf-cxx/core/entry-1.0.0");
+  node.SetTag("tag:github.com/eschnett/asdf-cxx/core/"
+              "entry-1.0.0");
   node["name"] = name;
   if (grp)
     node["group"] = grp->to_yaml(ws);
@@ -924,7 +1061,8 @@ group::group(const reader_state &rs, const YAML::Node &node) {
 
 YAML::Node group::to_yaml(writer_state &ws) const {
   YAML::Node node;
-  node.SetTag("tag:github.com/eschnett/asdf-cxx/core/group-1.0.0");
+  node.SetTag("tag:github.com/eschnett/asdf-cxx/core/"
+              "group-1.0.0");
   for (const auto &kv : entries)
     node[kv.first] = kv.second->to_yaml(ws);
   return node;
@@ -995,7 +1133,8 @@ void asdf::write(ostream &os) const {
   const auto &node = to_yaml(ws);
   os << "#ASDF " << asdf_format_version << "\n"
      << "#ASDF_STANDARD " << asdf_standard_version << "\n"
-     << "# This is an ASDF file <https://asdf-standard.readthedocs.io/>.\n"
+     << "# This is an ASDF file "
+        "<https://asdf-standard.readthedocs.io/>.\n"
      << "%YAML 1.1\n"
      << "%TAG ! tag:stsci.edu:asdf/\n"
      << "---\n"

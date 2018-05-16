@@ -7,7 +7,6 @@
 #include <complex>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <functional>
 #include <iostream>
 #include <istream>
@@ -107,7 +106,7 @@ template <> struct get_scalar_type_id<ucs4_t> {
   constexpr static scalar_type_id_t value = id_ucs4;
 };
 
-// Convert an enum id to its type size
+// Convert an enum id to its type
 template <size_t> struct get_scalar_type;
 template <> struct get_scalar_type<id_bool8> { typedef bool8_t type; };
 template <> struct get_scalar_type<id_int8> { typedef int8_t type; };
@@ -160,6 +159,8 @@ YAML::Node yaml_encode(float32_t val);
 YAML::Node yaml_encode(float64_t val);
 template <typename T> YAML::Node yaml_encode(const complex<T> &val);
 
+void parse_scalar(const YAML::Node &node, void *data,
+                  scalar_type_id_t scalar_type_id);
 YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -293,6 +294,7 @@ public:
   virtual const void *ptr() const = 0;
   virtual void *ptr() = 0;
   virtual size_t bytes() const = 0;
+  virtual void reserve(size_t bytes) = 0;
   virtual void resize(size_t bytes) = 0;
 };
 
@@ -311,6 +313,10 @@ public:
   virtual const void *ptr() const { return data.data(); }
   virtual void *ptr() { return data.data(); }
   virtual size_t bytes() const { return data.size() * sizeof(T); }
+  virtual void reserve(size_t bytes) {
+    assert(bytes % sizeof(T) == 0);
+    data.reserve(bytes / sizeof(T));
+  }
   virtual void resize(size_t bytes) {
     assert(bytes % sizeof(T) == 0);
     data.resize(bytes / sizeof(T));
@@ -339,6 +345,7 @@ public:
   virtual const void *ptr() const { return data.data(); }
   virtual void *ptr() { return data.data(); }
   virtual size_t bytes() const { return data.size(); }
+  virtual void reserve(size_t bytes) { data.resize(bytes); }
   virtual void resize(size_t bytes) { data.resize(bytes); }
 };
 
@@ -388,7 +395,7 @@ public:
     // Check strides
     if (strides.empty()) {
       strides.resize(rank);
-      int64_t str = 1;
+      int64_t str = get_scalar_type_size(scalar_type_id);
       for (int d = rank - 1; d >= 0; --d) {
         strides.at(d) = str;
         str *= shape.at(d);
@@ -540,7 +547,7 @@ public:
   asdf(const reader_state &rs, const YAML::Node &node);
   virtual YAML::Node to_yaml(writer_state &ws) const;
 
-  asdf(istream&is);
+  asdf(istream &is);
   void write(ostream &os) const;
 };
 
