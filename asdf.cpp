@@ -467,17 +467,17 @@ YAML::Node yaml_encode(byteorder_t byteorder) {
   return node;
 }
 
-constexpr uint64_t byteorder_magic{0x0102030405060708};
-constexpr array<unsigned char, 8> byteorder_magic_big{0x01, 0x02, 0x03, 0x04,
-                                                      0x05, 0x06, 0x07, 0x08};
-constexpr array<unsigned char, 8> byteorder_magic_little{
-    0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01};
-constexpr byteorder_t host_byteorder() {
-  return memcmp(&byteorder_magic, &byteorder_magic_big, 8) == 0
-             ? byteorder_t::big
-             : memcmp(&byteorder_magic, &byteorder_magic_little, 8) == 0
-                   ? byteorder_t::little
-                   : (assert(0), byteorder_t());
+byteorder_t host_byteorder() {
+  const uint64_t magic{0x0102030405060708};
+  const array<unsigned char, 8> magic_big{0x01, 0x02, 0x03, 0x04,
+                                          0x05, 0x06, 0x07, 0x08};
+  const array<unsigned char, 8> magic_little{0x08, 0x07, 0x06, 0x05,
+                                             0x04, 0x03, 0x02, 0x01};
+  if (memcmp(&magic, &magic_big, 8) == 0)
+    return byteorder_t::big;
+  if (memcmp(&magic, &magic_little, 8) == 0)
+    return byteorder_t::little;
+  assert(0);
 }
 
 void parse_inline_array_nd(const YAML::Node &node,
