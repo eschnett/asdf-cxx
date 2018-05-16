@@ -962,6 +962,13 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
   }
 }
 
+ndarray::ndarray(const copy_state &cs, const ndarray &arr) : ndarray(arr) {
+  if (cs.set_block_format)
+    block_format = cs.block_format;
+  // if (cs.set_compression)
+  //   compression = cs.compression;
+}
+
 YAML::Node ndarray::to_yaml(writer_state &ws) const {
   YAML::Node node;
   node.SetTag("core/ndarray-1.0.0");
@@ -1006,6 +1013,8 @@ column::column(const reader_state &rs, const YAML::Node &node) {
     description = node["description"].Scalar();
 }
 
+column::column(const copy_state &cs, const column &col) : column(col) {}
+
 YAML::Node column::to_yaml(writer_state &ws) const {
   YAML::Node node;
   node.SetTag("core/column-1.0.0");
@@ -1019,6 +1028,11 @@ YAML::Node column::to_yaml(writer_state &ws) const {
 table::table(const reader_state &rs, const YAML::Node &node) {
   for (const auto &col : node["columns"])
     columns.push_back(make_shared<column>(rs, col));
+}
+
+table::table(const copy_state &cs, const table &tab) {
+  for (const auto &col : tab.columns)
+    columns.push_back(make_shared<column>(cs, *col));
 }
 
 YAML::Node table::to_yaml(writer_state &ws) const {
@@ -1044,6 +1058,14 @@ entry::entry(const reader_state &rs, const YAML::Node &node) {
     description = node["description"].Scalar();
 }
 
+entry::entry(const copy_state &cs, const entry &ent)
+    : name(ent.name), description(ent.description) {
+  if (ent.grp)
+    grp = make_shared<group>(cs, *ent.grp);
+  if (ent.arr)
+    arr = make_shared<ndarray>(cs, *ent.arr);
+}
+
 YAML::Node entry::to_yaml(writer_state &ws) const {
   YAML::Node node;
   node.SetTag("tag:github.com/eschnett/asdf-cxx/core/"
@@ -1061,6 +1083,11 @@ YAML::Node entry::to_yaml(writer_state &ws) const {
 group::group(const reader_state &rs, const YAML::Node &node) {
   for (const auto &ent : node)
     entries[ent.first.Scalar()] = make_shared<entry>(rs, ent.second);
+}
+
+group::group(const copy_state &cs, const group &grp) {
+  for (const auto &kv : grp.entries)
+    entries[kv.first] = make_shared<entry>(cs, *kv.second);
 }
 
 YAML::Node group::to_yaml(writer_state &ws) const {
@@ -1098,6 +1125,13 @@ asdf::asdf(const reader_state &rs, const YAML::Node &node) {
   assert(bool(tab) + bool(grp) <= 1);
 }
 
+asdf::asdf(const copy_state &cs, const asdf &project) {
+  if (project.tab)
+    tab = make_shared<table>(cs, *project.tab);
+  if (project.grp)
+    grp = make_shared<group>(cs, *project.grp);
+}
+
 YAML::Node asdf::to_yaml(writer_state &ws) const {
   const auto &asdf_library =
       software("asdf-cxx", "Erik Schnetter",
@@ -1130,6 +1164,8 @@ asdf::asdf(istream &is) {
   tab = move(project.tab);
   grp = move(project.grp);
 }
+
+asdf asdf::copy(const copy_state &cs) const { return asdf(cs, *this); }
 
 void asdf::write(ostream &os) const {
   writer_state ws;

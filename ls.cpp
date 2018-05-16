@@ -12,7 +12,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   cout << "asdf-ls: List content of ASDF files\n";
-  cout << "Syntax: " << argv[0] << " {filename}\n";
+  // cout << "Syntax: " << argv[0] << " {filename}\n";
   for (int arg = 1; arg < argc; ++arg) {
     string filename = argv[arg];
     assert(!filename.empty());

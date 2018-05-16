@@ -407,7 +407,8 @@ public:
                 mask, get_scalar_type_id<T>::value, shape, strides, offset) {}
 
   ndarray(const reader_state &rs, const YAML::Node &node);
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  ndarray(const copy_state &cs, const ndarray &arr);
+  YAML::Node to_yaml(writer_state &ws) const;
 };
 
 inline YAML::Node make_yaml(writer_state &ws, const ndarray &arr) {
@@ -438,7 +439,8 @@ public:
   }
 
   column(const reader_state &rs, const YAML::Node &node);
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  column(const copy_state &cs, const column &col);
+  YAML::Node to_yaml(writer_state &ws) const;
 };
 
 // Table
@@ -455,7 +457,8 @@ public:
   table(const vector<shared_ptr<column>> &columns) : columns(columns) {}
 
   table(const reader_state &rs, const YAML::Node &node);
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  table(const copy_state &cs, const table &tab);
+  YAML::Node to_yaml(writer_state &ws) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -491,7 +494,8 @@ public:
   }
 
   entry(const reader_state &rs, const YAML::Node &node);
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  entry(const copy_state &cs, const entry &ent);
+  YAML::Node to_yaml(writer_state &ws) const;
 };
 
 // Group
@@ -508,7 +512,8 @@ public:
   group(const map<string, shared_ptr<entry>> &entries) : entries(entries) {}
 
   group(const reader_state &rs, const YAML::Node &node);
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  group(const copy_state &cs, const group &grp);
+  YAML::Node to_yaml(writer_state &ws) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -528,9 +533,11 @@ public:
   asdf(const shared_ptr<group> &grp) : grp(grp) { assert(grp); }
 
   asdf(const reader_state &rs, const YAML::Node &node);
-  virtual YAML::Node to_yaml(writer_state &ws) const;
+  asdf(const copy_state &cs, const asdf &project);
+  YAML::Node to_yaml(writer_state &ws) const;
 
   asdf(istream &is);
+  asdf copy(const copy_state &cs) const;
   void write(ostream &os) const;
 };
 
