@@ -40,10 +40,23 @@ YAML::Node yaml_encode(byteorder_t byteorder);
 // }
 
 constexpr uint16_t byteorder_magic = 1;
+// struct uchar2_t {
+//   unsigned char ch[2];
+// };
 constexpr byteorder_t host_byteorder() {
-  return *reinterpret_cast<const uint8_t *>(&byteorder_magic) == 1
+  // return *reinterpret_cast<const unsigned char *>(&byteorder_magic) == 1
+  //            ? byteorder_t::little
+  //            : byteorder_t::big;
+  return reinterpret_cast<const array<unsigned char, 2> &>(
+             byteorder_magic)[0] == 1
              ? byteorder_t::little
              : byteorder_t::big;
+  // return reinterpret_cast<unsigned char[2]>(byteorder_magic)[0] == 1
+  //            ? byteorder_t::little
+  //            : byteorder_t::big;
+  // return reinterpret_cast<uchar2_t>(byteorder_magic).ch[0] == 1
+  //            ? byteorder_t::little
+  //            : byteorder_t::big;
 }
 
 // Convert to host byte order
