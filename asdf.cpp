@@ -65,19 +65,6 @@ YAML::Node yaml_encode(byteorder_t byteorder) {
   return node;
 }
 
-byteorder_t host_byteorder() {
-  const uint64_t magic{0x0102030405060708};
-  const array<unsigned char, 8> magic_big{0x01, 0x02, 0x03, 0x04,
-                                          0x05, 0x06, 0x07, 0x08};
-  const array<unsigned char, 8> magic_little{0x08, 0x07, 0x06, 0x05,
-                                             0x04, 0x03, 0x02, 0x01};
-  if (memcmp(&magic, &magic_big, 8) == 0)
-    return byteorder_t::big;
-  if (memcmp(&magic, &magic_little, 8) == 0)
-    return byteorder_t::little;
-  assert(0);
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 // I/O
@@ -415,46 +402,59 @@ template <typename T> YAML::Node yaml_encode(const complex<T> &val) {
 }
 
 void parse_scalar(const YAML::Node &node, unsigned char *data,
-                  scalar_type_id_t scalar_type_id) {
+                  scalar_type_id_t scalar_type_id, byteorder_t byteorder) {
   switch (scalar_type_id) {
   case id_bool8:
     yaml_decode(node, *reinterpret_cast<bool8_t *>(data));
+    htox<sizeof(bool8_t)>(data, byteorder);
     break;
   case id_int8:
     yaml_decode(node, *reinterpret_cast<int8_t *>(data));
+    htox<sizeof(int8_t)>(data, byteorder);
     break;
   case id_int16:
     yaml_decode(node, *reinterpret_cast<int16_t *>(data));
+    htox<sizeof(int16_t)>(data, byteorder);
     break;
   case id_int32:
     yaml_decode(node, *reinterpret_cast<int32_t *>(data));
+    htox<sizeof(int32_t)>(data, byteorder);
     break;
   case id_int64:
     yaml_decode(node, *reinterpret_cast<int64_t *>(data));
+    htox<sizeof(int64_t)>(data, byteorder);
     break;
   case id_uint8:
     yaml_decode(node, *reinterpret_cast<uint8_t *>(data));
+    htox<sizeof(uint8_t)>(data, byteorder);
     break;
   case id_uint16:
     yaml_decode(node, *reinterpret_cast<uint16_t *>(data));
+    htox<sizeof(uint16_t)>(data, byteorder);
     break;
   case id_uint32:
     yaml_decode(node, *reinterpret_cast<uint32_t *>(data));
+    htox<sizeof(uint32_t)>(data, byteorder);
     break;
   case id_uint64:
     yaml_decode(node, *reinterpret_cast<uint64_t *>(data));
+    htox<sizeof(uint64_t)>(data, byteorder);
     break;
   case id_float32:
     yaml_decode(node, *reinterpret_cast<float32_t *>(data));
+    htox<sizeof(float32_t)>(data, byteorder);
     break;
   case id_float64:
     yaml_decode(node, *reinterpret_cast<float64_t *>(data));
+    htox<sizeof(float64_t)>(data, byteorder);
     break;
   case id_complex64:
     yaml_decode(node, *reinterpret_cast<complex64_t *>(data));
+    htox<sizeof(complex64_t)>(data, byteorder);
     break;
   case id_complex128:
     yaml_decode(node, *reinterpret_cast<complex128_t *>(data));
+    htox<sizeof(complex128_t)>(data, byteorder);
     break;
   // case id_ascii
   // case id_ucs4
@@ -464,47 +464,47 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
 }
 
 YAML::Node emit_scalar(const unsigned char *data,
-                       scalar_type_id_t scalar_type_id) {
+                       scalar_type_id_t scalar_type_id, byteorder_t byteorder) {
   YAML::Node node;
   switch (scalar_type_id) {
   case id_bool8:
-    node = yaml_encode(*reinterpret_cast<const bool8_t *>(data));
+    node = yaml_encode(bool(xtoh<unsigned char>(data, byteorder)));
     break;
   case id_int8:
-    node = yaml_encode(*reinterpret_cast<const int8_t *>(data));
+    node = yaml_encode(xtoh<int8_t>(data, byteorder));
     break;
   case id_int16:
-    node = yaml_encode(*reinterpret_cast<const int16_t *>(data));
+    node = yaml_encode(xtoh<int16_t>(data, byteorder));
     break;
   case id_int32:
-    node = yaml_encode(*reinterpret_cast<const int32_t *>(data));
+    node = yaml_encode(xtoh<int32_t>(data, byteorder));
     break;
   case id_int64:
-    node = yaml_encode(*reinterpret_cast<const int64_t *>(data));
+    node = yaml_encode(xtoh<int64_t>(data, byteorder));
     break;
   case id_uint8:
-    node = yaml_encode(*reinterpret_cast<const uint8_t *>(data));
+    node = yaml_encode(xtoh<uint8_t>(data, byteorder));
     break;
   case id_uint16:
-    node = yaml_encode(*reinterpret_cast<const uint16_t *>(data));
+    node = yaml_encode(xtoh<uint16_t>(data, byteorder));
     break;
   case id_uint32:
-    node = yaml_encode(*reinterpret_cast<const uint32_t *>(data));
+    node = yaml_encode(xtoh<uint32_t>(data, byteorder));
     break;
   case id_uint64:
-    node = yaml_encode(*reinterpret_cast<const uint64_t *>(data));
+    node = yaml_encode(xtoh<uint64_t>(data, byteorder));
     break;
   case id_float32:
-    node = yaml_encode(*reinterpret_cast<const float32_t *>(data));
+    node = yaml_encode(xtoh<float32_t>(data, byteorder));
     break;
   case id_float64:
-    node = yaml_encode(*reinterpret_cast<const float64_t *>(data));
+    node = yaml_encode(xtoh<float64_t>(data, byteorder));
     break;
   case id_complex64:
-    node = yaml_encode(*reinterpret_cast<const complex64_t *>(data));
+    node = yaml_encode(xtoh<complex64_t>(data, byteorder));
     break;
   case id_complex128:
-    node = yaml_encode(*reinterpret_cast<const complex128_t *>(data));
+    node = yaml_encode(xtoh<complex128_t>(data, byteorder));
     break;
   // case id_ascii
   // case id_ucs4
@@ -519,11 +519,10 @@ YAML::Node emit_scalar(const unsigned char *data,
 // Datatypes
 
 field_t::field_t(const string &name, const shared_ptr<datatype_t> &datatype,
-                 // bool have_byteorder, byteorder_t byteorder,
+                 bool have_byteorder, byteorder_t byteorder,
                  const vector<int64_t> &shape)
-    : name(name), datatype(datatype),
-      // have_byteorder(have_byteorder), byteorder(byteorder),
-      shape(shape) {
+    : name(name), datatype(datatype), have_byteorder(have_byteorder),
+      byteorder(byteorder), shape(shape) {
   assert(datatype);
 }
 
@@ -536,7 +535,8 @@ YAML::Node field_t::to_yaml(writer_state &ws) const {
   if (!name.empty())
     node["name"] = name;
   node["datatype"] = datatype->to_yaml(ws);
-  // byteorder
+  if (have_byteorder)
+    node["byteorder"] = yaml_encode(byteorder);
   if (!shape.empty())
     node["shape"] = shape;
   return node;
@@ -587,25 +587,30 @@ YAML::Node datatype_t::to_yaml(writer_state &ws) const {
 }
 
 void parse_scalar(const YAML::Node &node, unsigned char *data,
-                  const shared_ptr<datatype_t> &datatype) {
+                  const shared_ptr<datatype_t> &datatype,
+                  byteorder_t byteorder) {
   if (datatype->is_scalar)
-    return parse_scalar(node, data, datatype->scalar_type_id);
+    return parse_scalar(node, data, datatype->scalar_type_id, byteorder);
   unsigned char *ptr = data;
   for (const auto &field : datatype->fields) {
-    parse_scalar(node, ptr, field->datatype);
+    parse_scalar(node, ptr, field->datatype,
+                 field->have_byteorder ? field->byteorder : byteorder);
     ptr += field->datatype->type_size();
   }
 }
 
 YAML::Node emit_scalar(const unsigned char *data,
-                       const shared_ptr<datatype_t> &datatype) {
+                       const shared_ptr<datatype_t> &datatype,
+                       byteorder_t byteorder) {
   if (datatype->is_scalar)
-    return emit_scalar(data, datatype->scalar_type_id);
+    return emit_scalar(data, datatype->scalar_type_id, byteorder);
   YAML::Node node;
   node.SetStyle(YAML::EmitterStyle::Flow);
   const unsigned char *ptr = data;
   for (const auto &field : datatype->fields) {
-    node.push_back(emit_scalar(ptr, field->datatype));
+    node.push_back(
+        emit_scalar(ptr, field->datatype,
+                    field->have_byteorder ? field->byteorder : byteorder));
     ptr += field->datatype->type_size();
   }
   return node;
@@ -614,6 +619,15 @@ YAML::Node emit_scalar(const unsigned char *data,
 ////////////////////////////////////////////////////////////////////////////////
 
 // Multi-dimensional array
+
+blob_t<bool>::blob_t(const vector<bool> &data) {
+  this->data.resize(data.size());
+  for (size_t i = 0; i < this->data.size(); ++i)
+    this->data[i] = data[i];
+  // this->data.reserve(data.size());
+  // for (bool b : data)
+  //   push_back(this->data, b);
+}
 
 void parse_inline_array_nd(const YAML::Node &node,
                            const shared_ptr<datatype_t> &datatype,
@@ -685,11 +699,12 @@ void parse_inline_array(const YAML::Node &node,
     data1.reserve(npoints * datatype->type_size());
     parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
   }
-  data = make_shared<blob_t<unsigned char>>(compression_t::none, move(data1));
+  data = make_shared<blob_t<unsigned char>>(move(data1));
 }
 
 YAML::Node emit_inline_array(const unsigned char *data,
                              const shared_ptr<datatype_t> &datatype,
+                             byteorder_t byteorder,
                              const vector<int64_t> &shape,
                              const vector<int64_t> &strides) {
   size_t rank = shape.size();
@@ -699,7 +714,7 @@ YAML::Node emit_inline_array(const unsigned char *data,
     YAML::Node node;
     node.SetStyle(YAML::EmitterStyle::Flow);
     // node = data.at(offset);
-    node = emit_scalar(data, datatype);
+    node = emit_scalar(data, datatype, byteorder);
     return node;
   }
   if (rank == 1) {
@@ -707,7 +722,7 @@ YAML::Node emit_inline_array(const unsigned char *data,
     YAML::Node node;
     // node.SetStyle(YAML::EmitterStyle::Flow);
     for (size_t i = 0; i < shape.at(0); ++i)
-      node[i] = emit_scalar(data + i * strides.at(0), datatype);
+      node[i] = emit_scalar(data + i * strides.at(0), datatype, byteorder);
     return node;
   }
   // multi-dimensional array
@@ -720,8 +735,8 @@ YAML::Node emit_inline_array(const unsigned char *data,
   for (size_t d = 0; d < rank - 1; ++d)
     strides1.at(d) = strides.at(d + 1);
   for (size_t i = 0; i < shape.at(0); ++i)
-    node[i] =
-        emit_inline_array(data + i * strides.at(0), datatype, shape1, strides1);
+    node[i] = emit_inline_array(data + i * strides.at(0), datatype, byteorder,
+                                shape1, strides1);
   return node;
 }
 
@@ -759,6 +774,7 @@ shared_ptr<generic_blob_t> read_block(istream &is) {
   array<unsigned char, 4> comp;
   for (auto &ch : comp)
     input(is, ch);
+  // TODO: Remember compression
   compression_t compression;
   if ((comp == array<unsigned char, 4>{0, 0, 0, 0}))
     compression = compression_t::none;
@@ -871,7 +887,7 @@ shared_ptr<generic_blob_t> read_block(istream &is) {
   // skip padding
   if (used_space > allocated_space)
     is.seekg(used_space - allocated_space, ios_base::cur);
-  return make_shared<blob_t<unsigned char>>(compression, move(data));
+  return make_shared<blob_t<unsigned char>>(move(data));
 }
 
 template <typename T>
@@ -899,7 +915,7 @@ void ndarray::write_block(ostream &os) const {
   // compression
   array<unsigned char, 4> comp;
   shared_ptr<generic_blob_t> outdata;
-  switch (data->get_compression()) {
+  switch (compression) {
   case compression_t::none:
     comp = {0, 0, 0, 0};
     outdata = data;
@@ -908,10 +924,8 @@ void ndarray::write_block(ostream &os) const {
 #ifdef HAVE_BZIP2
     comp = {'b', 'z', 'p', '2'};
     // Allocate 600 bytes plus 1% more
-    outdata = make_shared<blob_t<unsigned char>>(
-        data->get_compression(),
-        vector<unsigned char>(600 + data->bytes() +
-                              (data->bytes() + 99) / 100));
+    outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
+        600 + data->bytes() + (data->bytes() + 99) / 100));
     const int level = 9;
     bz_stream strm;
     strm.bzalloc = NULL;
@@ -955,10 +969,8 @@ void ndarray::write_block(ostream &os) const {
 #ifdef HAVE_ZLIB
     comp = {'z', 'l', 'i', 'b'};
     // Allocate 6 bytes plus 5 bytes per 16 kByte more
-    outdata = make_shared<blob_t<unsigned char>>(
-        data->get_compression(),
-        vector<unsigned char>(
-            (6 + data->bytes() + (data->bytes() + 16383) / 16384 * 5)));
+    outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
+        (6 + data->bytes() + (data->bytes() + 16383) / 16384 * 5)));
     const int level = 9;
     z_stream strm;
     strm.zalloc = Z_NULL;
@@ -1053,11 +1065,10 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
   case block_format_t::block: {
     int64_t source;
     yaml_decode(node["source"], source);
-    // compression = compression_t::none;
+    // TODO: This is just a default choice
+    compression = compression_t::zlib;
     datatype = make_shared<datatype_t>(rs, node["datatype"]);
-    byteorder_t byteorder;
     yaml_decode(node["byteorder"], byteorder);
-    assert(byteorder == host_byteorder());
     yaml_decode(node["shape"], shape);
     if (node["offset"].IsDefined())
       yaml_decode(node["offset"], offset);
@@ -1105,9 +1116,8 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
 ndarray::ndarray(const copy_state &cs, const ndarray &arr) : ndarray(arr) {
   if (cs.set_block_format)
     block_format = cs.block_format;
-  // TODO: handle this
-  // if (cs.set_compression)
-  //   compression = cs.compression;
+  if (cs.set_compression)
+    compression = cs.compression;
 }
 
 YAML::Node ndarray::to_yaml(writer_state &ws) const {
@@ -1122,7 +1132,7 @@ YAML::Node ndarray::to_yaml(writer_state &ws) const {
     // data
     node["data"] = emit_inline_array(
         static_cast<const unsigned char *>(data->ptr()) + offset, datatype,
-        shape, strides);
+        byteorder, shape, strides);
   }
   // mask
   assert(mask.empty());
@@ -1130,7 +1140,7 @@ YAML::Node ndarray::to_yaml(writer_state &ws) const {
   node["datatype"] = datatype->to_yaml(ws);
   if (block_format == block_format_t::block) {
     // byteorder
-    node["byteorder"] = yaml_encode(host_byteorder());
+    node["byteorder"] = yaml_encode(byteorder);
   }
   // shape
   node["shape"] = shape;

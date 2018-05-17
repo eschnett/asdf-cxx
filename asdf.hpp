@@ -3,6 +3,7 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <algorithm>
 #include <cassert>
 #include <complex>
 #include <cstddef>
@@ -23,6 +24,64 @@ using namespace std;
 // Byte order
 
 enum class byteorder_t { big, little };
+
+void yaml_decode(const YAML::Node &node, byteorder_t &byteorder);
+YAML::Node yaml_encode(byteorder_t byteorder);
+
+// inline byteorder_t host_byteorder() {
+//   constexpr uint16_t magic{0x0102};
+//   constexpr array<unsigned char, 2> magic_big{0x01, 0x02};
+//   constexpr array<unsigned char, 2> magic_little{0x02, 0x01};
+//   if (reinterpret_cast<array<unsigned char, 2>>(magic) == magic_big)
+//     return byteorder_t::big;
+//   if (reinterpret_cast<array<unsigned char, 2>>(magic) == magic_little)
+//     return byteorder_t::little;
+//   assert(0);
+// }
+
+constexpr uint16_t byteorder_magic = 1;
+constexpr byteorder_t host_byteorder() {
+  return *reinterpret_cast<const uint8_t *>(&byteorder_magic) == 1
+             ? byteorder_t::little
+             : byteorder_t::big;
+}
+
+// Convert to host byte order
+template <typename T>
+inline T xtoh(const unsigned char *data, byteorder_t byteorder) {
+  if (byteorder == host_byteorder())
+    return *reinterpret_cast<const T *>(data);
+  array<unsigned char, sizeof(T)> res;
+  for (size_t i = 0; i < sizeof(T); ++i)
+    res[i] = data[sizeof(T) - 1 - i];
+  return *reinterpret_cast<const T *>(&res);
+}
+
+// Convert from host byte order
+template <typename T>
+inline array<unsigned char, sizeof(T)> htox(const T &val,
+                                            byteorder_t byteorder) {
+  const array<unsigned char, sizeof(T)> data =
+      reinterpret_cast<const array<unsigned char, sizeof(T)>>(val);
+  if (byteorder == host_byteorder())
+    return data;
+  array<unsigned char, sizeof(T)> res;
+  for (size_t i = 0; i < sizeof(T); ++i)
+    res[i] = data[sizeof(T) - 1 - i];
+  return res;
+}
+
+template <size_t N>
+inline void htox(unsigned char *val, byteorder_t byteorder) {
+  if (byteorder != host_byteorder()) {
+    // TODO: use std::reverse?
+    array<unsigned char, N> tmp;
+    for (size_t i = 0; i < N; ++i)
+      tmp[i] = val[N - 1 - i];
+    for (size_t i = 0; i < N; ++i)
+      val[i] = tmp[i];
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -223,9 +282,11 @@ YAML::Node yaml_encode(float64_t val);
 template <typename T> YAML::Node yaml_encode(const complex<T> &val);
 
 void parse_scalar(const YAML::Node &node, unsigned char *data,
-                  scalar_type_id_t scalar_type_id);
+                  scalar_type_id_t scalar_type_id,
+                  byteorder_t byteorder = host_byteorder());
 YAML::Node emit_scalar(const unsigned char *data,
-                       scalar_type_id_t scalar_type_id);
+                       scalar_type_id_t scalar_type_id,
+                       byteorder_t byteorder = host_byteorder());
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -237,8 +298,8 @@ class field_t {
 public:
   string name;
   shared_ptr<datatype_t> datatype;
-  // bool have_byteorder;
-  // byteorder_t byteorder;
+  bool have_byteorder;
+  byteorder_t byteorder;
   vector<int64_t> shape;
 
 public:
@@ -249,7 +310,7 @@ public:
   field_t &operator=(field_t &&) = default;
 
   field_t(const string &name, const shared_ptr<datatype_t> &datatype,
-          // bool have_byteorder, byteorder_t byteorder,
+          bool have_byteorder, byteorder_t byteorder,
           const vector<int64_t> &shape);
 
   field_t(const reader_state &rs, const YAML::Node &node);
@@ -282,9 +343,11 @@ public:
 };
 
 void parse_scalar(const YAML::Node &node, unsigned char *data,
-                  const shared_ptr<datatype_t> &datatype);
+                  const shared_ptr<datatype_t> &datatype,
+                  byteorder_t byteorder = host_byteorder());
 YAML::Node emit_scalar(const unsigned char *data,
-                       const shared_ptr<datatype_t> &datatype);
+                       const shared_ptr<datatype_t> &datatype,
+                       byteorder_t byteorder = host_byteorder());
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -330,15 +393,44 @@ YAML::Node yaml_encode(const map<K, T> &data) {
 
 // Multi-dimensional array
 
-class generic_blob_t {
-
+#if 0
+class block_t {
+  vector<unsigned char> data;
+  shared_ptr<datatype_t> datatype;
+  byteorder_t byteorder;
   compression_t compression;
 
 public:
-  generic_blob_t(compression_t compression) : compression(compression) {}
-  virtual ~generic_blob_t() {}
+  blob_t() = delete;
+  blob_t(const blob_t &) = delete;
+  blob_t(blob_t &&) = delete;
+  blob_t &operator=(const blob_t &) = delete;
+  blob_t &operator=(blob_t &&) = delete;
 
-  compression_t get_compression() const { return compression; }
+  blob_t(const vector<unsigned char> &data,
+         const shared_ptr<datatype_t> &datatype, byteorder_t byteorder,
+         compression_t compression::none)
+      : data(data), datatype(datatype), byteorder(byteorder),
+        compression(compression) {
+    assert(datatype);
+  }
+  blob_t(vector<unsigned char> &&data, const shared_ptr<datatype_t> &datatype,
+         byteorder_t byteorder, compression_t compression::none)
+      : data(move(data)), datatype(datatype), byteorder(byteorder),
+        compression(compression) {
+    assert(datatype);
+  }
+
+  block_t(istream&is);
+  void write(ostream&os)const;
+};
+#endif
+
+// TODO: Simplify this, avoid the abstract class
+class generic_blob_t {
+
+public:
+  virtual ~generic_blob_t() {}
 
   virtual const void *ptr() const = 0;
   virtual void *ptr() = 0;
@@ -352,10 +444,8 @@ template <typename T> class blob_t : public generic_blob_t {
 
 public:
   blob_t() = delete;
-  blob_t(compression_t compression, const vector<T> &data)
-      : generic_blob_t(compression), data(data) {}
-  blob_t(compression_t compression, vector<T> &&data)
-      : generic_blob_t(compression), data(move(data)) {}
+  blob_t(const vector<T> &data) : data(data) {}
+  blob_t(vector<T> &&data) : data(move(data)) {}
 
   virtual ~blob_t() {}
 
@@ -378,16 +468,9 @@ template <> class blob_t<bool> : public generic_blob_t {
 public:
   blob_t() = delete;
 
-  blob_t(compression_t compression, const vector<unsigned char> &data)
-      : generic_blob_t(compression), data(data) {}
-  blob_t(compression_t compression, vector<unsigned char> &&data)
-      : generic_blob_t(compression), data(move(data)) {}
-  blob_t(compression_t compression, const vector<bool> &data)
-      : generic_blob_t(compression) {
-    this->data.resize(data.size());
-    for (size_t i = 0; i < this->data.size(); ++i)
-      this->data[i] = data[i];
-  }
+  blob_t(const vector<unsigned char> &data) : data(data) {}
+  blob_t(vector<unsigned char> &&data) : data(move(data)) {}
+  blob_t(const vector<bool> &data);
 
   virtual ~blob_t() {}
 
@@ -403,12 +486,13 @@ shared_ptr<generic_blob_t> read_block(istream &is);
 class ndarray {
   shared_ptr<generic_blob_t> data;
   block_format_t block_format;
-  // compression_t compression;
+  compression_t compression;
   vector<bool> mask;
   shared_ptr<datatype_t> datatype;
+  byteorder_t byteorder;
   vector<int64_t> shape;
-  vector<int64_t> strides;
   int64_t offset;
+  vector<int64_t> strides;
 
   void write_block(ostream &os) const;
 
@@ -420,14 +504,13 @@ public:
   ndarray &operator=(ndarray &&) = default;
 
   ndarray(const shared_ptr<generic_blob_t> &data, block_format_t block_format,
-          // compression_t compression,
-          const vector<bool> &mask, const shared_ptr<datatype_t> &datatype,
-          const vector<int64_t> &shape, const vector<int64_t> &strides1 = {},
-          int64_t offset = 0)
-      : data(data), block_format(block_format),
-        // compression(compression),
-        mask(mask), datatype(datatype), shape(shape), strides(strides1),
-        offset(offset) {
+          compression_t compression, const vector<bool> &mask,
+          const shared_ptr<datatype_t> &datatype, byteorder_t byteorder,
+          const vector<int64_t> &shape, int64_t offset = 0,
+          const vector<int64_t> &strides1 = {})
+      : data(data), block_format(block_format), compression(compression),
+        mask(mask), datatype(datatype), byteorder(byteorder), shape(shape),
+        offset(offset), strides(strides1) {
     // Check shape
     int rank = shape.size();
     for (int d = 0; d < rank; ++d)
@@ -440,6 +523,8 @@ public:
     // Check mask
     if (!mask.empty())
       assert(mask.size() == npoints);
+    // offset
+    assert(offset >= 0);
     // Check strides
     if (strides.empty()) {
       strides.resize(rank);
@@ -453,7 +538,6 @@ public:
     for (int d = 0; d < rank; ++d)
       assert(strides.at(d) >= 1 || strides.at(d) <= -1);
     // TODO: check that strides are multiples of the element size
-    // offset
   }
 
   template <typename T>
@@ -461,17 +545,17 @@ public:
           compression_t compression, const vector<bool> &mask,
           const vector<int64_t> &shape, const vector<int64_t> &strides = {},
           int64_t offset = 0)
-      : ndarray(make_shared<blob_t<T>>(compression, data), block_format, mask,
-                make_shared<datatype_t>(get_scalar_type_id<T>::value), shape,
-                strides, offset) {}
+      : ndarray(make_shared<blob_t<T>>(data), block_format, compression, mask,
+                make_shared<datatype_t>(get_scalar_type_id<T>::value),
+                host_byteorder(), shape, offset, strides) {}
   template <typename T>
   ndarray(vector<T> &&data, block_format_t block_format,
           compression_t compression, const vector<bool> &mask,
           const vector<int64_t> &shape, const vector<int64_t> &strides = {},
           int64_t offset = 0)
-      : ndarray(make_shared<blob_t<T>>(compression, move(data)), block_format,
+      : ndarray(make_shared<blob_t<T>>(move(data)), block_format, compression,
                 mask, make_shared<datatype_t>(get_scalar_type_id<T>::value),
-                shape, strides, offset) {}
+                host_byteorder(), shape, offset, strides) {}
 
   ndarray(const reader_state &rs, const YAML::Node &node);
   ndarray(const copy_state &cs, const ndarray &arr);
