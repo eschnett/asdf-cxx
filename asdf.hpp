@@ -20,6 +20,69 @@ using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// Byte order
+
+enum class byteorder_t { big, little };
+
+////////////////////////////////////////////////////////////////////////////////
+
+// I/O
+
+enum class block_format_t { block, inline_array };
+enum class compression_t { none, bzip2, zlib };
+
+class generic_blob_t;
+shared_ptr<generic_blob_t> read_block(istream &is);
+
+class reader_state {
+  // TODO: Store only the file position
+  vector<shared_ptr<generic_blob_t>> blocks;
+
+public:
+  reader_state() = delete;
+  reader_state(const reader_state &) = delete;
+  reader_state(reader_state &&) = delete;
+  reader_state &operator=(const reader_state &) = delete;
+  reader_state &operator=(reader_state &&) = delete;
+
+  reader_state(istream &is);
+
+  shared_ptr<generic_blob_t> get_block(int64_t index) const {
+    assert(index >= 0);
+    return blocks.at(index);
+  }
+};
+
+struct copy_state {
+  bool set_block_format;
+  block_format_t block_format;
+  bool set_compression;
+  compression_t compression;
+};
+
+class writer_state {
+
+  vector<function<void(ostream &os)>> tasks;
+
+public:
+  writer_state(const writer_state &) = delete;
+  writer_state(writer_state &&) = delete;
+  writer_state &operator=(const writer_state &) = delete;
+  writer_state &operator=(writer_state &&) = delete;
+
+  writer_state();
+  ~writer_state();
+
+  int64_t add_task(function<void(ostream &)> &&task) {
+    tasks.push_back(move(task));
+    return tasks.size() - 1;
+  }
+
+  void flush(ostream &os);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
 // Scalar types
 
 // Define an id for every type
@@ -159,9 +222,69 @@ YAML::Node yaml_encode(float32_t val);
 YAML::Node yaml_encode(float64_t val);
 template <typename T> YAML::Node yaml_encode(const complex<T> &val);
 
-void parse_scalar(const YAML::Node &node, void *data,
+void parse_scalar(const YAML::Node &node, unsigned char *data,
                   scalar_type_id_t scalar_type_id);
-YAML::Node emit_scalar(const void *data, scalar_type_id_t scalar_type_id);
+YAML::Node emit_scalar(const unsigned char *data,
+                       scalar_type_id_t scalar_type_id);
+
+////////////////////////////////////////////////////////////////////////////////
+
+// Datatypes
+
+class datatype_t;
+
+class field_t {
+public:
+  string name;
+  shared_ptr<datatype_t> datatype;
+  // bool have_byteorder;
+  // byteorder_t byteorder;
+  vector<int64_t> shape;
+
+public:
+  field_t() = delete;
+  field_t(const field_t &) = default;
+  field_t(field_t &&) = default;
+  field_t &operator=(const field_t &) = default;
+  field_t &operator=(field_t &&) = default;
+
+  field_t(const string &name, const shared_ptr<datatype_t> &datatype,
+          // bool have_byteorder, byteorder_t byteorder,
+          const vector<int64_t> &shape);
+
+  field_t(const reader_state &rs, const YAML::Node &node);
+  field_t(const copy_state &cs, const field_t &field);
+  YAML::Node to_yaml(writer_state &ws) const;
+};
+
+class datatype_t {
+public:
+  bool is_scalar;
+  scalar_type_id_t scalar_type_id;
+  vector<shared_ptr<field_t>> fields;
+
+public:
+  datatype_t() = delete;
+  datatype_t(const datatype_t &) = default;
+  datatype_t(datatype_t &&) = default;
+  datatype_t &operator=(const datatype_t &) = default;
+  datatype_t &operator=(datatype_t &&) = default;
+
+  datatype_t(scalar_type_id_t scalar_type_id);
+  datatype_t(const vector<shared_ptr<field_t>> &fields);
+  datatype_t(vector<shared_ptr<field_t>> &&fields);
+
+  datatype_t(const reader_state &rs, const YAML::Node &node);
+  datatype_t(const copy_state &cs, const datatype_t &datatype);
+  YAML::Node to_yaml(writer_state &ws) const;
+
+  size_t type_size() const;
+};
+
+void parse_scalar(const YAML::Node &node, unsigned char *data,
+                  const shared_ptr<datatype_t> &datatype);
+YAML::Node emit_scalar(const unsigned char *data,
+                       const shared_ptr<datatype_t> &datatype);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -202,63 +325,6 @@ YAML::Node yaml_encode(const map<K, T> &data) {
   node = data;
   return node;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-
-// I/O
-
-enum class block_format_t { block, inline_array };
-enum class compression_t { none, bzip2, zlib };
-
-class generic_blob_t;
-shared_ptr<generic_blob_t> read_block(istream &is);
-
-class reader_state {
-  // TODO: Store only the file position
-  vector<shared_ptr<generic_blob_t>> blocks;
-
-public:
-  reader_state() = delete;
-  reader_state(const reader_state &) = delete;
-  reader_state(reader_state &&) = delete;
-  reader_state &operator=(const reader_state &) = delete;
-  reader_state &operator=(reader_state &&) = delete;
-
-  reader_state(istream &is);
-
-  shared_ptr<generic_blob_t> get_block(int64_t index) const {
-    assert(index >= 0);
-    return blocks.at(index);
-  }
-};
-
-struct copy_state {
-  bool set_block_format;
-  block_format_t block_format;
-  bool set_compression;
-  compression_t compression;
-};
-
-class writer_state {
-
-  vector<function<void(ostream &os)>> tasks;
-
-public:
-  writer_state(const writer_state &) = delete;
-  writer_state(writer_state &&) = delete;
-  writer_state &operator=(const writer_state &) = delete;
-  writer_state &operator=(writer_state &&) = delete;
-
-  writer_state();
-  ~writer_state();
-
-  int64_t add_task(function<void(ostream &)> &&task) {
-    tasks.push_back(move(task));
-    return tasks.size() - 1;
-  }
-
-  void flush(ostream &os);
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -339,8 +405,7 @@ class ndarray {
   block_format_t block_format;
   // compression_t compression;
   vector<bool> mask;
-  // TODO: allow general datatypes
-  scalar_type_id_t scalar_type_id;
+  shared_ptr<datatype_t> datatype;
   vector<int64_t> shape;
   vector<int64_t> strides;
   int64_t offset;
@@ -356,13 +421,13 @@ public:
 
   ndarray(const shared_ptr<generic_blob_t> &data, block_format_t block_format,
           // compression_t compression,
-          const vector<bool> &mask, scalar_type_id_t scalar_type_id,
+          const vector<bool> &mask, const shared_ptr<datatype_t> &datatype,
           const vector<int64_t> &shape, const vector<int64_t> &strides1 = {},
           int64_t offset = 0)
       : data(data), block_format(block_format),
         // compression(compression),
-        mask(mask), scalar_type_id(scalar_type_id), shape(shape),
-        strides(strides1), offset(offset) {
+        mask(mask), datatype(datatype), shape(shape), strides(strides1),
+        offset(offset) {
     // Check shape
     int rank = shape.size();
     for (int d = 0; d < rank; ++d)
@@ -371,14 +436,14 @@ public:
     int64_t npoints = 1;
     for (int d = 0; d < rank; ++d)
       npoints *= shape[d];
-    assert(data->bytes() == npoints * get_scalar_type_size(scalar_type_id));
+    assert(data->bytes() == npoints * datatype->type_size());
     // Check mask
     if (!mask.empty())
       assert(mask.size() == npoints);
     // Check strides
     if (strides.empty()) {
       strides.resize(rank);
-      int64_t str = get_scalar_type_size(scalar_type_id);
+      int64_t str = datatype->type_size();
       for (int d = rank - 1; d >= 0; --d) {
         strides.at(d) = str;
         str *= shape.at(d);
@@ -397,14 +462,16 @@ public:
           const vector<int64_t> &shape, const vector<int64_t> &strides = {},
           int64_t offset = 0)
       : ndarray(make_shared<blob_t<T>>(compression, data), block_format, mask,
-                get_scalar_type_id<T>::value, shape, strides, offset) {}
+                make_shared<datatype_t>(get_scalar_type_id<T>::value), shape,
+                strides, offset) {}
   template <typename T>
   ndarray(vector<T> &&data, block_format_t block_format,
           compression_t compression, const vector<bool> &mask,
           const vector<int64_t> &shape, const vector<int64_t> &strides = {},
           int64_t offset = 0)
       : ndarray(make_shared<blob_t<T>>(compression, move(data)), block_format,
-                mask, get_scalar_type_id<T>::value, shape, strides, offset) {}
+                mask, make_shared<datatype_t>(get_scalar_type_id<T>::value),
+                shape, strides, offset) {}
 
   ndarray(const reader_state &rs, const YAML::Node &node);
   ndarray(const copy_state &cs, const ndarray &arr);
@@ -417,7 +484,7 @@ inline YAML::Node make_yaml(writer_state &ws, const ndarray &arr) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// Column
+// Table and Column
 
 class column {
   string name;
@@ -443,7 +510,6 @@ public:
   YAML::Node to_yaml(writer_state &ws) const;
 };
 
-// Table
 class table {
   vector<shared_ptr<column>> columns;
 
@@ -463,7 +529,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// Entry
+// Group and Entry
 
 class group;
 
@@ -498,7 +564,6 @@ public:
   YAML::Node to_yaml(writer_state &ws) const;
 };
 
-// Group
 class group {
   map<string, shared_ptr<entry>> entries;
 
@@ -518,12 +583,14 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// ASDF
+
 class asdf {
-  shared_ptr<ndarray> data;
+  map<string, shared_ptr<ndarray>> data;
   // fits
   // wcs
   // shared_ptr<table> tab;
-  shared_ptr<group> grp;        // SimulationIO
+  shared_ptr<group> grp; // SimulationIO
 
 public:
   asdf() = default;
@@ -532,7 +599,7 @@ public:
   asdf &operator=(const asdf &) = default;
   asdf &operator=(asdf &&) = default;
 
-  asdf(const shared_ptr<ndarray> &data) : data(data) { assert(data); }
+  asdf(const map<string, shared_ptr<ndarray>> &data) : data(data) {}
   // asdf(const shared_ptr<table> &tab) : tab(tab) { assert(tab); }
   asdf(const shared_ptr<group> &grp) : grp(grp) { assert(grp); }
 

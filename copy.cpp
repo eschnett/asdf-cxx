@@ -28,6 +28,8 @@ int main(int argc, char **argv) {
   is.close();
   // Copy project
 #warning "TODO: Add command line option for this"
+  // auto project2 = project;
+  // auto project2 = project.copy({});
   auto project2 = project.copy({true, ASDF::block_format_t::inline_array});
   // Write project
   ofstream os(outputfilename, ios::binary | ios::trunc | ios::out);
