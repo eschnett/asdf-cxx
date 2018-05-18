@@ -5,6 +5,24 @@
 
 asdf-cxx: A C++ implementation for ASDF, the Advanced Scientific Data Format
 
+Overview
+--------
+
+`ASDF <https://github.com/spacetelescope/asdf-standard>` is an
+efficient file format for structure scientic data, backed by NASA's
+`Space Telescope Science Institute (STScI) <http://www.stsci.edu>`_.
+ASDF stores both array data (supporting efficient binary
+representations) as well as accompanying metadata in "key-value" form.
+Metadata are stored in the human-readable `YAML <http://yaml.org>`_
+format.
+
+ASDF exists as standard, and there are (so far) implementations in
+`Python <https://github.com/spacetelescope/asdf>`_ and `Go
+<https://github.com/astrogo/asdf>`_. This library `asdf-cxx
+<https://github.com/eschnett/asdf-cxx>`_ provides an independent
+implementation in C++, suitable for HPC environments.
+
+
 Standard conformance
 --------------------
 
@@ -23,6 +41,11 @@ are:
 Other minor limitations are:
 - The block index is not used; instead, it is always re-created.
 - Output files cannot be padded.
+- The ASDF standard requires that certain maps are output in a certain
+  order, and that certain elements are output in a certain style
+  ("block" or "flow"). However, it also requires that an ASDF reader
+  must not rely on this. asdf-cxx does probably not yet honour all
+  these "optional requirements".
 
 Also, the `yaml-cpp` library outputs the YAML 1.2 format, whereas ASDF
 requires the YAML 1.1 format. The differences between these two
