@@ -8,6 +8,7 @@
 #include <complex>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <iostream>
 #include <istream>
@@ -27,17 +28,6 @@ enum class byteorder_t { big, little };
 
 void yaml_decode(const YAML::Node &node, byteorder_t &byteorder);
 YAML::Node yaml_encode(byteorder_t byteorder);
-
-// inline byteorder_t host_byteorder() {
-//   constexpr uint16_t magic{0x0102};
-//   constexpr array<unsigned char, 2> magic_big{0x01, 0x02};
-//   constexpr array<unsigned char, 2> magic_little{0x02, 0x01};
-//   if (reinterpret_cast<array<unsigned char, 2>>(magic) == magic_big)
-//     return byteorder_t::big;
-//   if (reinterpret_cast<array<unsigned char, 2>>(magic) == magic_little)
-//     return byteorder_t::little;
-//   assert(0);
-// }
 
 constexpr uint16_t byteorder_magic = 1;
 inline byteorder_t host_byteorder() {
@@ -62,8 +52,7 @@ inline T xtoh(const unsigned char *data, byteorder_t byteorder) {
 template <typename T>
 inline array<unsigned char, sizeof(T)> htox(const T &val,
                                             byteorder_t byteorder) {
-  const array<unsigned char, sizeof(T)> data =
-      reinterpret_cast<const array<unsigned char, sizeof(T)>>(val);
+  auto data = reinterpret_cast<const array<unsigned char, sizeof(T)>>(val);
   if (byteorder == host_byteorder())
     return data;
   array<unsigned char, sizeof(T)> res;
@@ -75,12 +64,10 @@ inline array<unsigned char, sizeof(T)> htox(const T &val,
 template <size_t N>
 inline void htox(unsigned char *val, byteorder_t byteorder) {
   if (byteorder != host_byteorder()) {
-    // TODO: use std::reverse?
     array<unsigned char, N> tmp;
     for (size_t i = 0; i < N; ++i)
       tmp[i] = val[N - 1 - i];
-    for (size_t i = 0; i < N; ++i)
-      val[i] = tmp[i];
+    *reinterpret_cast<array<unsigned char, N> *>(val) = tmp;
   }
 }
 
