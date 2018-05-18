@@ -66,13 +66,17 @@ string(REPLACE "-DNDEBUG" ""
   CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 
 configure_file(
-  "${PROJECT_SOURCE_DIR}/asdf-config.hpp.in"
-  "${PROJECT_BINARY_DIR}/asdf-config.hpp"
+  "${PROJECT_SOURCE_DIR}/asdf_config.hpp.in"
+  "${PROJECT_BINARY_DIR}/asdf_config.hpp"
   )
 
 include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
 
-add_library(asdf-cxx asdf.cpp asdf-config.cpp)
+set(ASDF_SOURCES
+  asdf.cpp byteorder.cpp config.cpp datatype.cpp group.cpp io.cpp
+  ndarray.cpp table.cpp)
+
+add_library(asdf-cxx ${ASDF_SOURCES})
 set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 add_executable(asdf-copy copy.cpp)
@@ -102,14 +106,14 @@ option(COVERALLS "Generate coveralls data" OFF)
 if (COVERALLS)
   include(Coveralls)
   coveralls_turn_on_coverage()
-  set(COVERAGE_SRCS asdf.cpp asdf-config.cpp copy.cpp demo.cpp ls.cpp)
+  set(COVERAGE_SRCS ${ASDF_SOURCES} copy.cpp demo.cpp ls.cpp)
   coveralls_setup("${COVERAGE_SRCS}" ON)
 endif()
 
 # Install
 
 install(FILES asdf.hpp DESTINATION include)
-install(FILES "${PROJECT_BINARY_DIR}/asdf-config.hpp" DESTINATION include)
+install(FILES "${PROJECT_BINARY_DIR}/asdf_config.hpp" DESTINATION include)
 install(TARGETS asdf-cxx DESTINATION lib)
 install(TARGETS asdf-copy asdf-demo asdf-demo-large asdf-ls DESTINATION bin)
 

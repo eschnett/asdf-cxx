@@ -3,6 +3,9 @@
 #include <complex>
 #include <fstream>
 #include <iostream>
+#include <memory>
+#include <utility>
+#include <vector>
 
 using namespace std;
 using namespace ASDF;
@@ -34,9 +37,6 @@ int main(int argc, char **argv) {
                                       compression_t::zlib, vector<bool>(),
                                       vector<int64_t>{ni, nj, nk});
   assert(rho.empty());
-  // auto col3 = make_shared<column>("rho", array3d, string());
-  // auto tab = make_shared<table>(vector<shared_ptr<column>>{col3});
-  // auto project = asdf(tab);
   auto ent = make_shared<entry>("rho", array3d, string());
   auto grp = make_shared<group>(map<string, shared_ptr<entry>>{{"rho", ent}});
   auto project = asdf(grp);

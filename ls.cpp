@@ -1,5 +1,3 @@
-#include "asdf.hpp"
-
 #include <yaml-cpp/yaml.h>
 
 #include <cassert>
