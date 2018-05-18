@@ -72,6 +72,9 @@ configure_file(
 
 include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
 
+set(ASDF_HEADERS
+  asdf.hpp asdf_asdf.hpp asdf_byteorder.hpp asdf_datatype.hpp asdf_group.hpp
+  asdf_io.hpp asdf_ndarray.hpp asdf_stl.hpp asdf_table.hpp)
 set(ASDF_SOURCES
   asdf.cpp byteorder.cpp config.cpp datatype.cpp group.cpp io.cpp
   ndarray.cpp table.cpp)
@@ -112,7 +115,7 @@ endif()
 
 # Install
 
-install(FILES asdf.hpp DESTINATION include)
+install(FILES ${HEADERS} DESTINATION include)
 install(FILES "${PROJECT_BINARY_DIR}/asdf_config.hpp" DESTINATION include)
 install(TARGETS asdf-cxx DESTINATION lib)
 install(TARGETS asdf-copy asdf-demo asdf-demo-large asdf-ls DESTINATION bin)
