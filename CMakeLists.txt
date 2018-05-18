@@ -115,7 +115,7 @@ endif()
 
 # Install
 
-install(FILES ${HEADERS} DESTINATION include)
+install(FILES ${ASDF_HEADERS} DESTINATION include)
 install(FILES "${PROJECT_BINARY_DIR}/asdf_config.hpp" DESTINATION include)
 install(TARGETS asdf-cxx DESTINATION lib)
 install(TARGETS asdf-copy asdf-demo asdf-demo-large asdf-ls DESTINATION bin)
