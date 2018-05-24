@@ -101,8 +101,7 @@ add_test(NAME demo COMMAND ./asdf-demo)
 add_test(NAME ls COMMAND ./asdf-ls demo.asdf)
 add_test(NAME copy COMMAND ./asdf-copy demo.asdf demo2.asdf)
 add_test(NAME ls2 COMMAND ./asdf-ls demo2.asdf)
-set(compare_args './asdf-ls demo.asdf' './asdf-ls demo2.asdf')
-add_test(NAME compare COMMAND ../diff-commands.sh ${compare_args})
+add_test(NAME compare COMMAND ../diff-commands.sh \'./asdf-ls demo.asdf\' \'./asdf-ls demo2.asdf\')
 
 # Coverage
 
