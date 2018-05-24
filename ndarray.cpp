@@ -520,39 +520,39 @@ ndarray::ndarray(const copy_state &cs, const ndarray &arr) : ndarray(arr) {
     compression = cs.compression;
 }
 
-writer &ndarray::to_yaml(writer &ws) const {
-  ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/ndarray-1.0.0");
-  ws << YAML::BeginMap;
+writer &ndarray::to_yaml(writer &w) const {
+  w << YAML::VerbatimTag("tag:stsci.edu:asdf/core/ndarray-1.0.0");
+  w << YAML::BeginMap;
   if (block_format == block_format_t::block) {
     // source
     const auto &self = *this;
-    uint64_t idx = ws.add_task([=](ostream &os) { self.write_block(os); });
-    ws << YAML::Key << "source" << YAML::Value << idx;
+    uint64_t idx = w.add_task([=](ostream &os) { self.write_block(os); });
+    w << YAML::Key << "source" << YAML::Value << idx;
   } else {
     // data
-    ws << YAML::Key << "data" << YAML::Value
-       << emit_inline_array(static_cast<const unsigned char *>(data->ptr()) +
-                                offset,
-                            datatype, byteorder, shape, strides);
+    w << YAML::Key << "data" << YAML::Value
+      << emit_inline_array(static_cast<const unsigned char *>(data->ptr()) +
+                               offset,
+                           datatype, byteorder, shape, strides);
   }
   // mask
   assert(mask.empty());
   // datatype
-  ws << YAML::Key << "datatype" << YAML::Value << datatype->to_yaml(ws);
+  w << YAML::Key << "datatype" << YAML::Value << datatype->to_yaml(w);
   if (block_format == block_format_t::block) {
     // byteorder
-    ws << YAML::Key << "byteorder" << YAML::Value << yaml_encode(byteorder);
+    w << YAML::Key << "byteorder" << YAML::Value << yaml_encode(byteorder);
   }
   // shape
-  ws << YAML::Key << "shape" << YAML::Value << YAML::Flow << shape;
+  w << YAML::Key << "shape" << YAML::Value << YAML::Flow << shape;
   if (block_format == block_format_t::block) {
     // offset
-    ws << YAML::Key << "offset" << YAML::Value << offset;
+    w << YAML::Key << "offset" << YAML::Value << offset;
     // strides
-    ws << YAML::Key << "strides" << YAML::Value << YAML::Flow << strides;
+    w << YAML::Key << "strides" << YAML::Value << YAML::Flow << strides;
   }
-  ws << YAML::EndMap;
-  return ws;
+  w << YAML::EndMap;
+  return w;
 }
 
 } // namespace ASDF

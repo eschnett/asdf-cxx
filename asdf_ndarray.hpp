@@ -149,15 +149,11 @@ public:
 
   ndarray(const reader_state &rs, const YAML::Node &node);
   ndarray(const copy_state &cs, const ndarray &arr);
-  writer &to_yaml(writer &ws) const;
-  friend writer &operator<<(writer &ws, const ndarray &arr) {
-    return arr.to_yaml(ws);
+  writer &to_yaml(writer &w) const;
+  friend writer &operator<<(writer &w, const ndarray &arr) {
+    return arr.to_yaml(w);
   }
 };
-
-// inline writer &make_yaml(writer &ws, const ndarray &arr) {
-//   return arr.to_yaml(ws);
-// }
 
 } // namespace ASDF
 

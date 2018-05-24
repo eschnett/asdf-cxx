@@ -22,7 +22,7 @@ class asdf {
   // shared_ptr<table> tab;
   shared_ptr<group> grp;
   map<string, YAML::Node> nodes;
-  // function<map<string, YAML::Node>(writer &ws)> writer;
+  map<string, function<void(writer &w)>> writers;
 
 public:
   asdf() = delete;
@@ -35,14 +35,14 @@ public:
   // asdf(const shared_ptr<table> &tab) : tab(tab) { assert(tab); }
   asdf(const shared_ptr<group> &grp) : grp(grp) { assert(grp); }
   asdf(const map<string, YAML::Node> &nodes) : nodes(nodes) {}
-  // asdf(const function<map<string, YAML::Node>(writer &ws)> &writer)
-  //     : writer(writer) {}
+  asdf(const map<string, function<void(writer &w)>> &writers)
+      : writers(writers) {}
 
   asdf(const reader_state &rs, const YAML::Node &node);
   asdf(const copy_state &cs, const asdf &project);
-  writer &to_yaml(writer &ws) const;
-  friend writer &operator<<(writer &ws, const asdf &proj) {
-    return proj.to_yaml(ws);
+  writer &to_yaml(writer &w) const;
+  friend writer &operator<<(writer &w, const asdf &proj) {
+    return proj.to_yaml(w);
   }
 
   asdf(istream &is);

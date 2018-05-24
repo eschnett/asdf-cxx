@@ -50,25 +50,26 @@ asdf::asdf(const copy_state &cs, const asdf &project) {
     grp = make_shared<group>(cs, *project.grp);
 }
 
-writer &asdf::to_yaml(writer &ws) const {
-  ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/asdf-1.1.0");
-  ws << YAML::BeginMap;
-  ws << YAML::Key << "asdf_library" << YAML::Value
-     << software("asdf-cxx", "Erik Schnetter",
-                 "https://github.com/eschnett/asdf-cxx", ASDF_VERSION);
+writer &asdf::to_yaml(writer &w) const {
+  w << YAML::VerbatimTag("tag:stsci.edu:asdf/core/asdf-1.1.0");
+  w << YAML::BeginMap;
+  w << YAML::Key << "asdf_library" << YAML::Value
+    << software("asdf-cxx", "Erik Schnetter",
+                "https://github.com/eschnett/asdf-cxx", ASDF_VERSION);
   for (const auto &kv : data)
-    ws << YAML::Key << kv.first << YAML::Value << *kv.second;
+    w << YAML::Key << kv.first << YAML::Value << *kv.second;
   // if (tab)
-  //   node["table"] = tab->to_yaml(ws);
+  //   node["table"] = tab->to_yaml(w);
   if (grp)
-    ws << YAML::Key << "group" << YAML::Value << *grp;
+    w << YAML::Key << "group" << YAML::Value << *grp;
   for (const auto &kv : nodes)
-    ws << YAML::Key << kv.first << YAML::Value << kv.second;
-  // if (writer)
-  //   for (const auto &kv : writer(ws))
-  //     node[kv.first] = kv.second;
-  ws << YAML::EndMap;
-  return ws;
+    w << YAML::Key << kv.first << YAML::Value << kv.second;
+  for (const auto &kv : writers) {
+    w << YAML::Key << kv.first << YAML::Value;
+    kv.second(w);
+  }
+  w << YAML::EndMap;
+  return w;
 }
 
 asdf::asdf(istream &is) {
@@ -92,9 +93,9 @@ asdf::asdf(istream &is) {
 asdf asdf::copy(const copy_state &cs) const { return asdf(cs, *this); }
 
 void asdf::write(ostream &os) const {
-  writer ws(os);
-  ws << *this;
-  ws.flush();
+  writer w(os);
+  w << *this;
+  w.flush();
 }
 
 } // namespace ASDF

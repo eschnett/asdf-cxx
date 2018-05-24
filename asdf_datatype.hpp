@@ -185,7 +185,7 @@ public:
 
   field_t(const reader_state &rs, const YAML::Node &node);
   field_t(const copy_state &cs, const field_t &field);
-  YAML::Node to_yaml(writer &ws) const;
+  YAML::Node to_yaml(writer &w) const;
 };
 
 class datatype_t {
@@ -207,7 +207,7 @@ public:
 
   datatype_t(const reader_state &rs, const YAML::Node &node);
   datatype_t(const copy_state &cs, const datatype_t &datatype);
-  YAML::Node to_yaml(writer &ws) const;
+  YAML::Node to_yaml(writer &w) const;
 
   size_t type_size() const;
 };
