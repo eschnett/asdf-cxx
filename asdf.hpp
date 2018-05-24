@@ -13,7 +13,7 @@
 // namespace ASDF {
 
 // template <typename T>
-// writer_state &operator<<(writer_state &ws, const T &value) {
+// writer &operator<<(writer &ws, const T &value) {
 //   ws.emitter << value;
 //   return ws;
 // }

@@ -24,7 +24,7 @@ entry::entry(const copy_state &cs, const entry &ent)
     arr = make_shared<ndarray>(cs, *ent.arr);
 }
 
-writer_state &entry::to_yaml(writer_state &ws) const {
+writer &entry::to_yaml(writer &ws) const {
   ws << YAML::VerbatimTag("tag:github.com/eschnett/asdf-cxx/core/entry-1.0.0");
   ws << YAML::BeginMap;
   ws << YAML::Key << "name" << YAML::Value << name;
@@ -49,7 +49,7 @@ group::group(const copy_state &cs, const group &grp) {
     entries[kv.first] = make_shared<entry>(cs, *kv.second);
 }
 
-writer_state &group::to_yaml(writer_state &ws) const {
+writer &group::to_yaml(writer &ws) const {
   ws << YAML::VerbatimTag("tag:github.com/eschnett/asdf-cxx/core/group-1.0.0");
   ws << YAML::BeginMap;
   for (const auto &kv : entries)

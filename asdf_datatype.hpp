@@ -168,7 +168,6 @@ class field_t {
 public:
   string name;
   shared_ptr<datatype_t> datatype;
-#warning "TODO: use byteorder_t::undefined instead"
   bool have_byteorder;
   byteorder_t byteorder;
   vector<int64_t> shape;
@@ -186,7 +185,7 @@ public:
 
   field_t(const reader_state &rs, const YAML::Node &node);
   field_t(const copy_state &cs, const field_t &field);
-  YAML::Node to_yaml(writer_state &ws) const;
+  YAML::Node to_yaml(writer &ws) const;
 };
 
 class datatype_t {
@@ -208,7 +207,7 @@ public:
 
   datatype_t(const reader_state &rs, const YAML::Node &node);
   datatype_t(const copy_state &cs, const datatype_t &datatype);
-  YAML::Node to_yaml(writer_state &ws) const;
+  YAML::Node to_yaml(writer &ws) const;
 
   size_t type_size() const;
 };

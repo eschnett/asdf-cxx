@@ -520,7 +520,7 @@ ndarray::ndarray(const copy_state &cs, const ndarray &arr) : ndarray(arr) {
     compression = cs.compression;
 }
 
-writer_state &ndarray::to_yaml(writer_state &ws) const {
+writer &ndarray::to_yaml(writer &ws) const {
   ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/ndarray-1.0.0");
   ws << YAML::BeginMap;
   if (block_format == block_format_t::block) {

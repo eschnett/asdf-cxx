@@ -34,8 +34,8 @@ public:
 
   column(const reader_state &rs, const YAML::Node &node);
   column(const copy_state &cs, const column &col);
-  writer_state &to_yaml(writer_state &ws) const;
-  friend writer_state &operator<<(writer_state &ws, const column &col) {
+  writer &to_yaml(writer &ws) const;
+  friend writer &operator<<(writer &ws, const column &col) {
     return col.to_yaml(ws);
   }
 };
@@ -54,8 +54,8 @@ public:
 
   table(const reader_state &rs, const YAML::Node &node);
   table(const copy_state &cs, const table &tab);
-  writer_state &to_yaml(writer_state &ws) const;
-  friend writer_state &operator<<(writer_state &ws, const table &tab) {
+  writer &to_yaml(writer &ws) const;
+  friend writer &operator<<(writer &ws, const table &tab) {
     return tab.to_yaml(ws);
   }
 };

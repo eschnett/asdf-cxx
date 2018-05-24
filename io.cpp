@@ -18,7 +18,7 @@ reader_state::reader_state(istream &is) {
   }
 }
 
-writer_state::writer_state(ostream &os) : os(os), emitter(os) {
+writer::writer(ostream &os) : os(os), emitter(os) {
   // yaml-cpp does not support comments without leading space
   os << "#ASDF " << asdf_format_version << "\n"
      << "#ASDF_STANDARD " << asdf_standard_version << "\n"
@@ -31,9 +31,9 @@ writer_state::writer_state(ostream &os) : os(os), emitter(os) {
   emitter << YAML::BeginDoc;
 }
 
-writer_state::~writer_state() { assert(tasks.empty()); }
+writer::~writer() { assert(tasks.empty()); }
 
-void writer_state::flush() {
+void writer::flush() {
   emitter << YAML::EndDoc;
   if (!tasks.empty()) {
     YAML::Emitter index;

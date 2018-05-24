@@ -50,7 +50,7 @@ asdf::asdf(const copy_state &cs, const asdf &project) {
     grp = make_shared<group>(cs, *project.grp);
 }
 
-writer_state &asdf::to_yaml(writer_state &ws) const {
+writer &asdf::to_yaml(writer &ws) const {
   ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/asdf-1.1.0");
   ws << YAML::BeginMap;
   ws << YAML::Key << "asdf_library" << YAML::Value
@@ -92,7 +92,7 @@ asdf::asdf(istream &is) {
 asdf asdf::copy(const copy_state &cs) const { return asdf(cs, *this); }
 
 void asdf::write(ostream &os) const {
-  writer_state ws(os);
+  writer ws(os);
   ws << *this;
   ws.flush();
 }

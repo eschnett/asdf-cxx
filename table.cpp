@@ -14,7 +14,7 @@ column::column(const reader_state &rs, const YAML::Node &node) {
 
 column::column(const copy_state &cs, const column &col) : column(col) {}
 
-writer_state &column::to_yaml(writer_state &ws) const {
+writer &column::to_yaml(writer &ws) const {
   ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/column-1.0.0");
   ws << YAML::BeginMap;
   ws << YAML::Key << "name" << YAML::Value << name;
@@ -36,7 +36,7 @@ table::table(const copy_state &cs, const table &tab) {
     columns.push_back(make_shared<column>(cs, *col));
 }
 
-writer_state &table::to_yaml(writer_state &ws) const {
+writer &table::to_yaml(writer &ws) const {
   ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/table-1.0.0");
   ws << YAML::BeginMap;
   ws << YAML::Key << "columns" << YAML::Value;

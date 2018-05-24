@@ -149,13 +149,13 @@ public:
 
   ndarray(const reader_state &rs, const YAML::Node &node);
   ndarray(const copy_state &cs, const ndarray &arr);
-  writer_state &to_yaml(writer_state &ws) const;
-  friend writer_state &operator<<(writer_state &ws, const ndarray &arr) {
+  writer &to_yaml(writer &ws) const;
+  friend writer &operator<<(writer &ws, const ndarray &arr) {
     return arr.to_yaml(ws);
   }
 };
 
-// inline writer_state &make_yaml(writer_state &ws, const ndarray &arr) {
+// inline writer &make_yaml(writer &ws, const ndarray &arr) {
 //   return arr.to_yaml(ws);
 // }
 

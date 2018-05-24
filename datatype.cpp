@@ -431,7 +431,7 @@ field_t::field_t(const reader_state &rs, const YAML::Node &node) { assert(0); }
 
 field_t::field_t(const copy_state &cs, const field_t &field) { assert(0); }
 
-YAML::Node field_t::to_yaml(writer_state &ws) const {
+YAML::Node field_t::to_yaml(writer &ws) const {
   YAML::Node node;
   if (!name.empty())
     node["name"] = name;
@@ -478,7 +478,7 @@ datatype_t::datatype_t(const copy_state &cs, const datatype_t &datatype) {
   assert(0);
 }
 
-YAML::Node datatype_t::to_yaml(writer_state &ws) const {
+YAML::Node datatype_t::to_yaml(writer &ws) const {
   if (is_scalar)
     return yaml_encode(scalar_type_id);
   YAML::Node node;

@@ -46,7 +46,7 @@ struct copy_state {
   compression_t compression;
 };
 
-class writer_state {
+class writer {
 
   ostream &os;
   YAML::Emitter emitter;
@@ -54,21 +54,17 @@ class writer_state {
   vector<function<void(ostream &os)>> tasks;
 
 public:
-  writer_state(const writer_state &) = delete;
-  writer_state(writer_state &&) = delete;
-  writer_state &operator=(const writer_state &) = delete;
-  writer_state &operator=(writer_state &&) = delete;
+  writer(const writer &) = delete;
+  writer(writer &&) = delete;
+  writer &operator=(const writer &) = delete;
+  writer &operator=(writer &&) = delete;
 
-  writer_state(ostream &os);
-  ~writer_state();
+  writer(ostream &os);
+  ~writer();
 
-  // YAML::Emitter &e() { return emitter; }
-  // template <typename T>
-  // friend writer_state &operator<<(writer_state &ws, const T &value);
-  template <typename T>
-  friend writer_state &operator<<(writer_state &ws, const T &value) {
-    ws.emitter << value;
-    return ws;
+  template <typename T> friend writer &operator<<(writer &w, const T &value) {
+    w.emitter << value;
+    return w;
   }
 
   int64_t add_task(function<void(ostream &)> &&task) {
@@ -78,12 +74,6 @@ public:
 
   void flush();
 };
-
-// template <typename T>
-// writer_state &operator<<(writer_state &ws, const T &value) {
-//   ws.e() << value;
-//   return ws;
-// }
 
 } // namespace ASDF
 

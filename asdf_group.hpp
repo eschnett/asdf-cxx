@@ -44,8 +44,8 @@ public:
 
   entry(const reader_state &rs, const YAML::Node &node);
   entry(const copy_state &cs, const entry &ent);
-  writer_state &to_yaml(writer_state &ws) const;
-  friend writer_state &operator<<(writer_state &ws, const entry &ent) {
+  writer &to_yaml(writer &ws) const;
+  friend writer &operator<<(writer &ws, const entry &ent) {
     return ent.to_yaml(ws);
   }
 };
@@ -70,8 +70,8 @@ public:
 
   group(const reader_state &rs, const YAML::Node &node);
   group(const copy_state &cs, const group &grp);
-  writer_state &to_yaml(writer_state &ws) const;
-  friend writer_state &operator<<(writer_state &ws, const group &grp) {
+  writer &to_yaml(writer &ws) const;
+  friend writer &operator<<(writer &ws, const group &grp) {
     return grp.to_yaml(ws);
   }
 };
