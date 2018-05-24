@@ -3,6 +3,8 @@
 
 #include "asdf_ndarray.hpp"
 
+#include <yaml-cpp/yaml.h>
+
 #include <memory>
 #include <string>
 
@@ -32,6 +34,7 @@ public:
     assert(!name.empty());
     assert(arr);
   }
+
   entry(const string &name, const shared_ptr<group> &grp,
         const string &description)
       : name(name), grp(grp), description(description) {
@@ -41,7 +44,10 @@ public:
 
   entry(const reader_state &rs, const YAML::Node &node);
   entry(const copy_state &cs, const entry &ent);
-  YAML::Node to_yaml(writer_state &ws) const;
+  writer_state &to_yaml(writer_state &ws) const;
+  friend writer_state &operator<<(writer_state &ws, const entry &ent) {
+    return ent.to_yaml(ws);
+  }
 };
 
 class group {
@@ -55,10 +61,19 @@ public:
   group &operator=(group &&) = default;
 
   group(const map<string, shared_ptr<entry>> &entries) : entries(entries) {}
+  template <typename T>
+  group(const map<string, shared_ptr<T>> &data,
+        const function<entry(const T &)> &f) {
+    for (const auto &kv : data)
+      entries[kv.first] = f(*kv.second);
+  }
 
   group(const reader_state &rs, const YAML::Node &node);
   group(const copy_state &cs, const group &grp);
-  YAML::Node to_yaml(writer_state &ws) const;
+  writer_state &to_yaml(writer_state &ws) const;
+  friend writer_state &operator<<(writer_state &ws, const group &grp) {
+    return grp.to_yaml(ws);
+  }
 };
 
 } // namespace ASDF

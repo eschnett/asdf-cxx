@@ -34,7 +34,10 @@ public:
 
   column(const reader_state &rs, const YAML::Node &node);
   column(const copy_state &cs, const column &col);
-  YAML::Node to_yaml(writer_state &ws) const;
+  writer_state &to_yaml(writer_state &ws) const;
+  friend writer_state &operator<<(writer_state &ws, const column &col) {
+    return col.to_yaml(ws);
+  }
 };
 
 class table {
@@ -51,7 +54,10 @@ public:
 
   table(const reader_state &rs, const YAML::Node &node);
   table(const copy_state &cs, const table &tab);
-  YAML::Node to_yaml(writer_state &ws) const;
+  writer_state &to_yaml(writer_state &ws) const;
+  friend writer_state &operator<<(writer_state &ws, const table &tab) {
+    return tab.to_yaml(ws);
+  }
 };
 
 } // namespace ASDF

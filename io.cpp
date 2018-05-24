@@ -4,6 +4,9 @@
 
 namespace ASDF {
 
+const string asdf_format_version = "1.0.0";
+const string asdf_standard_version = "1.1.0";
+
 // I/O
 
 reader_state::reader_state(istream &is) {
@@ -15,27 +18,38 @@ reader_state::reader_state(istream &is) {
   }
 }
 
-writer_state::writer_state() {}
+writer_state::writer_state(ostream &os) : os(os), emitter(os) {
+  // yaml-cpp does not support comments without leading space
+  os << "#ASDF " << asdf_format_version << "\n"
+     << "#ASDF_STANDARD " << asdf_standard_version << "\n"
+     << "# This is an ASDF file <https://asdf-standard.readthedocs.io/>\n"
+     // yaml-cpp does not support writing a YAML tab
+     << "%YAML 1.1\n";
+#warning "TODO: Use Tag, LocalTag, or similar"
+  // << "%TAG ! tag:stsci.edu:asdf/\n"
+  // << "%TAG !! tag:github.com/eschnett/asdf-cxx/\n"
+  emitter << YAML::BeginDoc;
+}
 
 writer_state::~writer_state() { assert(tasks.empty()); }
 
-void writer_state::flush(ostream &os) {
-  if (tasks.empty())
-    return;
-  YAML::Emitter index;
-  index << YAML::Flow;
-  index << YAML::BeginSeq;
-  for (auto &&task : tasks) {
-    index << os.tellp();
-    move(task)(os);
+void writer_state::flush() {
+  emitter << YAML::EndDoc;
+  if (!tasks.empty()) {
+    YAML::Emitter index;
+    index << YAML::BeginDoc << YAML::Flow << YAML::BeginSeq;
+    for (auto &&task : tasks) {
+      index << os.tellp();
+      move(task)(os);
+    }
+    tasks.clear();
+    index << YAML::EndSeq << YAML::EndDoc;
+    // yaml-cpp does not support comments without leading space
+    os << "#ASDF BLOCK INDEX\n"
+       // yaml-cpp does not support writing a YAML tab
+       << "%YAML 1.1\n"
+       << index.c_str();
   }
-  tasks.clear();
-  index << YAML::EndSeq;
-  os << "#ASDF BLOCK INDEX\n"
-     << "%YAML 1.1\n"
-     << "---\n"
-     << index.c_str() << "\n"
-     << "...\n";
 }
 
 } // namespace ASDF

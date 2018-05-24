@@ -4,6 +4,8 @@
 #include "asdf_datatype.hpp"
 #include "asdf_io.hpp"
 
+#include <yaml-cpp/yaml.h>
+
 #include <cassert>
 #include <cstddef>
 #include <memory>
@@ -147,12 +149,15 @@ public:
 
   ndarray(const reader_state &rs, const YAML::Node &node);
   ndarray(const copy_state &cs, const ndarray &arr);
-  YAML::Node to_yaml(writer_state &ws) const;
+  writer_state &to_yaml(writer_state &ws) const;
+  friend writer_state &operator<<(writer_state &ws, const ndarray &arr) {
+    return arr.to_yaml(ws);
+  }
 };
 
-inline YAML::Node make_yaml(writer_state &ws, const ndarray &arr) {
-  return arr.to_yaml(ws);
-}
+// inline writer_state &make_yaml(writer_state &ws, const ndarray &arr) {
+//   return arr.to_yaml(ws);
+// }
 
 } // namespace ASDF
 

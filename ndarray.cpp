@@ -23,9 +23,6 @@ blob_t<bool>::blob_t(const vector<bool> &data) {
   this->data.resize(data.size());
   for (size_t i = 0; i < this->data.size(); ++i)
     this->data[i] = data[i];
-  // this->data.reserve(data.size());
-  // for (bool b : data)
-  //   push_back(this->data, b);
 }
 
 void parse_inline_array_nd(const YAML::Node &node,
@@ -71,7 +68,7 @@ void parse_inline_array(const YAML::Node &node,
     npoints *= shape[d];
   vector<unsigned char> data1;
   if (!have_datatype) {
-    // determine while parsing datatype
+    // determine datatype while parsing
     try {
       datatype = make_shared<datatype_t>(id_int64);
       data1.reserve(npoints * datatype->type_size());
@@ -94,7 +91,7 @@ void parse_inline_array(const YAML::Node &node,
       }
     }
   } else {
-    // parse data
+    // parse data, expecting a particular datatype
     data1.reserve(npoints * datatype->type_size());
     parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
   }
@@ -452,7 +449,10 @@ void ndarray::write_block(ostream &os) const {
   os.write(padding.data(), padding.size());
 }
 
-ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
+ndarray::ndarray(const reader_state &rs, const YAML::Node &node)
+    : block_format(block_format_t::undefined),
+      compression(compression_t::undefined), byteorder(byteorder_t::undefined),
+      offset(-1) {
   assert(node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.0.0");
   if (node["source"].IsDefined())
     block_format = block_format_t::block;
@@ -488,10 +488,11 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node) {
     break;
   }
   case block_format_t::inline_array: {
-    // not yet implemented
+    // compression remains uninitialized
     bool have_datatype = node["datatype"].IsDefined();
     if (have_datatype)
       datatype = make_shared<datatype_t>(rs, node["datatype"]);
+    byteorder = host_byteorder();
     bool have_shape = node["shape"].IsDefined();
     if (have_shape)
       yaml_decode(node["shape"], shape);
@@ -519,39 +520,39 @@ ndarray::ndarray(const copy_state &cs, const ndarray &arr) : ndarray(arr) {
     compression = cs.compression;
 }
 
-YAML::Node ndarray::to_yaml(writer_state &ws) const {
-  YAML::Node node;
-  node.SetTag("tag:stsci.edu:asdf/core/ndarray-1.0.0");
+writer_state &ndarray::to_yaml(writer_state &ws) const {
+  ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/ndarray-1.0.0");
+  ws << YAML::BeginMap;
   if (block_format == block_format_t::block) {
     // source
     const auto &self = *this;
     uint64_t idx = ws.add_task([=](ostream &os) { self.write_block(os); });
-    node["source"] = idx;
+    ws << YAML::Key << "source" << YAML::Value << idx;
   } else {
     // data
-    node["data"] = emit_inline_array(
-        static_cast<const unsigned char *>(data->ptr()) + offset, datatype,
-        byteorder, shape, strides);
+    ws << YAML::Key << "data" << YAML::Value
+       << emit_inline_array(static_cast<const unsigned char *>(data->ptr()) +
+                                offset,
+                            datatype, byteorder, shape, strides);
   }
   // mask
   assert(mask.empty());
   // datatype
-  node["datatype"] = datatype->to_yaml(ws);
+  ws << YAML::Key << "datatype" << YAML::Value << datatype->to_yaml(ws);
   if (block_format == block_format_t::block) {
     // byteorder
-    node["byteorder"] = yaml_encode(byteorder);
+    ws << YAML::Key << "byteorder" << YAML::Value << yaml_encode(byteorder);
   }
   // shape
-  node["shape"] = shape;
-  node["shape"].SetStyle(YAML::EmitterStyle::Flow);
+  ws << YAML::Key << "shape" << YAML::Value << YAML::Flow << shape;
   if (block_format == block_format_t::block) {
     // offset
-    node["offset"] = offset;
+    ws << YAML::Key << "offset" << YAML::Value << offset;
     // strides
-    node["strides"] = strides;
-    node["strides"].SetStyle(YAML::EmitterStyle::Flow);
+    ws << YAML::Key << "strides" << YAML::Value << YAML::Flow << strides;
   }
-  return node;
+  ws << YAML::EndMap;
+  return ws;
 }
 
 } // namespace ASDF

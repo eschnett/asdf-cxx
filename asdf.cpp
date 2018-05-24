@@ -4,9 +4,6 @@ namespace ASDF {
 
 // ASDF
 
-const string asdf_format_version = "1.0.0";
-const string asdf_standard_version = "1.1.0";
-
 YAML::Node software(const string &name, const string &author,
                     const string &homepage, const string &version) {
   YAML::Node node;
@@ -53,24 +50,25 @@ asdf::asdf(const copy_state &cs, const asdf &project) {
     grp = make_shared<group>(cs, *project.grp);
 }
 
-YAML::Node asdf::to_yaml(writer_state &ws) const {
-  const auto &asdf_library =
-      software("asdf-cxx", "Erik Schnetter",
-               "https://github.com/eschnett/asdf-cxx", ASDF_VERSION);
-  YAML::Node node;
-  node.SetTag("tag:stsci.edu:asdf/core/asdf-1.1.0");
-  node["asdf_library"] = asdf_library;
-  for (const auto &kv : data) {
-    const auto &key = kv.first;
-    node[key] = kv.second->to_yaml(ws);
-  }
+writer_state &asdf::to_yaml(writer_state &ws) const {
+  ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/asdf-1.1.0");
+  ws << YAML::BeginMap;
+  ws << YAML::Key << "asdf_library" << YAML::Value
+     << software("asdf-cxx", "Erik Schnetter",
+                 "https://github.com/eschnett/asdf-cxx", ASDF_VERSION);
+  for (const auto &kv : data)
+    ws << YAML::Key << kv.first << YAML::Value << *kv.second;
   // if (tab)
   //   node["table"] = tab->to_yaml(ws);
   if (grp)
-    node["group"] = grp->to_yaml(ws);
-  // node.SetStyle(YAML::EmitterStyle::BeginDoc);
-  // node.SetStyle(YAML::EmitterStyle::EndDoc);
-  return node;
+    ws << YAML::Key << "group" << YAML::Value << *grp;
+  for (const auto &kv : nodes)
+    ws << YAML::Key << kv.first << YAML::Value << kv.second;
+  // if (writer)
+  //   for (const auto &kv : writer(ws))
+  //     node[kv.first] = kv.second;
+  ws << YAML::EndMap;
+  return ws;
 }
 
 asdf::asdf(istream &is) {
@@ -94,19 +92,9 @@ asdf::asdf(istream &is) {
 asdf asdf::copy(const copy_state &cs) const { return asdf(cs, *this); }
 
 void asdf::write(ostream &os) const {
-  writer_state ws;
-  // TODO: Use YAML::Emitter(os) instead
-  const auto &node = to_yaml(ws);
-  os << "#ASDF " << asdf_format_version << "\n"
-     << "#ASDF_STANDARD " << asdf_standard_version << "\n"
-     << "# This is an ASDF file <https://asdf-standard.readthedocs.io/>.\n"
-     << "%YAML 1.1\n"
-     // << "%TAG ! tag:stsci.edu:asdf/\n"
-     // << "%TAG !! tag:github.com/eschnett/asdf-cxx/\n"
-     << "---\n"
-     << node << "\n"
-     << "...\n";
-  ws.flush(os);
+  writer_state ws(os);
+  ws << *this;
+  ws.flush();
 }
 
 } // namespace ASDF

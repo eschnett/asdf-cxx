@@ -168,6 +168,7 @@ class field_t {
 public:
   string name;
   shared_ptr<datatype_t> datatype;
+#warning "TODO: use byteorder_t::undefined instead"
   bool have_byteorder;
   byteorder_t byteorder;
   vector<int64_t> shape;

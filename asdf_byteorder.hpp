@@ -4,13 +4,14 @@
 #include <yaml-cpp/yaml.h>
 
 #include <array>
+#include <cassert>
 
 namespace ASDF {
 using namespace std;
 
 // Byte order
 
-enum class byteorder_t { big, little };
+enum class byteorder_t { undefined, big, little };
 
 void yaml_decode(const YAML::Node &node, byteorder_t &byteorder);
 YAML::Node yaml_encode(byteorder_t byteorder);
@@ -50,6 +51,7 @@ inline array<unsigned char, sizeof(T)> htox(const T &val,
 template <size_t N>
 inline void htox(unsigned char *val, byteorder_t byteorder) {
   if (byteorder != host_byteorder()) {
+    assert(byteorder != byteorder_t::undefined);
     array<unsigned char, N> tmp;
     for (size_t i = 0; i < N; ++i)
       tmp[i] = val[N - 1 - i];

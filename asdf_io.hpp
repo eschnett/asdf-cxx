@@ -1,6 +1,8 @@
 #ifndef ASDF_IO_HPP
 #define ASDF_IO_HPP
 
+#include <yaml-cpp/yaml.h>
+
 #include <cassert>
 #include <functional>
 #include <iostream>
@@ -12,8 +14,8 @@ using namespace std;
 
 // I/O
 
-enum class block_format_t { block, inline_array };
-enum class compression_t { none, bzip2, zlib };
+enum class block_format_t { undefined, block, inline_array };
+enum class compression_t { undefined, none, bzip2, zlib };
 
 class generic_blob_t;
 shared_ptr<generic_blob_t> read_block(istream &is);
@@ -46,6 +48,9 @@ struct copy_state {
 
 class writer_state {
 
+  ostream &os;
+  YAML::Emitter emitter;
+  // Tasks that write the blocks
   vector<function<void(ostream &os)>> tasks;
 
 public:
@@ -54,16 +59,31 @@ public:
   writer_state &operator=(const writer_state &) = delete;
   writer_state &operator=(writer_state &&) = delete;
 
-  writer_state();
+  writer_state(ostream &os);
   ~writer_state();
+
+  // YAML::Emitter &e() { return emitter; }
+  // template <typename T>
+  // friend writer_state &operator<<(writer_state &ws, const T &value);
+  template <typename T>
+  friend writer_state &operator<<(writer_state &ws, const T &value) {
+    ws.emitter << value;
+    return ws;
+  }
 
   int64_t add_task(function<void(ostream &)> &&task) {
     tasks.push_back(move(task));
     return tasks.size() - 1;
   }
 
-  void flush(ostream &os);
+  void flush();
 };
+
+// template <typename T>
+// writer_state &operator<<(writer_state &ws, const T &value) {
+//   ws.e() << value;
+//   return ws;
+// }
 
 } // namespace ASDF
 

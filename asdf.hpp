@@ -10,6 +10,16 @@
 #include "asdf_stl.hpp"
 #include "asdf_table.hpp"
 
+// namespace ASDF {
+
+// template <typename T>
+// writer_state &operator<<(writer_state &ws, const T &value) {
+//   ws.emitter << value;
+//   return ws;
+// }
+
+// } // namespace ASDF
+
 #define ASDF_HPP_DONE
 #endif // #ifndef ASDF_HPP
 #ifndef ASDF_HPP_DONE

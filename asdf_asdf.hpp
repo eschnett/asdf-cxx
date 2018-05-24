@@ -5,6 +5,8 @@
 #include "asdf_group.hpp"
 #include "asdf_ndarray.hpp"
 
+#include <yaml-cpp/yaml.h>
+
 #include <map>
 #include <memory>
 
@@ -18,10 +20,12 @@ class asdf {
   // fits
   // wcs
   // shared_ptr<table> tab;
-  shared_ptr<group> grp; // SimulationIO
+  shared_ptr<group> grp;
+  map<string, YAML::Node> nodes;
+  // function<map<string, YAML::Node>(writer_state &ws)> writer;
 
 public:
-  asdf() = default;
+  asdf() = delete;
   asdf(const asdf &) = default;
   asdf(asdf &&) = default;
   asdf &operator=(const asdf &) = default;
@@ -30,10 +34,16 @@ public:
   asdf(const map<string, shared_ptr<ndarray>> &data) : data(data) {}
   // asdf(const shared_ptr<table> &tab) : tab(tab) { assert(tab); }
   asdf(const shared_ptr<group> &grp) : grp(grp) { assert(grp); }
+  asdf(const map<string, YAML::Node> &nodes) : nodes(nodes) {}
+  // asdf(const function<map<string, YAML::Node>(writer_state &ws)> &writer)
+  //     : writer(writer) {}
 
   asdf(const reader_state &rs, const YAML::Node &node);
   asdf(const copy_state &cs, const asdf &project);
-  YAML::Node to_yaml(writer_state &ws) const;
+  writer_state &to_yaml(writer_state &ws) const;
+  friend writer_state &operator<<(writer_state &ws, const asdf &proj) {
+    return proj.to_yaml(ws);
+  }
 
   asdf(istream &is);
   asdf copy(const copy_state &cs) const;

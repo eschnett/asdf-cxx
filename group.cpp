@@ -24,17 +24,18 @@ entry::entry(const copy_state &cs, const entry &ent)
     arr = make_shared<ndarray>(cs, *ent.arr);
 }
 
-YAML::Node entry::to_yaml(writer_state &ws) const {
-  YAML::Node node;
-  node.SetTag("tag:github.com/eschnett/asdf-cxx/core/entry-1.0.0");
-  node["name"] = name;
+writer_state &entry::to_yaml(writer_state &ws) const {
+  ws << YAML::VerbatimTag("tag:github.com/eschnett/asdf-cxx/core/entry-1.0.0");
+  ws << YAML::BeginMap;
+  ws << YAML::Key << "name" << YAML::Value << name;
   if (grp)
-    node["group"] = grp->to_yaml(ws);
+    ws << YAML::Key << "group" << YAML::Value << *grp;
   if (arr)
-    node["data"] = arr->to_yaml(ws);
+    ws << YAML::Key << "data" << YAML::Value << *arr;
   if (!description.empty())
-    node["description"] = description;
-  return node;
+    ws << YAML::Key << "description" << YAML::Value << description;
+  ws << YAML::EndMap;
+  return ws;
 }
 
 group::group(const reader_state &rs, const YAML::Node &node) {
@@ -48,12 +49,13 @@ group::group(const copy_state &cs, const group &grp) {
     entries[kv.first] = make_shared<entry>(cs, *kv.second);
 }
 
-YAML::Node group::to_yaml(writer_state &ws) const {
-  YAML::Node node;
-  node.SetTag("tag:github.com/eschnett/asdf-cxx/core/group-1.0.0");
+writer_state &group::to_yaml(writer_state &ws) const {
+  ws << YAML::VerbatimTag("tag:github.com/eschnett/asdf-cxx/core/group-1.0.0");
+  ws << YAML::BeginMap;
   for (const auto &kv : entries)
-    node[kv.first] = kv.second->to_yaml(ws);
-  return node;
+    ws << YAML::Key << kv.first << YAML::Value << *kv.second;
+  ws << YAML::EndMap;
+  return ws;
 }
 
 } // namespace ASDF

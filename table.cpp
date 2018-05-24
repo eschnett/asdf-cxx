@@ -14,14 +14,15 @@ column::column(const reader_state &rs, const YAML::Node &node) {
 
 column::column(const copy_state &cs, const column &col) : column(col) {}
 
-YAML::Node column::to_yaml(writer_state &ws) const {
-  YAML::Node node;
-  node.SetTag("tag:stsci.edu:asdf/core/column-1.0.0");
-  node["name"] = name;
-  node["data"] = data->to_yaml(ws);
+writer_state &column::to_yaml(writer_state &ws) const {
+  ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/column-1.0.0");
+  ws << YAML::BeginMap;
+  ws << YAML::Key << "name" << YAML::Value << name;
+  ws << YAML::Key << "data" << YAML::Value << *data;
   if (!description.empty())
-    node["description"] = description;
-  return node;
+    ws << YAML::Key << "description" << YAML::Value << description;
+  ws << YAML::EndMap;
+  return ws;
 }
 
 table::table(const reader_state &rs, const YAML::Node &node) {
@@ -35,14 +36,16 @@ table::table(const copy_state &cs, const table &tab) {
     columns.push_back(make_shared<column>(cs, *col));
 }
 
-YAML::Node table::to_yaml(writer_state &ws) const {
-  YAML::Node cols;
+writer_state &table::to_yaml(writer_state &ws) const {
+  ws << YAML::VerbatimTag("tag:stsci.edu:asdf/core/table-1.0.0");
+  ws << YAML::BeginMap;
+  ws << YAML::Key << "columns" << YAML::Value;
+  ws << YAML::BeginSeq;
   for (size_t i = 0; i < columns.size(); ++i)
-    cols[i] = columns[i]->to_yaml(ws);
-  YAML::Node node;
-  node.SetTag("tag:stsci.edu:asdf/core/table-1.0.0");
-  node["columns"] = move(cols);
-  return node;
+    ws << *columns[i];
+  ws << YAML::EndSeq;
+  ws << YAML::EndMap;
+  return ws;
 }
 
 } // namespace ASDF
