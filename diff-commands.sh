@@ -13,4 +13,4 @@ $2 >"$dir/output2"
 diff -u "$dir/output1" "$dir/output2"
 retval=$?
 rm -rf "$dir"
-return "$retval"
+(exit "$retval")
