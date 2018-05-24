@@ -2,6 +2,8 @@
 
 if [ $# != 2 ]; then
     echo "Synopsis: $0 <command 1> <command 2>" 1>&2
+    echo '$#' "$#"
+    echo '$@' "$@"
     exit 1
 fi
 
