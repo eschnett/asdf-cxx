@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
                                                         {"gamma", ent2},
                                                         {"delta", ent3},
                                                         {"epsilon", ent8}});
-  auto project = asdf(grp);
+  auto project = asdf({}, grp);
   fstream os("demo.asdf", ios::binary | ios::trunc | ios::out);
   project.write(os);
   os.close();

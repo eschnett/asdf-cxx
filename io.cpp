@@ -18,7 +18,8 @@ reader_state::reader_state(istream &is) {
   }
 }
 
-writer::writer(ostream &os) : os(os), emitter(os) {
+writer::writer(ostream &os, const map<string, string> &tags)
+    : os(os), emitter(os) {
   // yaml-cpp does not support comments without leading space
   os << "#ASDF " << asdf_format_version << "\n"
      << "#ASDF_STANDARD " << asdf_standard_version << "\n"
@@ -27,6 +28,8 @@ writer::writer(ostream &os) : os(os), emitter(os) {
      << "%YAML 1.1\n"
      << "%TAG ! tag:stsci.edu:asdf/\n"
      << "%TAG !asdf-cxx! tag:github.com/eschnett/asdf-cxx/\n";
+  for (const auto &kv : tags)
+    os << "%TAG !" << kv.first << "! " << kv.second << "\n";
   emitter << YAML::BeginDoc;
 }
 

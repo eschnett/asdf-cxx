@@ -93,7 +93,7 @@ asdf::asdf(istream &is) {
 asdf asdf::copy(const copy_state &cs) const { return asdf(cs, *this); }
 
 void asdf::write(ostream &os) const {
-  writer w(os);
+  writer w(os, tags);
   w << *this;
   w.flush();
 }

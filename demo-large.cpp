@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
   assert(rho.empty());
   auto ent = make_shared<entry>("rho", array3d, string());
   auto grp = make_shared<group>(map<string, shared_ptr<entry>>{{"rho", ent}});
-  auto project = asdf(grp);
+  auto project = asdf({}, grp);
   cout << "\n";
 
   cout << "  writing project..." << flush;

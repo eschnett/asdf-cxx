@@ -50,6 +50,7 @@ class writer {
 
   ostream &os;
   YAML::Emitter emitter;
+
   // Tasks that write the blocks
   vector<function<void(ostream &os)>> tasks;
 
@@ -59,7 +60,7 @@ public:
   writer &operator=(const writer &) = delete;
   writer &operator=(writer &&) = delete;
 
-  writer(ostream &os);
+  writer(ostream &os, const map<string, string> &tags);
   ~writer();
 
   template <typename T> friend writer &operator<<(writer &w, const T &value) {
