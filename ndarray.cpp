@@ -321,7 +321,7 @@ void ndarray::write_block(ostream &os) const {
     comp = {'b', 'z', 'p', '2'};
     // Allocate 600 bytes plus 1% more
     outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
-        600 + data->bytes() + (data->bytes() + 99) / 100));
+        600 + data->nbytes() + (data->nbytes() + 99) / 100));
     const int level = 9;
     bz_stream strm;
     strm.bzalloc = NULL;
@@ -330,8 +330,8 @@ void ndarray::write_block(ostream &os) const {
     BZ2_bzCompressInit(&strm, level, 0, 0);
     strm.next_in = reinterpret_cast<char *>(const_cast<void *>(data->ptr()));
     strm.next_out = reinterpret_cast<char *>(outdata->ptr());
-    uint64_t avail_in = data->bytes();
-    uint64_t avail_out = outdata->bytes();
+    uint64_t avail_in = data->nbytes();
+    uint64_t avail_out = outdata->nbytes();
     for (;;) {
       uint64_t this_avail_in =
           min(uint64_t(numeric_limits<unsigned int>::max()), avail_in);
@@ -348,8 +348,8 @@ void ndarray::write_block(ostream &os) const {
       assert(iret == BZ_RUN_OK);
     }
     assert(avail_in == 0);
-    outdata->resize(outdata->bytes() - avail_out);
-    if (outdata->bytes() >= data->bytes()) {
+    outdata->resize(outdata->nbytes() - avail_out);
+    if (outdata->nbytes() >= data->nbytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
       outdata = data;
@@ -366,7 +366,7 @@ void ndarray::write_block(ostream &os) const {
     comp = {'z', 'l', 'i', 'b'};
     // Allocate 6 bytes plus 5 bytes per 16 kByte more
     outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
-        (6 + data->bytes() + (data->bytes() + 16383) / 16384 * 5)));
+        (6 + data->nbytes() + (data->nbytes() + 16383) / 16384 * 5)));
     const int level = 9;
     z_stream strm;
     strm.zalloc = Z_NULL;
@@ -377,8 +377,8 @@ void ndarray::write_block(ostream &os) const {
     strm.next_in =
         reinterpret_cast<unsigned char *>(const_cast<void *>(data->ptr()));
     strm.next_out = reinterpret_cast<unsigned char *>(outdata->ptr());
-    uint64_t avail_in = data->bytes();
-    uint64_t avail_out = outdata->bytes();
+    uint64_t avail_in = data->nbytes();
+    uint64_t avail_out = outdata->nbytes();
     for (;;) {
       uint64_t this_avail_in =
           min(uint64_t(numeric_limits<uInt>::max()), avail_in);
@@ -395,8 +395,8 @@ void ndarray::write_block(ostream &os) const {
       assert(iret == Z_OK);
     }
     assert(avail_in == 0);
-    outdata->resize(outdata->bytes() - avail_out);
-    if (outdata->bytes() >= data->bytes()) {
+    outdata->resize(outdata->nbytes() - avail_out);
+    if (outdata->nbytes() >= data->nbytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
       outdata = data;
@@ -414,20 +414,20 @@ void ndarray::write_block(ostream &os) const {
   for (auto ch : comp)
     output(header, ch);
   // allocated_space
-  uint64_t allocated_space = outdata->bytes();
+  uint64_t allocated_space = outdata->nbytes();
   output(header, allocated_space);
   // used_space
   uint64_t used_space = allocated_space; // no padding
   output(header, used_space);
   // data_space
-  uint64_t data_space = data->bytes();
+  uint64_t data_space = data->nbytes();
   output(header, data_space);
   // checksum
   array<unsigned char, 16> checksum;
 #ifdef HAVE_OPENSSL
   MD5_CTX ctx;
   MD5_Init(&ctx);
-  MD5_Update(&ctx, outdata->ptr(), outdata->bytes());
+  MD5_Update(&ctx, outdata->ptr(), outdata->nbytes());
   MD5_Final(checksum.data(), &ctx);
 #else
   checksum = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -443,7 +443,7 @@ void ndarray::write_block(ostream &os) const {
   // write header
   os.write(reinterpret_cast<const char *>(header.data()), header.size());
   // write data
-  os.write(reinterpret_cast<const char *>(outdata->ptr()), outdata->bytes());
+  os.write(reinterpret_cast<const char *>(outdata->ptr()), outdata->nbytes());
   // write padding
   vector<char> padding(allocated_space - used_space);
   os.write(padding.data(), padding.size());

@@ -24,9 +24,9 @@ public:
 
   virtual const void *ptr() const = 0;
   virtual void *ptr() = 0;
-  virtual size_t bytes() const = 0;
-  virtual void reserve(size_t bytes) = 0;
-  virtual void resize(size_t bytes) = 0;
+  virtual size_t nbytes() const = 0;
+  virtual void reserve(size_t nbytes) = 0;
+  virtual void resize(size_t nbytes) = 0;
 };
 
 template <typename T> class blob_t : public generic_blob_t {
@@ -41,14 +41,14 @@ public:
 
   virtual const void *ptr() const { return data.data(); }
   virtual void *ptr() { return data.data(); }
-  virtual size_t bytes() const { return data.size() * sizeof(T); }
-  virtual void reserve(size_t bytes) {
-    assert(bytes % sizeof(T) == 0);
-    data.reserve(bytes / sizeof(T));
+  virtual size_t nbytes() const { return data.size() * sizeof(T); }
+  virtual void reserve(size_t nbytes) {
+    assert(nbytes % sizeof(T) == 0);
+    data.reserve(nbytes / sizeof(T));
   }
-  virtual void resize(size_t bytes) {
-    assert(bytes % sizeof(T) == 0);
-    data.resize(bytes / sizeof(T));
+  virtual void resize(size_t nbytes) {
+    assert(nbytes % sizeof(T) == 0);
+    data.resize(nbytes / sizeof(T));
   }
 };
 
@@ -66,9 +66,30 @@ public:
 
   virtual const void *ptr() const { return data.data(); }
   virtual void *ptr() { return data.data(); }
-  virtual size_t bytes() const { return data.size(); }
-  virtual void reserve(size_t bytes) { data.resize(bytes); }
-  virtual void resize(size_t bytes) { data.resize(bytes); }
+  virtual size_t nbytes() const { return data.size(); }
+  virtual void reserve(size_t nbytes) { data.resize(nbytes); }
+  virtual void resize(size_t nbytes) { data.resize(nbytes); }
+};
+
+class ptr_blob_t : public generic_blob_t {
+  void *data;
+  size_t size;
+
+public:
+  ptr_blob_t() = delete;
+
+  ptr_blob_t(void *data, size_t size) : data(data), size(size) { assert(data); }
+  template <typename T>
+  ptr_blob_t(const vector<T> &data)
+      : data(data.data()), size(data.size() * sizeof(T)) {}
+
+  virtual ~ptr_blob_t() {}
+
+  virtual const void *ptr() const { return data; }
+  virtual void *ptr() { return data; }
+  virtual size_t nbytes() const { return size; }
+  virtual void reserve(size_t nbytes) { assert(0); }
+  virtual void resize(size_t nbytes) { assert(0); }
 };
 
 shared_ptr<generic_blob_t> read_block(istream &is);
@@ -109,7 +130,7 @@ public:
     int64_t npoints = 1;
     for (int d = 0; d < rank; ++d)
       npoints *= shape[d];
-    assert(data->bytes() == npoints * datatype->type_size());
+    assert(data->nbytes() == npoints * datatype->type_size());
     // Check mask
     if (!mask.empty())
       assert(mask.size() == npoints);

@@ -52,6 +52,7 @@ class writer {
   YAML::Emitter emitter;
 
   // Tasks that write the blocks
+  // TODO: rename this variable
   vector<function<void(ostream &os)>> tasks;
 
 public:
@@ -68,6 +69,7 @@ public:
     return w;
   }
 
+  // TODO: rename this function
   int64_t add_task(function<void(ostream &)> &&task) {
     tasks.push_back(move(task));
     return tasks.size() - 1;

@@ -34,6 +34,7 @@ asdf::asdf(const reader_state &rs, const YAML::Node &node) {
       // } else if (key == "table") {
       //   tab = make_shared<table>(rs, node["table"]);
     } else {
+#warning "TODO: check tag"
       data[key] = make_shared<ndarray>(rs, kv.second);
     }
   }
