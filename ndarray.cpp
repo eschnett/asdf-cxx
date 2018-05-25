@@ -521,7 +521,7 @@ ndarray::ndarray(const copy_state &cs, const ndarray &arr) : ndarray(arr) {
 }
 
 writer &ndarray::to_yaml(writer &w) const {
-  w << YAML::VerbatimTag("tag:stsci.edu:asdf/core/ndarray-1.0.0");
+  w << YAML::LocalTag("core/ndarray-1.0.0");
   w << YAML::BeginMap;
   if (block_format == block_format_t::block) {
     // source

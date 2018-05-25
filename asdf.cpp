@@ -51,7 +51,7 @@ asdf::asdf(const copy_state &cs, const asdf &project) {
 }
 
 writer &asdf::to_yaml(writer &w) const {
-  w << YAML::VerbatimTag("tag:stsci.edu:asdf/core/asdf-1.1.0");
+  w << YAML::LocalTag("core/asdf-1.1.0");
   w << YAML::BeginMap;
   w << YAML::Key << "asdf_library" << YAML::Value
     << software("asdf-cxx", "Erik Schnetter",

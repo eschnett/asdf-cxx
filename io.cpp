@@ -24,10 +24,9 @@ writer::writer(ostream &os) : os(os), emitter(os) {
      << "#ASDF_STANDARD " << asdf_standard_version << "\n"
      << "# This is an ASDF file <https://asdf-standard.readthedocs.io/>\n"
      // yaml-cpp does not support writing a YAML tab
-     << "%YAML 1.1\n";
-#warning "TODO: Use Tag, LocalTag, or similar"
-  // << "%TAG ! tag:stsci.edu:asdf/\n"
-  // << "%TAG !! tag:github.com/eschnett/asdf-cxx/\n"
+     << "%YAML 1.1\n"
+     << "%TAG ! tag:stsci.edu:asdf/\n"
+     << "%TAG !asdf-cxx! tag:github.com/eschnett/asdf-cxx/\n";
   emitter << YAML::BeginDoc;
 }
 

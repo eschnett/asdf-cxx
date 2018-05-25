@@ -25,7 +25,7 @@ entry::entry(const copy_state &cs, const entry &ent)
 }
 
 writer &entry::to_yaml(writer &w) const {
-  w << YAML::VerbatimTag("tag:github.com/eschnett/asdf-cxx/core/entry-1.0.0");
+  w << YAML::LocalTag("asdf-cxx", "core/entry-1.0.0");
   w << YAML::BeginMap;
   w << YAML::Key << "name" << YAML::Value << name;
   if (grp)
@@ -50,7 +50,7 @@ group::group(const copy_state &cs, const group &grp) {
 }
 
 writer &group::to_yaml(writer &w) const {
-  w << YAML::VerbatimTag("tag:github.com/eschnett/asdf-cxx/core/group-1.0.0");
+  w << YAML::LocalTag("asdf-cxx", "core/group-1.0.0");
   w << YAML::BeginMap;
   for (const auto &kv : entries)
     w << YAML::Key << kv.first << YAML::Value << *kv.second;
