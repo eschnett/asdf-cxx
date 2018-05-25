@@ -185,8 +185,11 @@ public:
 
   field_t(const reader_state &rs, const YAML::Node &node);
   field_t(const copy_state &cs, const field_t &field);
-  YAML::Node to_yaml(writer &w) const;
+  YAML::Node to_yaml() const;
+  YAML::Node to_yaml(writer &w) const { return to_yaml(); }
 };
+
+inline YAML::Node yaml_encode(const field_t &field) { return field.to_yaml(); }
 
 class datatype_t {
 public:
@@ -207,10 +210,15 @@ public:
 
   datatype_t(const reader_state &rs, const YAML::Node &node);
   datatype_t(const copy_state &cs, const datatype_t &datatype);
-  YAML::Node to_yaml(writer &w) const;
+  YAML::Node to_yaml() const;
+  YAML::Node to_yaml(writer &w) const { return to_yaml(); }
 
   size_t type_size() const;
 };
+
+inline YAML::Node yaml_encode(const datatype_t &datatype) {
+  return datatype.to_yaml();
+}
 
 void parse_scalar(const YAML::Node &node, unsigned char *data,
                   const shared_ptr<datatype_t> &datatype,
