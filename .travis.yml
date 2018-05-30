@@ -41,7 +41,7 @@ install:
           tar xzf yaml-cpp-0.6.2.tar.gz
           mkdir yaml-cpp-0.6.2-build
           cd yaml-cpp-0.6.2-build
-          cmake -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_INSTALL_PREFIX="$YAML_CPP_DIR" ../yaml-cpp-yaml-cpp-0.6.2
+          cmake -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$YAML_CPP_DIR" ../yaml-cpp-yaml-cpp-0.6.2
           make -j2
           make -j2 install
         )
@@ -62,7 +62,7 @@ install:
           tar xzf yaml-cpp-0.6.2.tar.gz
           mkdir yaml-cpp-0.6.2-build
           cd yaml-cpp-0.6.2-build
-          cmake -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_INSTALL_PREFIX="$YAML_CPP_DIR" ../yaml-cpp-yaml-cpp-0.6.2
+          cmake -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$YAML_CPP_DIR" ../yaml-cpp-yaml-cpp-0.6.2
           make -j2
           make -j2 install
         )
