@@ -1,5 +1,8 @@
 #include "asdf_asdf.hpp"
 
+#include <cstdlib>
+#include <iostream>
+
 namespace ASDF {
 
 // ASDF
@@ -19,23 +22,38 @@ YAML::Node software(const string &name, const string &author,
   return node;
 }
 
-asdf::asdf(const reader_state &rs, const YAML::Node &node) {
+asdf::asdf(
+    const reader_state &rs, const YAML::Node &node,
+    const map<string, function<void(const reader_state &rs, const string &name,
+                                    const YAML::Node &node)>> &readers) {
   assert(node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.0.0" ||
          node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.1.0");
-  // TODO: read software
   for (const auto &kv : node) {
     const auto &key = kv.first.Scalar();
-    if (key == "asdf_library") {
+    const auto &node = kv.second;
+    const auto &tag = node.Tag();
+    if (tag == "tag:stsci.edu:asdf/core/software-1.0.0") {
       // TODO
-    } else if (key == "group") {
-      grp = make_shared<group>(rs, node["group"]);
-    } else if (key == "history") {
+    } else if (tag == "tag:stsci.edu:asdf/core/history_entry-1.0.0") {
       // TODO
+    } else if (tag == "tag:github.com/eschnett/asdf-cxx/core/group-1.0.0") {
+      grp = make_shared<group>(rs, node);
       // } else if (key == "table") {
       //   tab = make_shared<table>(rs, node["table"]);
+    } else if (tag == "tag:stsci.edu:asdf/core/ndarray-1.0.0") {
+      data[key] = make_shared<ndarray>(rs, node);
+    } else if (readers.count(tag)) {
+      readers.at(tag)(rs, key, node);
     } else {
-#warning "TODO: check tag"
-      data[key] = make_shared<ndarray>(rs, kv.second);
+      cerr << "No handler for tag <" << tag << ">\n";
+      if (readers.empty()) {
+        cerr << "There are no known tags.\n";
+      } else {
+        cerr << "Known tags are:\n";
+        for (const auto &kv : readers)
+          cerr << "  <" << kv.first << ">\n";
+      }
+      exit(2);
     }
   }
 }
@@ -73,7 +91,10 @@ writer &asdf::to_yaml(writer &w) const {
   return w;
 }
 
-asdf::asdf(istream &is) {
+asdf::asdf(
+    istream &is,
+    const map<string, function<void(const reader_state &rs, const string &name,
+                                    const YAML::Node &node)>> &readers) {
   // TODO: stream the file instead
   ostringstream doc;
   for (;;) {
@@ -85,10 +106,7 @@ asdf::asdf(istream &is) {
   }
   YAML::Node node = YAML::Load(doc.str());
   reader_state rs(is);
-  auto project = asdf(rs, node);
-  data = move(project.data);
-  // tab = move(project.tab);
-  grp = move(project.grp);
+  *this = asdf(rs, node, readers);
 }
 
 asdf asdf::copy(const copy_state &cs) const { return asdf(cs, *this); }

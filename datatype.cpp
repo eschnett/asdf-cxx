@@ -419,11 +419,11 @@ YAML::Node emit_scalar(const unsigned char *data,
 
 // Datatypes
 
-field_t::field_t(const string &name, const shared_ptr<datatype_t> &datatype,
+field_t::field_t(string name, shared_ptr<datatype_t> datatype,
                  bool have_byteorder, byteorder_t byteorder,
-                 const vector<int64_t> &shape)
-    : name(name), datatype(datatype), have_byteorder(have_byteorder),
-      byteorder(byteorder), shape(shape) {
+                 vector<int64_t> shape)
+    : name(move(name)), datatype(move(datatype)),
+      have_byteorder(have_byteorder), byteorder(byteorder), shape(move(shape)) {
   assert(datatype);
 }
 
@@ -446,10 +446,7 @@ YAML::Node field_t::to_yaml() const {
 datatype_t::datatype_t(scalar_type_id_t scalar_type_id)
     : is_scalar(true), scalar_type_id(scalar_type_id) {}
 
-datatype_t::datatype_t(const vector<shared_ptr<field_t>> &fields)
-    : is_scalar(false), fields(fields) {}
-
-datatype_t::datatype_t(vector<shared_ptr<field_t>> &&fields)
+datatype_t::datatype_t(vector<shared_ptr<field_t>> fields)
     : is_scalar(false), fields(move(fields)) {}
 
 size_t datatype_t::type_size() const {

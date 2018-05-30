@@ -34,8 +34,7 @@ template <typename T> class blob_t : public generic_blob_t {
 
 public:
   blob_t() = delete;
-  blob_t(const vector<T> &data) : data(data) {}
-  blob_t(vector<T> &&data) : data(move(data)) {}
+  blob_t(vector<T> data1) : data(move(data1)) {}
 
   virtual ~blob_t() {}
 
@@ -58,8 +57,7 @@ template <> class blob_t<bool> : public generic_blob_t {
 public:
   blob_t() = delete;
 
-  blob_t(const vector<unsigned char> &data) : data(data) {}
-  blob_t(vector<unsigned char> &&data) : data(move(data)) {}
+  blob_t(vector<unsigned char> data1) : data(move(data1)) {}
   blob_t(const vector<bool> &data);
 
   virtual ~blob_t() {}
@@ -80,7 +78,7 @@ public:
 
   ptr_blob_t(void *data, size_t size) : data(data), size(size) { assert(data); }
   template <typename T>
-  ptr_blob_t(const vector<T> &data)
+  ptr_blob_t(vector<T> &data)
       : data(data.data()), size(data.size() * sizeof(T)) {}
 
   virtual ~ptr_blob_t() {}
@@ -114,14 +112,14 @@ public:
   ndarray &operator=(const ndarray &) = default;
   ndarray &operator=(ndarray &&) = default;
 
-  ndarray(const shared_ptr<generic_blob_t> &data, block_format_t block_format,
-          compression_t compression, const vector<bool> &mask,
-          const shared_ptr<datatype_t> &datatype, byteorder_t byteorder,
-          const vector<int64_t> &shape, int64_t offset = 0,
-          const vector<int64_t> &strides1 = {})
-      : data(data), block_format(block_format), compression(compression),
-        mask(mask), datatype(datatype), byteorder(byteorder), shape(shape),
-        offset(offset), strides(strides1) {
+  ndarray(shared_ptr<generic_blob_t> data1, block_format_t block_format,
+          compression_t compression, vector<bool> mask1,
+          shared_ptr<datatype_t> datatype1, byteorder_t byteorder,
+          vector<int64_t> shape1, int64_t offset = 0,
+          vector<int64_t> strides1 = {})
+      : data(move(data1)), block_format(block_format), compression(compression),
+        mask(move(mask1)), datatype(move(datatype1)), byteorder(byteorder),
+        shape(move(shape1)), offset(offset), strides(move(strides1)) {
     // Check shape
     int rank = shape.size();
     for (int d = 0; d < rank; ++d)
@@ -152,21 +150,13 @@ public:
   }
 
   template <typename T>
-  ndarray(const vector<T> &data, block_format_t block_format,
-          compression_t compression, const vector<bool> &mask,
-          const vector<int64_t> &shape, const vector<int64_t> &strides = {},
-          int64_t offset = 0)
-      : ndarray(make_shared<blob_t<T>>(data), block_format, compression, mask,
+  ndarray(vector<T> data1, block_format_t block_format,
+          compression_t compression, vector<bool> mask1, vector<int64_t> shape1,
+          vector<int64_t> strides1 = {}, int64_t offset = 0)
+      : ndarray(make_shared<blob_t<T>>(move(data1)), block_format, compression,
+                move(mask1),
                 make_shared<datatype_t>(get_scalar_type_id<T>::value),
-                host_byteorder(), shape, offset, strides) {}
-  template <typename T>
-  ndarray(vector<T> &&data, block_format_t block_format,
-          compression_t compression, const vector<bool> &mask,
-          const vector<int64_t> &shape, const vector<int64_t> &strides = {},
-          int64_t offset = 0)
-      : ndarray(make_shared<blob_t<T>>(move(data)), block_format, compression,
-                mask, make_shared<datatype_t>(get_scalar_type_id<T>::value),
-                host_byteorder(), shape, offset, strides) {}
+                host_byteorder(), move(shape1), offset, move(strides1)) {}
 
   ndarray(const reader_state &rs, const YAML::Node &node);
   ndarray(const copy_state &cs, const ndarray &arr);

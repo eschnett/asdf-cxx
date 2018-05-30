@@ -25,9 +25,8 @@ public:
   column &operator=(const column &) = default;
   column &operator=(column &&) = default;
 
-  column(const string &name, const shared_ptr<ndarray> &data,
-         const string &description)
-      : name(name), data(data), description(description) {
+  column(string name1, shared_ptr<ndarray> data1, string description1)
+      : name(move(name1)), data(move(data1)), description(move(description1)) {
     assert(!name.empty());
     assert(data);
   }
@@ -50,7 +49,7 @@ public:
   table &operator=(const table &) = default;
   table &operator=(table &&) = default;
 
-  table(const vector<shared_ptr<column>> &columns) : columns(columns) {}
+  table(vector<shared_ptr<column>> columns1) : columns(move(columns1)) {}
 
   table(const reader_state &rs, const YAML::Node &node);
   table(const copy_state &cs, const table &tab);

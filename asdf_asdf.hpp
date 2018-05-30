@@ -33,31 +33,36 @@ public:
   asdf &operator=(const asdf &) = default;
   asdf &operator=(asdf &&) = default;
 
-  asdf(const map<string, string> &tags,
-       const map<string, shared_ptr<ndarray>> &data)
-      : tags(tags), data(data) {}
+  asdf(map<string, string> tags1, map<string, shared_ptr<ndarray>> data1)
+      : tags(move(tags1)), data(move(data1)) {}
   // asdf(const map<string, string> &tags, const shared_ptr<table> &tab)
   //     : tags(tags), tab(tab) {
   //   assert(tab);
   // }
-  asdf(const map<string, string> &tags, const shared_ptr<group> &grp)
-      : tags(tags), grp(grp) {
+  asdf(map<string, string> tags1, shared_ptr<group> grp1)
+      : tags(move(tags1)), grp(move(grp1)) {
     assert(grp);
   }
-  asdf(const map<string, string> &tags, const map<string, YAML::Node> &nodes)
-      : tags(tags), nodes(nodes) {}
-  asdf(const map<string, string> &tags,
-       const map<string, function<void(writer &w)>> &writers)
-      : tags(tags), writers(writers) {}
+  asdf(map<string, string> tags1, map<string, YAML::Node> nodes1)
+      : tags(move(tags1)), nodes(move(nodes1)) {}
+  asdf(map<string, string> tags1,
+       map<string, function<void(writer &w)>> writers1)
+      : tags(move(tags1)), writers(move(writers1)) {}
 
-  asdf(const reader_state &rs, const YAML::Node &node);
+  asdf(const reader_state &rs, const YAML::Node &node,
+       const map<string,
+                 function<void(const reader_state &rs, const string &name,
+                               const YAML::Node &node)>> &readers = {});
   asdf(const copy_state &cs, const asdf &project);
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const asdf &proj) {
     return proj.to_yaml(w);
   }
 
-  asdf(istream &is);
+  asdf(istream &is,
+       const map<string,
+                 function<void(const reader_state &rs, const string &name,
+                               const YAML::Node &node)>> &readers = {});
   asdf copy(const copy_state &cs) const;
   void write(ostream &os) const;
 };

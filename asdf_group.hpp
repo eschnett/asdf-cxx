@@ -28,16 +28,14 @@ public:
   entry &operator=(const entry &) = default;
   entry &operator=(entry &&) = default;
 
-  entry(const string &name, const shared_ptr<ndarray> &arr,
-        const string &description)
-      : name(name), arr(arr), description(description) {
+  entry(string name1, shared_ptr<ndarray> arr1, string description1)
+      : name(move(name1)), arr(move(arr1)), description(move(description1)) {
     assert(!name.empty());
     assert(arr);
   }
 
-  entry(const string &name, const shared_ptr<group> &grp,
-        const string &description)
-      : name(name), grp(grp), description(description) {
+  entry(string name1, shared_ptr<group> grp1, string description1)
+      : name(move(name1)), grp(move(grp1)), description(move(description1)) {
     assert(!name.empty());
     assert(grp);
   }
@@ -60,7 +58,7 @@ public:
   group &operator=(const group &) = default;
   group &operator=(group &&) = default;
 
-  group(const map<string, shared_ptr<entry>> &entries) : entries(entries) {}
+  group(map<string, shared_ptr<entry>> entries1) : entries(move(entries1)) {}
   template <typename T>
   group(const map<string, shared_ptr<T>> &data,
         const function<entry(const T &)> &f) {

@@ -179,9 +179,8 @@ public:
   field_t &operator=(const field_t &) = default;
   field_t &operator=(field_t &&) = default;
 
-  field_t(const string &name, const shared_ptr<datatype_t> &datatype,
-          bool have_byteorder, byteorder_t byteorder,
-          const vector<int64_t> &shape);
+  field_t(string name, shared_ptr<datatype_t> datatype, bool have_byteorder,
+          byteorder_t byteorder, vector<int64_t> shape);
 
   field_t(const reader_state &rs, const YAML::Node &node);
   field_t(const copy_state &cs, const field_t &field);
@@ -205,8 +204,7 @@ public:
   datatype_t &operator=(datatype_t &&) = default;
 
   datatype_t(scalar_type_id_t scalar_type_id);
-  datatype_t(const vector<shared_ptr<field_t>> &fields);
-  datatype_t(vector<shared_ptr<field_t>> &&fields);
+  datatype_t(vector<shared_ptr<field_t>> fields);
 
   datatype_t(const reader_state &rs, const YAML::Node &node);
   datatype_t(const copy_state &cs, const datatype_t &datatype);
