@@ -12,7 +12,7 @@ YAML::Node software(const string &name, const string &author,
   YAML::Node node;
   node.SetTag("tag:stsci.edu:asdf/core/software-1.0.0");
   assert(!name.empty());
-  node[name] = name;
+  node["name"] = name;
   if (!author.empty())
     node["author"] = author;
   if (!homepage.empty())
