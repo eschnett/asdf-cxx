@@ -17,10 +17,15 @@ Metadata are stored in the human-readable `YAML <http://yaml.org>`_
 format.
 
 ASDF exists as standard, and there are (so far) implementations in
-`Python <https://github.com/spacetelescope/asdf>`_ and `Go
-<https://github.com/astrogo/asdf>`_. This library `asdf-cxx
-<https://github.com/eschnett/asdf-cxx>`_ provides an independent
-implementation in C++, suitable for HPC environments.
+`Python <https://github.com/spacetelescope/asdf>`_, `C++
+<https://github.com/spacetelescope/asdf-cpp>`_, and `Go
+<https://github.com/astrogo/asdf>`_.
+
+This library `asdf-cxx <https://github.com/eschnett/asdf-cxx>`_
+provides an independent implementation in C++, suitable for HPC
+environments. This library `asdf-cxx` and the other C++ library
+`asdf-cpp` are very similar in terms of the features they offer, while
+providing different APIs.
 
 
 Standard conformance
