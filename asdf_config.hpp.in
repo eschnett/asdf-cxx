@@ -27,25 +27,25 @@ void checkVersion(const char *header_version);
 // bzip2 support
 
 #if @HAVE_BZIP2@
-#define HAVE_BZIP2 1
+#define ASDF_HAVE_BZIP2 1
 #else
-#undef HAVE_BZIP2
+#undef ASDF_HAVE_BZIP2
 #endif
 
 // OpenSSL support
 
 #if @HAVE_OPENSSL@
-#define HAVE_OPENSSL 1
+#define ASDF_HAVE_OPENSSL 1
 #else
-#undef HAVE_OPENSSL
+#undef ASDF_HAVE_OPENSSL
 #endif
 
 // zlib support
 
 #if @HAVE_ZLIB@
-#define HAVE_ZLIB 1
+#define ASDF_HAVE_ZLIB 1
 #else
-#undef HAVE_ZLIB
+#undef ASDF_HAVE_ZLIB
 #endif
 
 } // namespace ASDF

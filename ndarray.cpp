@@ -3,15 +3,15 @@
 #include "asdf_config.hpp"
 #include "asdf_stl.hpp"
 
-#ifdef HAVE_BZIP2
+#ifdef ASDF_HAVE_BZIP2
 #include <bzlib.h>
 #endif
 
-#ifdef HAVE_OPENSSL
+#ifdef ASDF_HAVE_OPENSSL
 #include <openssl/md5.h>
 #endif
 
-#ifdef HAVE_ZLIB
+#ifdef ASDF_HAVE_ZLIB
 #include <zlib.h>
 #endif
 
@@ -211,7 +211,7 @@ shared_ptr<generic_blob_t> read_block(istream &is) {
     assert(data_space == allocated_space);
     data = move(indata);
     break;
-#ifdef HAVE_BZIP2
+#ifdef ASDF_HAVE_BZIP2
   case compression_t::bzip2: {
     data.resize(data_space);
     bz_stream strm;
@@ -244,7 +244,7 @@ shared_ptr<generic_blob_t> read_block(istream &is) {
     break;
   }
 #endif
-#ifdef HAVE_ZLIB
+#ifdef ASDF_HAVE_ZLIB
   case compression_t::zlib: {
     data.resize(data_space);
     z_stream strm;
@@ -317,7 +317,7 @@ void ndarray::write_block(ostream &os) const {
     outdata = data;
     break;
   case compression_t::bzip2: {
-#ifdef HAVE_BZIP2
+#ifdef ASDF_HAVE_BZIP2
     comp = {'b', 'z', 'p', '2'};
     // Allocate 600 bytes plus 1% more
     outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
@@ -362,7 +362,7 @@ void ndarray::write_block(ostream &os) const {
     break;
   }
   case compression_t::zlib: {
-#ifdef HAVE_ZLIB
+#ifdef ASDF_HAVE_ZLIB
     comp = {'z', 'l', 'i', 'b'};
     // Allocate 6 bytes plus 5 bytes per 16 kByte more
     outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
@@ -424,7 +424,7 @@ void ndarray::write_block(ostream &os) const {
   output(header, data_space);
   // checksum
   array<unsigned char, 16> checksum;
-#ifdef HAVE_OPENSSL
+#ifdef ASDF_HAVE_OPENSSL
   MD5_CTX ctx;
   MD5_Init(&ctx);
   MD5_Update(&ctx, outdata->ptr(), outdata->nbytes());
