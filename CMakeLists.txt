@@ -6,7 +6,7 @@ cmake_policy(SET CMP0048 NEW)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
-project(asdf-cxx VERSION 2.0.2 LANGUAGES CXX)
+project(asdf-cxx VERSION 2.0.3 LANGUAGES CXX)
 set(PROJECT_DESCRIPTION
   "asdf-cxx (Advanced Scientific Data Format), C++ implementation")
 set(PROJECT_URL "https://github.com/eschnett/asdf-cxx")
@@ -101,7 +101,7 @@ add_test(NAME demo COMMAND ./asdf-demo)
 add_test(NAME ls COMMAND ./asdf-ls demo.asdf)
 add_test(NAME copy COMMAND ./asdf-copy demo.asdf demo2.asdf)
 add_test(NAME ls2 COMMAND ./asdf-ls demo2.asdf)
-add_test(NAME compare COMMAND ../diff-commands.sh "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
+add_test(NAME compare COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
 
 # Coverage
 
