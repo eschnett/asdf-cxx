@@ -11,8 +11,7 @@ namespace ASDF {
 #define ASDF_VERSION_MINOR @asdf-cxx_VERSION_MINOR@
 #define ASDF_VERSION_PATCH @asdf-cxx_VERSION_PATCH@
 
-#define ASDF_VERSION                                                           \
-  "@asdf-cxx_VERSION_MAJOR@.@asdf-cxx_VERSION_MINOR@.@asdf-cxx_VERSION_PATCH@"
+#define ASDF_VERSION "@asdf-cxx_VERSION_MAJOR@.@asdf-cxx_VERSION_MINOR@.@asdf-cxx_VERSION_PATCH@"
 
 int versionMajor();
 int versionMinor();

@@ -6,7 +6,7 @@ cmake_policy(SET CMP0048 NEW)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
-project(asdf-cxx VERSION 2.0.3 LANGUAGES CXX)
+project(asdf-cxx VERSION 2.1.0 LANGUAGES CXX)
 set(PROJECT_DESCRIPTION
   "asdf-cxx (Advanced Scientific Data Format), C++ implementation")
 set(PROJECT_URL "https://github.com/eschnett/asdf-cxx")
