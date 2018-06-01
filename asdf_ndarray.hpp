@@ -152,7 +152,7 @@ public:
   template <typename T>
   ndarray(vector<T> data1, block_format_t block_format,
           compression_t compression, vector<bool> mask1, vector<int64_t> shape1,
-          vector<int64_t> strides1 = {}, int64_t offset = 0)
+          int64_t offset = 0, vector<int64_t> strides1 = {})
       : ndarray(make_shared<blob_t<T>>(move(data1)), block_format, compression,
                 move(mask1),
                 make_shared<datatype_t>(get_scalar_type_id<T>::value),
