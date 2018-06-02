@@ -36,8 +36,8 @@ are:
 
 - History entries are not supported (i.e. are not written, and are
   ignored when reading).
-- URI references to other files (e.g. "exploded files") are not
-  supported
+- Simple ndarray references to other files (e.g. "exploded files") are
+  not supported. (Full URI references are supported.)
 - Streaming writes and reading streamed datasets is not supported.
 - String types (i.e. arrays of fixed length strings) are not supported.
 - Errors are not handled gracefully; the code will simply abort on
