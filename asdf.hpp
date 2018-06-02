@@ -7,6 +7,7 @@
 #include "asdf_group.hpp"
 #include "asdf_io.hpp"
 #include "asdf_ndarray.hpp"
+#include "asdf_reference.hpp"
 #include "asdf_stl.hpp"
 #include "asdf_table.hpp"
 

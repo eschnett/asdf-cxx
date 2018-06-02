@@ -7,34 +7,66 @@ namespace ASDF {
 entry::entry(const reader_state &rs, const YAML::Node &node) {
   assert(node.Tag() == "tag:github.com/eschnett/asdf-cxx/core/entry-1.0.0");
   name = node["name"].Scalar();
-  if (node["group"].IsDefined())
-    grp = make_shared<group>(rs, node["group"]);
   if (node["data"].IsDefined())
     arr = make_shared<ndarray>(rs, node["data"]);
-  assert(bool(grp) + bool(arr) == 1);
+  if (node["reference"].IsDefined())
+    ref = make_shared<reference>(rs, node["reference"]);
+  if (node["sequence"].IsDefined())
+    seq = make_shared<sequence>(rs, node["sequence"]);
+  if (node["group"].IsDefined())
+    grp = make_shared<group>(rs, node["group"]);
+  assert(bool(arr) + bool(ref) + bool(seq) +bool(grp)  == 1);
   if (node["description"].IsDefined())
     description = node["description"].Scalar();
 }
 
 entry::entry(const copy_state &cs, const entry &ent)
     : name(ent.name), description(ent.description) {
-  if (ent.grp)
-    grp = make_shared<group>(cs, *ent.grp);
   if (ent.arr)
     arr = make_shared<ndarray>(cs, *ent.arr);
+  if (ent.ref)
+    ref = make_shared<reference>(cs, *ent.ref);
+  if (ent.seq)
+    seq = make_shared<sequence>(cs, *ent.seq);
+  if (ent.grp)
+    grp = make_shared<group>(cs, *ent.grp);
 }
 
 writer &entry::to_yaml(writer &w) const {
   w << YAML::LocalTag("asdf-cxx", "core/entry-1.0.0");
   w << YAML::BeginMap;
   w << YAML::Key << "name" << YAML::Value << name;
-  if (grp)
-    w << YAML::Key << "group" << YAML::Value << *grp;
   if (arr)
     w << YAML::Key << "data" << YAML::Value << *arr;
+  if (ref)
+    w << YAML::Key << "reference" << YAML::Value << *ref;
+  if (seq)
+    w << YAML::Key << "sequence" << YAML::Value << *seq;
+  if (grp)
+    w << YAML::Key << "group" << YAML::Value << *grp;
   if (!description.empty())
     w << YAML::Key << "description" << YAML::Value << description;
   w << YAML::EndMap;
+  return w;
+}
+
+sequence::sequence(const reader_state &rs, const YAML::Node &node) {
+  assert(node.Tag() == "tag:github.com/eschnett/asdf-cxx/core/sequence-1.0.0");
+  for (const auto &ent : node)
+    entries.push_back(make_shared<entry>(rs, ent));
+}
+
+sequence::sequence(const copy_state &cs, const sequence &seq) {
+  for (const auto &v : seq.entries)
+    entries.push_back(make_shared<entry>(cs, *v));
+}
+
+writer &sequence::to_yaml(writer &w) const {
+  w << YAML::LocalTag("asdf-cxx", "core/sequence-1.0.0");
+  w << YAML::BeginSeq;
+  for (const auto &v : entries)
+    w << *v;
+  w << YAML::EndSeq;
   return w;
 }
 

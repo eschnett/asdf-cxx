@@ -49,20 +49,18 @@ public:
        map<string, function<void(writer &w)>> writers1)
       : tags(move(tags1)), writers(move(writers1)) {}
 
+  typedef function<void(const reader_state &rs, const string &name,
+                        const YAML::Node &node)>
+      reader_t;
   asdf(const reader_state &rs, const YAML::Node &node,
-       const map<string,
-                 function<void(const reader_state &rs, const string &name,
-                               const YAML::Node &node)>> &readers = {});
+       const map<string, reader_t> &readers = {});
   asdf(const copy_state &cs, const asdf &project);
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const asdf &proj) {
     return proj.to_yaml(w);
   }
 
-  asdf(istream &is,
-       const map<string,
-                 function<void(const reader_state &rs, const string &name,
-                               const YAML::Node &node)>> &readers = {});
+  asdf(istream &is, const map<string, reader_t> &readers = {});
   asdf copy(const copy_state &cs) const;
   void write(ostream &os) const;
 };

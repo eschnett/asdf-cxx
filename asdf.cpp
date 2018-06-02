@@ -22,10 +22,8 @@ YAML::Node software(const string &name, const string &author,
   return node;
 }
 
-asdf::asdf(
-    const reader_state &rs, const YAML::Node &node,
-    const map<string, function<void(const reader_state &rs, const string &name,
-                                    const YAML::Node &node)>> &readers) {
+asdf::asdf(const reader_state &rs, const YAML::Node &node,
+           const map<string, reader_t> &readers) {
   assert(node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.0.0" ||
          node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.1.0");
   for (const auto &kv : node) {
@@ -91,10 +89,7 @@ writer &asdf::to_yaml(writer &w) const {
   return w;
 }
 
-asdf::asdf(
-    istream &is,
-    const map<string, function<void(const reader_state &rs, const string &name,
-                                    const YAML::Node &node)>> &readers) {
+asdf::asdf(istream &is, const map<string, reader_t> &readers) {
   // TODO: stream the file instead
   ostringstream doc;
   for (;;) {
