@@ -15,7 +15,7 @@ entry::entry(const reader_state &rs, const YAML::Node &node) {
     seq = make_shared<sequence>(rs, node["sequence"]);
   if (node["group"].IsDefined())
     grp = make_shared<group>(rs, node["group"]);
-  assert(bool(arr) + bool(ref) + bool(seq) +bool(grp)  == 1);
+  assert(bool(arr) + bool(ref) + bool(seq) + bool(grp) == 1);
   if (node["description"].IsDefined())
     description = node["description"].Scalar();
 }
