@@ -99,7 +99,7 @@ reference::reference(const copy_state &cs, const reference &ref) {
 
 writer &reference::to_yaml(writer &w) const {
   // w << YAML::LocalTag("core/reference-1.0.0");
-  w << YAML::BeginMap;
+  w << YAML::Flow << YAML::BeginMap;
   w << YAML::Key << "$ref" << YAML::Value << target;
   w << YAML::EndMap;
   return w;
