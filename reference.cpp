@@ -37,10 +37,9 @@ reference::reference(const string &base_target,
 
 pair<string, vector<string>> reference::get_split_target() const {
   auto hashpos = target.find('#');
-  if (hashpos == string::npos) {
+  if (hashpos == string::npos)
     return {target, {}};
-  }
-  auto base_target = target.substr(0, hashpos - 1);
+  auto base_target = target.substr(0, hashpos);
   auto fragment = target.substr(hashpos + 1);
   vector<string> doc_path;
   for (;;) {
@@ -49,12 +48,11 @@ pair<string, vector<string>> reference::get_split_target() const {
       doc_path.push_back(fragment);
       break;
     }
-    doc_path.push_back(fragment.substr(0, slashpos - 1));
+    doc_path.push_back(fragment.substr(0, slashpos));
     fragment = fragment.substr(slashpos + 1);
   }
-  // The fragment should either be empty, or should begin with a
-  // slash. In both cases, the first element of doc_path should have
-  // length zero.
+  // The fragment should either be empty, or should begin with a slash. In both
+  // cases, the first element of doc_path should have length zero.
   assert(doc_path.size() > 0);
   assert(doc_path.at(0).size() == 0);
   doc_path.erase(doc_path.begin());
