@@ -37,6 +37,8 @@ public:
 
 YAML::Node resolve_reference(const YAML::Node &doc,
                              const vector<string> &doc_path);
+YAML::Node resolve_reference(const reader_state &rs,
+                             const vector<string> &doc_path);
 
 } // namespace ASDF
 

@@ -100,7 +100,7 @@ asdf::asdf(istream &is, const map<string, reader_t> &readers) {
       break;
   }
   YAML::Node node = YAML::Load(doc.str());
-  reader_state rs(is);
+  reader_state rs(node, is);
   *this = asdf(rs, node, readers);
 }
 

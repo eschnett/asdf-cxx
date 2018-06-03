@@ -130,4 +130,9 @@ YAML::Node resolve_reference(const YAML::Node &doc,
   return *node;
 }
 
+YAML::Node resolve_reference(const reader_state &rs,
+                             const vector<string> &doc_path) {
+  return resolve_reference(rs.doc, doc_path);
+}
+
 } // namespace ASDF

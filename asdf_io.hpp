@@ -21,8 +21,12 @@ class generic_blob_t;
 shared_ptr<generic_blob_t> read_block(istream &is);
 
 class reader_state {
+  YAML::Node doc;
   // TODO: Store only the file position
   vector<shared_ptr<generic_blob_t>> blocks;
+
+  friend YAML::Node resolve_reference(const reader_state &rs,
+                                      const vector<string> &doc_path);
 
 public:
   reader_state() = delete;
@@ -31,7 +35,7 @@ public:
   reader_state &operator=(const reader_state &) = delete;
   reader_state &operator=(reader_state &&) = delete;
 
-  reader_state(istream &is);
+  reader_state(const YAML::Node &doc, istream &is);
 
   shared_ptr<generic_blob_t> get_block(int64_t index) const {
     assert(index >= 0);

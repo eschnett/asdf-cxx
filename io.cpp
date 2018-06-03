@@ -9,7 +9,7 @@ const string asdf_standard_version = "1.1.0";
 
 // I/O
 
-reader_state::reader_state(istream &is) {
+reader_state::reader_state(const YAML::Node &doc, istream &is) : doc(doc) {
   for (;;) {
     const auto &block = read_block(is);
     if (!block)
@@ -24,7 +24,7 @@ writer::writer(ostream &os, const map<string, string> &tags)
   os << "#ASDF " << asdf_format_version << "\n"
      << "#ASDF_STANDARD " << asdf_standard_version << "\n"
      << "# This is an ASDF file <https://asdf-standard.readthedocs.io/>\n"
-     // yaml-cpp does not support writing a YAML tab
+     // yaml-cpp does not support writing a YAML tag
      << "%YAML 1.1\n"
      << "%TAG ! tag:stsci.edu:asdf/\n"
      << "%TAG !asdf-cxx! tag:github.com/eschnett/asdf-cxx/\n";
@@ -48,7 +48,7 @@ void writer::flush() {
     index << YAML::EndSeq << YAML::EndDoc;
     // yaml-cpp does not support comments without leading space
     os << "#ASDF BLOCK INDEX\n"
-       // yaml-cpp does not support writing a YAML tab
+       // yaml-cpp does not support writing a YAML tag
        << "%YAML 1.1\n"
        << index.c_str();
   }
