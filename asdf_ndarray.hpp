@@ -6,6 +6,7 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <memory>
@@ -168,6 +169,29 @@ public:
   shared_ptr<generic_blob_t> get_data() const { return data; }
   shared_ptr<datatype_t> get_datatype() const { return datatype; }
   vector<int64_t> get_shape() const { return shape; }
+  int64_t get_offset() const { return offset; }
+  vector<int64_t> get_strides() const { return strides; }
+
+  int64_t linear_index(const vector<int64_t> &idx) const {
+    int dim = shape.size();
+    assert(idx.size() == dim);
+    int64_t lin = offset;
+    for (int d = 0; d < dim; ++d) {
+      assert(idx[d] >= 0 && idx[d] < shape[d]);
+      lin += strides[d] * idx[d];
+    }
+    return lin;
+  }
+  template <int D> int64_t linear_index(const array<int64_t, D> &idx) const {
+    int dim = shape.size();
+    assert(D == dim);
+    int64_t lin = offset;
+    for (int d = 0; d < dim; ++d) {
+      assert(idx[d] >= 0 && idx[d] < shape[d]);
+      lin += strides[d] * idx[d];
+    }
+    return lin;
+  }
 };
 
 } // namespace ASDF
