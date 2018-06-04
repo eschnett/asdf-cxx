@@ -24,9 +24,10 @@ int main(int argc, char **argv) {
       vector<int64_t>{1, 2, 3}, block_format_t::block, compression_t::none,
       vector<bool>(), vector<int64_t>{3});
   auto ent1 = make_shared<entry>("beta", array1d, string());
-  auto array2d = make_shared<ndarray>(
-      vector<float64_t>{1.0, 2.0, 3.0, 4.0}, block_format_t::inline_array,
-      compression_t::none, vector<bool>(), vector<int64_t>{2, 2});
+  auto array2d =
+      make_shared<ndarray>(vector<float64_t>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0},
+                           block_format_t::inline_array, compression_t::none,
+                           vector<bool>(), vector<int64_t>{2, 3});
   auto ent2 = make_shared<entry>("gamma", array2d, string());
   auto array3d =
       make_shared<ndarray>(vector<complex128_t>{1, -2, 3i, -4i, 5 + 1i, 6 - 1i},

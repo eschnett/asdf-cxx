@@ -38,7 +38,7 @@ void parse_inline_array_nd(const YAML::Node &node,
     parse_scalar(node, &data[oldsize], datatype);
     return;
   }
-  int64_t size = shape.at(rank - 1);
+  int64_t size = shape.at(shape.size() - rank);
   assert(node.IsSequence());
   assert(node.size() == size);
   for (YAML::const_iterator ni = node.begin(), ne = node.end(); ni != ne; ++ni)
