@@ -164,6 +164,10 @@ public:
   friend writer &operator<<(writer &w, const ndarray &arr) {
     return arr.to_yaml(w);
   }
+
+  shared_ptr<generic_blob_t> get_data() const { return data; }
+  shared_ptr<datatype_t> get_datatype() const { return datatype; }
+  vector<int64_t> get_shape() const { return shape; }
 };
 
 } // namespace ASDF
