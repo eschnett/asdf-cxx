@@ -47,11 +47,11 @@ string tilde_encode(const string &raw) {
   ostringstream buf;
   for (unsigned char ch : raw) {
     switch (ch) {
-    case '~':
-      buf << "~0";
-      break;
     case '/':
       buf << "~1";
+      break;
+    case '~':
+      buf << "~0";
       break;
     default:
       buf << ch;
@@ -112,7 +112,7 @@ string fragment_percent_encode(const string &raw) {
   for (unsigned char ch : raw) {
     bool isallowed = isalpha(ch) || isdigit(ch);
     switch (ch) {
-      // unreserved
+    // unreserved
     case '-':
     case '.':
     case '_':
@@ -129,10 +129,10 @@ string fragment_percent_encode(const string &raw) {
     case ',':
     case ';':
     case '=':
-      // pchar
+    // pchar
     case ':':
     case '@':
-      // fragment
+    // fragment
     case '/':
     case '?':
       isallowed = true;
@@ -143,7 +143,7 @@ string fragment_percent_encode(const string &raw) {
       buf << '%' << uppercase << hex << setw(2) << setfill('0') << int(ch);
   }
   auto cooked = buf.str();
-  assert(tilde_decode(cooked) == raw);
+  assert(fragment_percent_decode(cooked) == raw);
   return cooked;
 }
 
@@ -199,7 +199,9 @@ reference::reference(const copy_state &cs, const reference &ref) {
 writer &reference::to_yaml(writer &w) const {
   // w << YAML::LocalTag("core/reference-1.0.0");
   w << YAML::Flow << YAML::BeginMap;
-  w << YAML::Key << "$ref" << YAML::Value << target;
+  // We need to double-quote the string to make Python's YAML accept it;
+  // Python's YAML parser does not accept plain strings that contain colons ":"
+  w << YAML::Key << "$ref" << YAML::Value << YAML::DoubleQuoted << target;
   w << YAML::EndMap;
   return w;
 }
