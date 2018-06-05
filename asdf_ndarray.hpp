@@ -182,7 +182,7 @@ public:
     }
     return lin;
   }
-  template <int D> int64_t linear_index(const array<int64_t, D> &idx) const {
+  template <size_t D> int64_t linear_index(const array<int64_t, D> &idx) const {
     int dim = shape.size();
     assert(D == dim);
     int64_t lin = offset;
