@@ -44,6 +44,9 @@ are:
   most errors.
 
 Other minor limitations are:
+- Non-YAML Comments (using a `//` key) are ignored, and there is no
+  way to generate such comments when writing ASDF files.
+- Integers using more than 52 bits are not rejected.
 - The block index is not used; instead, it is always re-created.
 - Output files cannot be padded.
 - The ASDF standard requires that certain maps are output in a certain
@@ -51,6 +54,10 @@ Other minor limitations are:
   ("block" or "flow"). However, it also requires that an ASDF reader
   must not rely on this. asdf-cxx does probably not yet honour all
   these "optional requirements".
+- JSON URI references are not percent encoded
+
+Things that should be improved:
+- Travis should test against the Python reference `asdf` library
 
 Also, the `yaml-cpp` library outputs the YAML 1.2 format, whereas ASDF
 requires the YAML 1.1 format. The differences between these two
