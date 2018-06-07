@@ -23,9 +23,9 @@ int main(int argc, char **argv) {
   assert(!outputfilename.empty());
 
   // Read project
-  ifstream is(inputfilename, ios::binary | ios::in);
-  auto project = ASDF::asdf(is);
-  is.close();
+  auto pis = make_shared<ifstream>(inputfilename, ios::binary | ios::in);
+  auto project = ASDF::asdf(pis);
+  pis.reset();
 
   // Copy project
 #warning "TODO: Add command line option for this"

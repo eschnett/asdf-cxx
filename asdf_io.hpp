@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -18,12 +19,13 @@ enum class block_format_t { undefined, block, inline_array };
 enum class compression_t { undefined, none, bzip2, zlib };
 
 class generic_blob_t;
-shared_ptr<generic_blob_t> read_block(istream &is);
+shared_future<shared_ptr<generic_blob_t>>
+read_block(const shared_ptr<istream> &pis);
 
 class reader_state {
   YAML::Node doc;
   // TODO: Store only the file position
-  vector<shared_ptr<generic_blob_t>> blocks;
+  vector<shared_future<shared_ptr<generic_blob_t>>> blocks;
 
   friend YAML::Node resolve_reference(const reader_state &rs,
                                       const vector<string> &doc_path);
@@ -35,9 +37,9 @@ public:
   reader_state &operator=(const reader_state &) = delete;
   reader_state &operator=(reader_state &&) = delete;
 
-  reader_state(const YAML::Node &doc, istream &is);
+  reader_state(const YAML::Node &doc, const shared_ptr<istream> &pis);
 
-  shared_ptr<generic_blob_t> get_block(int64_t index) const {
+  shared_future<shared_ptr<generic_blob_t>> get_block(int64_t index) const {
     assert(index >= 0);
     return blocks.at(index);
   }

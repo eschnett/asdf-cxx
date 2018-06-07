@@ -89,7 +89,9 @@ writer &asdf::to_yaml(writer &w) const {
   return w;
 }
 
-asdf::asdf(istream &is, const map<string, reader_t> &readers) {
+asdf::asdf(const shared_ptr<istream> &pis,
+           const map<string, reader_t> &readers) {
+  istream &is = *pis;
   // TODO: stream the file instead
   ostringstream doc;
   for (;;) {
@@ -100,7 +102,7 @@ asdf::asdf(istream &is, const map<string, reader_t> &readers) {
       break;
   }
   YAML::Node node = YAML::Load(doc.str());
-  reader_state rs(node, is);
+  reader_state rs(node, pis);
   *this = asdf(rs, node, readers);
 }
 

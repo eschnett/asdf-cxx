@@ -9,10 +9,12 @@ const string asdf_standard_version = "1.1.0";
 
 // I/O
 
-reader_state::reader_state(const YAML::Node &doc, istream &is) : doc(doc) {
+reader_state::reader_state(const YAML::Node &doc,
+                           const shared_ptr<istream> &pis)
+    : doc(doc) {
   for (;;) {
-    const auto &block = read_block(is);
-    if (!block)
+    const auto &block = read_block(pis);
+    if (!block.valid())
       break;
     blocks.push_back(move(block));
   }

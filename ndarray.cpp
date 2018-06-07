@@ -149,14 +149,125 @@ template <typename T> void input(istream &is, T &data) {
   }
 }
 
-shared_ptr<generic_blob_t> read_block(istream &is) {
+shared_ptr<generic_blob_t>
+read_block_data(const shared_ptr<istream> &pis, ios::streamoff block_begin,
+                uint64_t allocated_space, uint64_t data_space,
+                compression_t compression,
+                const array<unsigned char, 16> &want_checksum) {
+  istream &is = *pis;
+  assert(is);
+  is.seekg(block_begin);
+  assert(is);
+  vector<unsigned char> indata(allocated_space);
+  is.read(reinterpret_cast<char *>(indata.data()), indata.size());
+  assert(is);
+
+  // check checksum
+#ifdef ASDF_HAVE_OPENSSL
+  if (want_checksum != array<unsigned char, 16>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                                0, 0, 0, 0, 0}) {
+    array<unsigned char, 16> checksum;
+    MD5_CTX ctx;
+    MD5_Init(&ctx);
+    MD5_Update(&ctx, indata.data(), indata.size());
+    MD5_Final(checksum.data(), &ctx);
+    assert(checksum == want_checksum);
+  }
+#endif
+
+  // decompress data
+  vector<unsigned char> data;
+  switch (compression) {
+
+  case compression_t::none:
+    assert(data_space == allocated_space);
+    data = move(indata);
+    break;
+
+#ifdef ASDF_HAVE_BZIP2
+  case compression_t::bzip2: {
+    data.resize(data_space);
+    bz_stream strm;
+    strm.bzalloc = NULL;
+    strm.bzfree = NULL;
+    strm.opaque = NULL;
+    BZ2_bzDecompressInit(&strm, 0, 0);
+    strm.next_in =
+        reinterpret_cast<char *>(const_cast<unsigned char *>(indata.data()));
+    strm.next_out = reinterpret_cast<char *>(data.data());
+    uint64_t avail_in = indata.size();
+    uint64_t avail_out = data.size();
+    for (;;) {
+      uint64_t this_avail_in =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_in);
+      uint64_t this_avail_out =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_out);
+      strm.avail_in = this_avail_in;
+      strm.avail_out = this_avail_out;
+      int iret = BZ2_bzDecompress(&strm);
+      avail_in -= this_avail_in - strm.avail_in;
+      avail_out -= this_avail_out - strm.avail_out;
+      if (iret == BZ_STREAM_END)
+        break;
+      assert(iret == BZ_OK);
+    }
+    BZ2_bzDecompressEnd(&strm);
+    assert(avail_in == 0);
+    assert(avail_out == 0);
+    break;
+  }
+#endif
+
+#ifdef ASDF_HAVE_ZLIB
+  case compression_t::zlib: {
+    data.resize(data_space);
+    z_stream strm;
+    strm.zalloc = NULL;
+    strm.zfree = NULL;
+    strm.opaque = NULL;
+    inflateInit(&strm);
+    strm.next_in = const_cast<unsigned char *>(indata.data());
+    strm.next_out = data.data();
+    uint64_t avail_in = indata.size();
+    uint64_t avail_out = data.size();
+    for (;;) {
+      uint64_t this_avail_in =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_in);
+      uint64_t this_avail_out =
+          min(uint64_t(numeric_limits<unsigned int>::max()), avail_out);
+      strm.avail_in = this_avail_in;
+      strm.avail_out = this_avail_out;
+      int iret = inflate(&strm, Z_NO_FLUSH);
+      avail_in -= this_avail_in - strm.avail_in;
+      avail_out -= this_avail_out - strm.avail_out;
+      if (iret == Z_STREAM_END)
+        break;
+      assert(iret == Z_OK);
+    }
+    inflateEnd(&strm);
+    assert(avail_in == 0);
+    assert(avail_out == 0);
+    break;
+  }
+#endif
+
+  default:
+    assert(0);
+  }
+
+  return make_shared<blob_t<unsigned char>>(move(data));
+}
+
+shared_future<shared_ptr<generic_blob_t>>
+read_block(const shared_ptr<istream> &pis) {
+  istream &is = *pis;
   // block_magic_token
   array<unsigned char, 4> token;
   for (auto &ch : token)
     input(is, ch);
   if (token != block_magic_token) {
     is.seekg(-int64_t(token.size()), ios_base::cur);
-    return nullptr;
+    return {};
   }
   // header_size
   uint16_t header_size;
@@ -201,89 +312,14 @@ shared_ptr<generic_blob_t> read_block(istream &is) {
   if (header_read < header_size)
     is.seekg(header_size - header_read, ios_base::cur);
   // read data
-  vector<unsigned char> indata(allocated_space);
-  is.read(reinterpret_cast<char *>(indata.data()), indata.size());
-  // TODO: check checksum
-  // decompress data
-  vector<unsigned char> data;
-  switch (compression) {
-  case compression_t::none:
-    assert(data_space == allocated_space);
-    data = move(indata);
-    break;
-#ifdef ASDF_HAVE_BZIP2
-  case compression_t::bzip2: {
-    data.resize(data_space);
-    bz_stream strm;
-    strm.bzalloc = NULL;
-    strm.bzfree = NULL;
-    strm.opaque = NULL;
-    BZ2_bzDecompressInit(&strm, 0, 0);
-    strm.next_in =
-        reinterpret_cast<char *>(const_cast<unsigned char *>(indata.data()));
-    strm.next_out = reinterpret_cast<char *>(data.data());
-    uint64_t avail_in = indata.size();
-    uint64_t avail_out = data.size();
-    for (;;) {
-      uint64_t this_avail_in =
-          min(uint64_t(numeric_limits<unsigned int>::max()), avail_in);
-      uint64_t this_avail_out =
-          min(uint64_t(numeric_limits<unsigned int>::max()), avail_out);
-      strm.avail_in = this_avail_in;
-      strm.avail_out = this_avail_out;
-      int iret = BZ2_bzDecompress(&strm);
-      avail_in -= this_avail_in - strm.avail_in;
-      avail_out -= this_avail_out - strm.avail_out;
-      if (iret == BZ_STREAM_END)
-        break;
-      assert(iret == BZ_OK);
-    }
-    BZ2_bzDecompressEnd(&strm);
-    assert(avail_in == 0);
-    assert(avail_out == 0);
-    break;
-  }
-#endif
-#ifdef ASDF_HAVE_ZLIB
-  case compression_t::zlib: {
-    data.resize(data_space);
-    z_stream strm;
-    strm.zalloc = NULL;
-    strm.zfree = NULL;
-    strm.opaque = NULL;
-    inflateInit(&strm);
-    strm.next_in = const_cast<unsigned char *>(indata.data());
-    strm.next_out = data.data();
-    uint64_t avail_in = indata.size();
-    uint64_t avail_out = data.size();
-    for (;;) {
-      uint64_t this_avail_in =
-          min(uint64_t(numeric_limits<unsigned int>::max()), avail_in);
-      uint64_t this_avail_out =
-          min(uint64_t(numeric_limits<unsigned int>::max()), avail_out);
-      strm.avail_in = this_avail_in;
-      strm.avail_out = this_avail_out;
-      int iret = inflate(&strm, Z_NO_FLUSH);
-      avail_in -= this_avail_in - strm.avail_in;
-      avail_out -= this_avail_out - strm.avail_out;
-      if (iret == Z_STREAM_END)
-        break;
-      assert(iret == Z_OK);
-    }
-    inflateEnd(&strm);
-    assert(avail_in == 0);
-    assert(avail_out == 0);
-    break;
-  }
-#endif
-  default:
-    assert(0);
-  }
+  auto block_begin = is.tellg();
+  auto fdata = async(launch::deferred, read_block_data, pis, block_begin,
+                     allocated_space, data_space, compression, checksum);
+  // fdata.wait();
 
   // skip padding
-  if (used_space > allocated_space)
-    is.seekg(used_space - allocated_space, ios_base::cur);
-  return make_shared<blob_t<unsigned char>>(move(data));
+  is.seekg(block_begin + ios::streamoff(used_space));
+  return fdata;
 }
 
 template <typename T>
@@ -311,26 +347,30 @@ void ndarray::write_block(ostream &os) const {
   // compression
   array<unsigned char, 4> comp;
   shared_ptr<generic_blob_t> outdata;
+
   switch (compression) {
+
   case compression_t::none:
     comp = {0, 0, 0, 0};
-    outdata = data;
+    outdata = get_data();
     break;
+
   case compression_t::bzip2: {
 #ifdef ASDF_HAVE_BZIP2
     comp = {'b', 'z', 'p', '2'};
     // Allocate 600 bytes plus 1% more
     outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
-        600 + data->nbytes() + (data->nbytes() + 99) / 100));
+        600 + get_data()->nbytes() + (get_data()->nbytes() + 99) / 100));
     const int level = 9;
     bz_stream strm;
     strm.bzalloc = NULL;
     strm.bzfree = NULL;
     strm.opaque = NULL;
     BZ2_bzCompressInit(&strm, level, 0, 0);
-    strm.next_in = reinterpret_cast<char *>(const_cast<void *>(data->ptr()));
+    strm.next_in =
+        reinterpret_cast<char *>(const_cast<void *>(get_data()->ptr()));
     strm.next_out = reinterpret_cast<char *>(outdata->ptr());
-    uint64_t avail_in = data->nbytes();
+    uint64_t avail_in = get_data()->nbytes();
     uint64_t avail_out = outdata->nbytes();
     for (;;) {
       uint64_t this_avail_in =
@@ -349,24 +389,26 @@ void ndarray::write_block(ostream &os) const {
     }
     assert(avail_in == 0);
     outdata->resize(outdata->nbytes() - avail_out);
-    if (outdata->nbytes() >= data->nbytes()) {
+    if (outdata->nbytes() >= get_data()->nbytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
-      outdata = data;
+      outdata = get_data();
     }
 #else
     // Fall back to no compression if bzip2 is not available
     comp = {0, 0, 0, 0};
-    outdata = data;
+    outdata = get_data();
 #endif
     break;
   }
+
   case compression_t::zlib: {
 #ifdef ASDF_HAVE_ZLIB
     comp = {'z', 'l', 'i', 'b'};
     // Allocate 6 bytes plus 5 bytes per 16 kByte more
-    outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
-        (6 + data->nbytes() + (data->nbytes() + 16383) / 16384 * 5)));
+    outdata = make_shared<blob_t<unsigned char>>(
+        vector<unsigned char>((6 + get_data()->nbytes() +
+                               (get_data()->nbytes() + 16383) / 16384 * 5)));
     const int level = 9;
     z_stream strm;
     strm.zalloc = Z_NULL;
@@ -374,10 +416,10 @@ void ndarray::write_block(ostream &os) const {
     strm.opaque = Z_NULL;
     int iret = deflateInit(&strm, level);
     assert(iret == Z_OK);
-    strm.next_in =
-        reinterpret_cast<unsigned char *>(const_cast<void *>(data->ptr()));
+    strm.next_in = reinterpret_cast<unsigned char *>(
+        const_cast<void *>(get_data()->ptr()));
     strm.next_out = reinterpret_cast<unsigned char *>(outdata->ptr());
-    uint64_t avail_in = data->nbytes();
+    uint64_t avail_in = get_data()->nbytes();
     uint64_t avail_out = outdata->nbytes();
     for (;;) {
       uint64_t this_avail_in =
@@ -396,10 +438,10 @@ void ndarray::write_block(ostream &os) const {
     }
     assert(avail_in == 0);
     outdata->resize(outdata->nbytes() - avail_out);
-    if (outdata->nbytes() >= data->nbytes()) {
+    if (outdata->nbytes() >= get_data()->nbytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
-      outdata = data;
+      outdata = get_data();
     }
 #else
     // Fall back to no compression if zlib is not available
@@ -408,9 +450,11 @@ void ndarray::write_block(ostream &os) const {
 #endif
     break;
   }
+
   default:
     assert(0);
   }
+
   for (auto ch : comp)
     output(header, ch);
   // allocated_space
@@ -420,8 +464,9 @@ void ndarray::write_block(ostream &os) const {
   uint64_t used_space = allocated_space; // no padding
   output(header, used_space);
   // data_space
-  uint64_t data_space = data->nbytes();
+  uint64_t data_space = get_data()->nbytes();
   output(header, data_space);
+
   // checksum
   array<unsigned char, 16> checksum;
 #ifdef ASDF_HAVE_OPENSSL
@@ -434,6 +479,7 @@ void ndarray::write_block(ostream &os) const {
 #endif
   for (auto ch : checksum)
     output(header, ch);
+
   // fill in header_size
   uint16_t header_size = header.size() - header_prefix_length;
   vector<unsigned char> header_size_buf;
@@ -442,8 +488,10 @@ void ndarray::write_block(ostream &os) const {
     header.at(header_size_pos + p) = header_size_buf.at(p);
   // write header
   os.write(reinterpret_cast<const char *>(header.data()), header.size());
+
   // write data
   os.write(reinterpret_cast<const char *>(outdata->ptr()), outdata->nbytes());
+
   // write padding
   vector<char> padding(allocated_space - used_space);
   os.write(padding.data(), padding.size());
@@ -484,7 +532,7 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node)
         str *= shape.at(d);
       }
     }
-    data = rs.get_block(source);
+    fdata = rs.get_block(source);
     break;
   }
   case block_format_t::inline_array: {
@@ -496,8 +544,10 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node)
     bool have_shape = node["shape"].IsDefined();
     if (have_shape)
       yaml_decode(node["shape"], shape);
+    shared_ptr<generic_blob_t> data;
     parse_inline_array(node["data"], data, have_datatype, datatype, have_shape,
                        shape);
+    fdata = make_future<shared_ptr<generic_blob_t>>(data);
     offset = 0;
     int rank = shape.size();
     strides.resize(rank);
@@ -531,9 +581,9 @@ writer &ndarray::to_yaml(writer &w) const {
   } else {
     // data
     w << YAML::Key << "data" << YAML::Value
-      << emit_inline_array(static_cast<const unsigned char *>(data->ptr()) +
-                               offset,
-                           datatype, byteorder, shape, strides);
+      << emit_inline_array(
+             static_cast<const unsigned char *>(get_data()->ptr()) + offset,
+             datatype, byteorder, shape, strides);
   }
   // mask
   assert(mask.empty());

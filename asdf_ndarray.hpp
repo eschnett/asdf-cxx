@@ -9,6 +9,7 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
+#include <future>
 #include <memory>
 #include <vector>
 
@@ -91,10 +92,11 @@ public:
   virtual void resize(size_t nbytes) { assert(0); }
 };
 
-shared_ptr<generic_blob_t> read_block(istream &is);
+shared_future<shared_ptr<generic_blob_t>>
+read_block(const shared_ptr<istream> &is);
 
 class ndarray {
-  shared_ptr<generic_blob_t> data;
+  shared_future<shared_ptr<generic_blob_t>> fdata;
   block_format_t block_format;
   compression_t compression;
   vector<bool> mask;
@@ -106,6 +108,22 @@ class ndarray {
 
   void write_block(ostream &os) const;
 
+  // Modelled after std::experimental::make_ready_future
+  template <typename T>
+  future<typename decay<T>::type> make_ready_future(T &&value) {
+    typedef typename decay<T>::type R;
+    promise<R> p;
+    p.set_value(forward<T>(value));
+    return p.get_future();
+  }
+
+  // Modelled after std::make_shared
+  template <typename T, class... Args> future<T> make_future(Args &&... args) {
+    promise<T> p;
+    p.set_value(T(forward<Args...>(args)...));
+    return p.get_future();
+  }
+
 public:
   ndarray() = delete;
   ndarray(const ndarray &) = default;
@@ -113,14 +131,15 @@ public:
   ndarray &operator=(const ndarray &) = default;
   ndarray &operator=(ndarray &&) = default;
 
-  ndarray(shared_ptr<generic_blob_t> data1, block_format_t block_format,
-          compression_t compression, vector<bool> mask1,
-          shared_ptr<datatype_t> datatype1, byteorder_t byteorder,
-          vector<int64_t> shape1, int64_t offset = 0,
+  ndarray(shared_future<shared_ptr<generic_blob_t>> fdata1,
+          block_format_t block_format, compression_t compression,
+          vector<bool> mask1, shared_ptr<datatype_t> datatype1,
+          byteorder_t byteorder, vector<int64_t> shape1, int64_t offset = 0,
           vector<int64_t> strides1 = {})
-      : data(move(data1)), block_format(block_format), compression(compression),
-        mask(move(mask1)), datatype(move(datatype1)), byteorder(byteorder),
-        shape(move(shape1)), offset(offset), strides(move(strides1)) {
+      : fdata(move(fdata1)), block_format(block_format),
+        compression(compression), mask(move(mask1)), datatype(move(datatype1)),
+        byteorder(byteorder), shape(move(shape1)), offset(offset),
+        strides(move(strides1)) {
     // Check shape
     int rank = shape.size();
     for (int d = 0; d < rank; ++d)
@@ -129,7 +148,6 @@ public:
     int64_t npoints = 1;
     for (int d = 0; d < rank; ++d)
       npoints *= shape[d];
-    assert(data->nbytes() == npoints * datatype->type_size());
     // Check mask
     if (!mask.empty())
       assert(mask.size() == npoints);
@@ -154,8 +172,9 @@ public:
   ndarray(vector<T> data1, block_format_t block_format,
           compression_t compression, vector<bool> mask1, vector<int64_t> shape1,
           int64_t offset = 0, vector<int64_t> strides1 = {})
-      : ndarray(make_shared<blob_t<T>>(move(data1)), block_format, compression,
-                move(mask1),
+      : ndarray(make_future<shared_ptr<generic_blob_t>>(
+                    make_shared<blob_t<T>>(move(data1))),
+                block_format, compression, move(mask1),
                 make_shared<datatype_t>(get_scalar_type_id<T>::value),
                 host_byteorder(), move(shape1), offset, move(strides1)) {}
 
@@ -166,7 +185,14 @@ public:
     return arr.to_yaml(w);
   }
 
-  shared_ptr<generic_blob_t> get_data() const { return data; }
+  shared_ptr<generic_blob_t> get_data() const {
+    int rank = shape.size();
+    int64_t npoints = 1;
+    for (int d = 0; d < rank; ++d)
+      npoints *= shape[d];
+    assert(fdata.get()->nbytes() == npoints * datatype->type_size());
+    return fdata.get();
+  }
   shared_ptr<datatype_t> get_datatype() const { return datatype; }
   vector<int64_t> get_shape() const { return shape; }
   int64_t get_offset() const { return offset; }

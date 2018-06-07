@@ -60,7 +60,8 @@ public:
     return proj.to_yaml(w);
   }
 
-  asdf(istream &is, const map<string, reader_t> &readers = {});
+  asdf(const shared_ptr<istream> &pis,
+       const map<string, reader_t> &readers = {});
   asdf copy(const copy_state &cs) const;
   void write(ostream &os) const;
 };
