@@ -57,6 +57,9 @@ else()
   set(HAVE_ZLIB 0)
 endif()
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 # Main project
 
 set(CMAKE_CXX_STANDARD 11)
