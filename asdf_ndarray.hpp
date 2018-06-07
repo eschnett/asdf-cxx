@@ -18,6 +18,22 @@ using namespace std;
 
 // Multi-dimensional array
 
+// Modelled after std::experimental::make_ready_future
+template <typename T>
+future<typename decay<T>::type> make_ready_future(T &&value) {
+  typedef typename decay<T>::type R;
+  promise<R> p;
+  p.set_value(forward<T>(value));
+  return p.get_future();
+}
+
+// Modelled after std::make_shared
+template <typename T, class... Args> future<T> make_future(Args &&... args) {
+  promise<T> p;
+  p.set_value(T(forward<Args...>(args)...));
+  return p.get_future();
+}
+
 // TODO: Simplify this, avoid the abstract class
 class generic_blob_t {
 
@@ -107,22 +123,6 @@ class ndarray {
   vector<int64_t> strides;
 
   void write_block(ostream &os) const;
-
-  // Modelled after std::experimental::make_ready_future
-  template <typename T>
-  future<typename decay<T>::type> make_ready_future(T &&value) {
-    typedef typename decay<T>::type R;
-    promise<R> p;
-    p.set_value(forward<T>(value));
-    return p.get_future();
-  }
-
-  // Modelled after std::make_shared
-  template <typename T, class... Args> future<T> make_future(Args &&... args) {
-    promise<T> p;
-    p.set_value(T(forward<Args...>(args)...));
-    return p.get_future();
-  }
 
 public:
   ndarray() = delete;
