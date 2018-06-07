@@ -315,11 +315,12 @@ read_block(const shared_ptr<istream> &pis) {
   auto block_begin = is.tellg();
   auto fdata = async(launch::deferred, read_block_data, pis, block_begin,
                      allocated_space, data_space, compression, checksum);
+  // This would ensure synchronous reading, which might be useful for debugging
   // fdata.wait();
 
   // skip padding
   is.seekg(block_begin + ios::streamoff(used_space));
-  return fdata;
+  return move(fdata);
 }
 
 template <typename T>
