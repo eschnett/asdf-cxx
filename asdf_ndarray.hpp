@@ -114,10 +114,10 @@ read_block(const shared_ptr<istream> &is);
 class ndarray {
   shared_future<shared_ptr<generic_blob_t>> fdata;
   block_format_t block_format;
-  compression_t compression;
+  compression_t compression; // TODO: move to generic_blob_t
   vector<bool> mask;
   shared_ptr<datatype_t> datatype;
-  byteorder_t byteorder;
+  byteorder_t byteorder; // TODO: move to generic_blob_t
   vector<int64_t> shape;
   int64_t offset;
   vector<int64_t> strides;
