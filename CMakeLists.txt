@@ -73,11 +73,29 @@ configure_file(
 include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
 
 set(ASDF_HEADERS
-  asdf.hpp asdf_asdf.hpp asdf_byteorder.hpp asdf_datatype.hpp asdf_group.hpp
-  asdf_io.hpp asdf_ndarray.hpp asdf_reference.hpp asdf_stl.hpp asdf_table.hpp)
+  asdf.hpp
+  asdf_asdf.hpp
+  asdf_byteorder.hpp
+  asdf_datatype.hpp
+  asdf_group.hpp
+  asdf_io.hpp
+  asdf_memoized.hpp
+  asdf_ndarray.hpp
+  asdf_reference.hpp
+  asdf_stl.hpp
+  asdf_table.hpp
+  )
 set(ASDF_SOURCES
-  asdf.cpp byteorder.cpp config.cpp datatype.cpp group.cpp io.cpp ndarray.cpp
-  reference.cpp table.cpp)
+  asdf.cpp
+  byteorder.cpp
+  config.cpp
+  datatype.cpp
+  group.cpp
+  io.cpp
+  ndarray.cpp
+  reference.cpp
+  table.cpp
+  )
 
 add_library(asdf-cxx ${ASDF_SOURCES})
 set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
