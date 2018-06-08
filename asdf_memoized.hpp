@@ -60,11 +60,12 @@ public:
   }
 };
 
-// Modelled after std::make_shared
-template <typename T, class... Args>
-memoized<T> make_memoized(const Args &... args) {
-  return memoized<T>([=]() { return make_shared<T>(args...); });
-}
+// // Modelled after std::make_shared
+// template <typename T, class... Args>
+// memoized<T> make_memoized(const Args &... args) {
+//   return memoized<T>(
+//       [=]() { return make_shared<T>(forward<Args...>(args...)); });
+// }
 
 // Modelled after std::experimental::make_ready_future
 template <typename T>
