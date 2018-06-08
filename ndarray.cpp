@@ -349,6 +349,9 @@ void ndarray::write_block(ostream &os) const {
   array<unsigned char, 4> comp;
   shared_ptr<block_t> outdata;
 
+  // storage management
+  const bool old_cached = get_data().cached();
+
   switch (compression) {
 
   case compression_t::none:
@@ -447,7 +450,7 @@ void ndarray::write_block(ostream &os) const {
 #else
     // Fall back to no compression if zlib is not available
     comp = {0, 0, 0, 0};
-    outdata = data;
+    outdata = get_data().get();
 #endif
     break;
   }
@@ -492,6 +495,10 @@ void ndarray::write_block(ostream &os) const {
 
   // write data
   os.write(reinterpret_cast<const char *>(outdata->ptr()), outdata->nbytes());
+
+  // storage management
+  if (!old_cached)
+    get_data().forget();
 
   // write padding
   vector<char> padding(allocated_space - used_space);
@@ -608,6 +615,14 @@ writer &ndarray::to_yaml(writer &w) const {
   }
   w << YAML::EndMap;
   return w;
+}
+
+void ndarray::check_shape() const {
+  int rank = shape.size();
+  int64_t npoints = 1;
+  for (int d = 0; d < rank; ++d)
+    npoints *= shape[d];
+  assert(mdata->nbytes() == npoints * datatype->type_size());
 }
 
 } // namespace ASDF

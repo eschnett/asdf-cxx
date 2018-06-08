@@ -108,6 +108,8 @@ class ndarray {
   void write_block(ostream &os) const;
 
 public:
+  static memoized<block_t> read_block(const shared_ptr<istream> &is);
+
   ndarray() = delete;
   ndarray(const ndarray &) = default;
   ndarray(ndarray &&) = default;
@@ -168,16 +170,19 @@ public:
     return arr.to_yaml(w);
   }
 
-  static memoized<block_t> read_block(const shared_ptr<istream> &is);
+private:
+  void check_shape() const;
 
-  memoized<block_t> get_data() const {
-    int rank = shape.size();
-    int64_t npoints = 1;
-    for (int d = 0; d < rank; ++d)
-      npoints *= shape[d];
-    assert(mdata->nbytes() == npoints * datatype->type_size());
+public:
+  const memoized<block_t> &get_data() const {
+    // check_shape();
     return mdata;
   }
+  memoized<block_t> get_data() {
+    // check_shape();
+    return mdata;
+  }
+
   shared_ptr<datatype_t> get_datatype() const { return datatype; }
   vector<int64_t> get_shape() const { return shape; }
   int64_t get_offset() const { return offset; }
