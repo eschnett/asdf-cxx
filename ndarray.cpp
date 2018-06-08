@@ -19,7 +19,7 @@ namespace ASDF {
 
 // Multi-dimensional array
 
-blob_t<bool>::blob_t(const vector<bool> &data) {
+typed_block_t<bool>::typed_block_t(const vector<bool> &data) {
   this->data.resize(data.size());
   for (size_t i = 0; i < this->data.size(); ++i)
     this->data[i] = data[i];
@@ -45,8 +45,7 @@ void parse_inline_array_nd(const YAML::Node &node,
     parse_inline_array_nd(*ni, datatype, shape, rank - 1, data);
 }
 
-void parse_inline_array(const YAML::Node &node,
-                        shared_ptr<generic_blob_t> &data,
+void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
                         const bool have_datatype,
                         shared_ptr<datatype_t> &datatype, const bool have_shape,
                         vector<int64_t> &shape) {
@@ -95,7 +94,7 @@ void parse_inline_array(const YAML::Node &node,
     data1.reserve(npoints * datatype->type_size());
     parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
   }
-  data = make_shared<blob_t<unsigned char>>(move(data1));
+  data = make_shared<typed_block_t<unsigned char>>(move(data1));
 }
 
 YAML::Node emit_inline_array(const unsigned char *data,
@@ -149,7 +148,7 @@ template <typename T> void input(istream &is, T &data) {
   }
 }
 
-shared_ptr<generic_blob_t>
+shared_ptr<block_t>
 read_block_data(const shared_ptr<istream> &pis, ios::streamoff block_begin,
                 uint64_t allocated_space, uint64_t data_space,
                 compression_t compression,
@@ -255,11 +254,10 @@ read_block_data(const shared_ptr<istream> &pis, ios::streamoff block_begin,
     assert(0);
   }
 
-  return make_shared<blob_t<unsigned char>>(move(data));
+  return make_shared<typed_block_t<unsigned char>>(move(data));
 }
 
-shared_future<shared_ptr<generic_blob_t>>
-read_block(const shared_ptr<istream> &pis) {
+memoized<block_t> ndarray::read_block(const shared_ptr<istream> &pis) {
   istream &is = *pis;
   // block_magic_token
   array<unsigned char, 4> token;
@@ -313,10 +311,12 @@ read_block(const shared_ptr<istream> &pis) {
     is.seekg(header_size - header_read, ios_base::cur);
   // read data
   auto block_begin = is.tellg();
-  auto fdata = async(launch::deferred, read_block_data, pis, block_begin,
-                     allocated_space, data_space, compression, checksum);
+  auto fdata = memoized<block_t>([=]() {
+    return read_block_data(pis, block_begin, allocated_space, data_space,
+                           compression, checksum);
+  });
   // This would ensure synchronous reading, which might be useful for debugging
-  // fdata.wait();
+  // fdata.fill_cache();
 
   // skip padding
   is.seekg(block_begin + ios::streamoff(used_space));
@@ -347,20 +347,20 @@ void ndarray::write_block(ostream &os) const {
   output(header, flags);
   // compression
   array<unsigned char, 4> comp;
-  shared_ptr<generic_blob_t> outdata;
+  shared_ptr<block_t> outdata;
 
   switch (compression) {
 
   case compression_t::none:
     comp = {0, 0, 0, 0};
-    outdata = get_data();
+    outdata = get_data().get();
     break;
 
   case compression_t::bzip2: {
 #ifdef ASDF_HAVE_BZIP2
     comp = {'b', 'z', 'p', '2'};
     // Allocate 600 bytes plus 1% more
-    outdata = make_shared<blob_t<unsigned char>>(vector<unsigned char>(
+    outdata = make_shared<typed_block_t<unsigned char>>(vector<unsigned char>(
         600 + get_data()->nbytes() + (get_data()->nbytes() + 99) / 100));
     const int level = 9;
     bz_stream strm;
@@ -393,12 +393,12 @@ void ndarray::write_block(ostream &os) const {
     if (outdata->nbytes() >= get_data()->nbytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
-      outdata = get_data();
+      outdata = get_data().get();
     }
 #else
     // Fall back to no compression if bzip2 is not available
     comp = {0, 0, 0, 0};
-    outdata = get_data();
+    outdata = get_data().get();
 #endif
     break;
   }
@@ -407,7 +407,7 @@ void ndarray::write_block(ostream &os) const {
 #ifdef ASDF_HAVE_ZLIB
     comp = {'z', 'l', 'i', 'b'};
     // Allocate 6 bytes plus 5 bytes per 16 kByte more
-    outdata = make_shared<blob_t<unsigned char>>(
+    outdata = make_shared<typed_block_t<unsigned char>>(
         vector<unsigned char>((6 + get_data()->nbytes() +
                                (get_data()->nbytes() + 16383) / 16384 * 5)));
     const int level = 9;
@@ -442,7 +442,7 @@ void ndarray::write_block(ostream &os) const {
     if (outdata->nbytes() >= get_data()->nbytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
-      outdata = get_data();
+      outdata = get_data().get();
     }
 #else
     // Fall back to no compression if zlib is not available
@@ -509,7 +509,9 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node)
     block_format = block_format_t::inline_array;
   else
     assert(0);
+
   switch (block_format) {
+
   case block_format_t::block: {
     int64_t source;
     yaml_decode(node["source"], source);
@@ -533,9 +535,10 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node)
         str *= shape.at(d);
       }
     }
-    fdata = rs.get_block(source);
+    mdata = rs.get_block(source);
     break;
   }
+
   case block_format_t::inline_array: {
     // compression remains uninitialized
     bool have_datatype = node["datatype"].IsDefined();
@@ -545,10 +548,10 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node)
     bool have_shape = node["shape"].IsDefined();
     if (have_shape)
       yaml_decode(node["shape"], shape);
-    shared_ptr<generic_blob_t> data;
+    shared_ptr<block_t> data;
     parse_inline_array(node["data"], data, have_datatype, datatype, have_shape,
                        shape);
-    fdata = make_future<shared_ptr<generic_blob_t>>(data);
+    mdata = memoized<block_t>([=]() { return data; });
     offset = 0;
     int rank = shape.size();
     strides.resize(rank);
@@ -559,6 +562,7 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node)
     }
     break;
   }
+
   default:
     assert(0);
   }

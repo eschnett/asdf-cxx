@@ -1,4 +1,5 @@
 #include "asdf_io.hpp"
+#include "asdf_ndarray.hpp"
 
 #include <yaml-cpp/yaml.h>
 
@@ -13,7 +14,7 @@ reader_state::reader_state(const YAML::Node &doc,
                            const shared_ptr<istream> &pis)
     : doc(doc) {
   for (;;) {
-    const auto &block = read_block(pis);
+    const auto &block = ndarray::read_block(pis);
     if (!block.valid())
       break;
     blocks.push_back(move(block));

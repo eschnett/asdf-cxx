@@ -6,7 +6,7 @@ cmake_policy(SET CMP0048 NEW)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
-project(asdf-cxx VERSION 3.1.0 LANGUAGES CXX)
+project(asdf-cxx VERSION 4.0.0 LANGUAGES CXX)
 set(PROJECT_DESCRIPTION
   "asdf-cxx (Advanced Scientific Data Format), C++ implementation")
 set(PROJECT_URL "https://github.com/eschnett/asdf-cxx")
@@ -56,10 +56,6 @@ if(ZLIB_FOUND)
 else()
   set(HAVE_ZLIB 0)
 endif()
-
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-set(LIBS ${LIBS} Threads::Threads)
 
 # Main project
 

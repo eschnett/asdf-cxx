@@ -1,11 +1,12 @@
 #ifndef ASDF_IO_HPP
 #define ASDF_IO_HPP
 
+#include "asdf_memoized.hpp"
+
 #include <yaml-cpp/yaml.h>
 
 #include <cassert>
 #include <functional>
-#include <future>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -18,14 +19,12 @@ using namespace std;
 enum class block_format_t { undefined, block, inline_array };
 enum class compression_t { undefined, none, bzip2, zlib };
 
-class generic_blob_t;
-shared_future<shared_ptr<generic_blob_t>>
-read_block(const shared_ptr<istream> &pis);
+class block_t;
 
 class reader_state {
   YAML::Node doc;
   // TODO: Store only the file position
-  vector<shared_future<shared_ptr<generic_blob_t>>> blocks;
+  vector<memoized<block_t>> blocks;
 
   friend YAML::Node resolve_reference(const reader_state &rs,
                                       const vector<string> &doc_path);
@@ -39,7 +38,7 @@ public:
 
   reader_state(const YAML::Node &doc, const shared_ptr<istream> &pis);
 
-  shared_future<shared_ptr<generic_blob_t>> get_block(int64_t index) const {
+  memoized<block_t> get_block(int64_t index) const {
     assert(index >= 0);
     return blocks.at(index);
   }
