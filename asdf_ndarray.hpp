@@ -94,6 +94,8 @@ public:
   virtual void resize(size_t nbytes) { assert(0); }
 };
 
+// ndarray
+
 class ndarray {
   memoized<block_t> mdata;
   block_format_t block_format;

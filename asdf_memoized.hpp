@@ -10,54 +10,62 @@ namespace ASDF {
 
 using namespace std;
 
-template <typename T> class memoized {
+template <typename T> class memoized_state {
   function<shared_ptr<T>()> fun;
-  mutable bool have_value;
-  mutable shared_ptr<T> value;
+  bool have_value;
+  shared_ptr<T> value;
 
 public:
-  memoized() : have_value(false) {}
-  memoized(function<shared_ptr<T>()> fun1)
+  memoized_state() = delete;
+  memoized_state(function<shared_ptr<T>()> fun1)
       : fun(move(fun1)), have_value(false) {}
 
-  bool valid() const { return bool(fun); }
-  void reset() { *this = memoized(); }
-
   bool cached() const { return have_value; }
-  void fill_cache() const {
+  void fill_cache() {
     if (have_value)
       return;
     value = fun();
     have_value = true;
   }
-  void forget() const {
+  void forget() {
     if (!have_value)
       return;
     value.reset();
     have_value = false;
   }
 
-  shared_ptr<T> get() const {
+  shared_ptr<T> get() {
     fill_cache();
     return value;
   }
+};
 
-  const T &operator*() const {
-    fill_cache();
-    return *value;
-  }
-  T &operator*() {
-    fill_cache();
-    return *value;
-  }
-  const T *operator->() const {
-    fill_cache();
-    return value.get();
-  }
-  T *operator->() {
-    fill_cache();
-    return value.get();
-  }
+template <typename T> class memoized {
+  shared_ptr<memoized_state<T>> state;
+
+public:
+  memoized() = default;
+  memoized(const memoized &) = default;
+  memoized(memoized &&) = default;
+  memoized &operator=(const memoized &) = default;
+  memoized &operator=(memoized &&) = default;
+
+  memoized(function<shared_ptr<T>()> fun1)
+      : state(make_shared<memoized_state<T>>(move(fun1))) {}
+
+  bool valid() const { return bool(state); }
+  void reset() { state.reset(); }
+
+  bool cached() const { return state->cached(); }
+  void fill_cache() const { state->fill_cache(); }
+  void forget() const { state->forget(); }
+
+  shared_ptr<T> get() const { return state->get(); }
+
+  const T &operator*() const { return *get(); }
+  T &operator*() { return *get(); }
+  const T *operator->() const { return get().get(); }
+  T *operator->() { return get(); }
 };
 
 // // Modelled after std::make_shared
