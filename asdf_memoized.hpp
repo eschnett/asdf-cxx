@@ -65,7 +65,7 @@ public:
   const T &operator*() const { return *get(); }
   T &operator*() { return *get(); }
   const T *operator->() const { return get().get(); }
-  T *operator->() { return get(); }
+  T *operator->() { return get().get(); }
 };
 
 // // Modelled after std::make_shared
