@@ -20,8 +20,8 @@ public:
   memoized_state(function<shared_ptr<T>()> fun1)
       : fun(move(fun1)), have_value(false) {}
 
-  bool cached() const { return have_value; }
-  void fill_cache() {
+  bool ready() const { return have_value; }
+  void make_ready() {
     if (have_value)
       return;
     value = fun();
@@ -35,7 +35,7 @@ public:
   }
 
   shared_ptr<T> get() {
-    fill_cache();
+    make_ready();
     return value;
   }
 };
@@ -56,8 +56,8 @@ public:
   bool valid() const { return bool(state); }
   void reset() { state.reset(); }
 
-  bool cached() const { return state->cached(); }
-  void fill_cache() const { state->fill_cache(); }
+  bool ready() const { return state->ready(); }
+  void make_ready() const { state->make_ready(); }
   void forget() const { state->forget(); }
 
   shared_ptr<T> get() const { return state->get(); }

@@ -350,7 +350,7 @@ void ndarray::write_block(ostream &os) const {
   shared_ptr<block_t> outdata;
 
   // storage management
-  const bool old_cached = get_data().cached();
+  const bool old_ready = get_data().ready();
 
   switch (compression) {
 
@@ -497,7 +497,7 @@ void ndarray::write_block(ostream &os) const {
   os.write(reinterpret_cast<const char *>(outdata->ptr()), outdata->nbytes());
 
   // storage management
-  if (!old_cached)
+  if (!old_ready)
     get_data().forget();
 
   // write padding
