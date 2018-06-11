@@ -15,6 +15,9 @@ enum class byteorder_t { undefined, big, little };
 
 void yaml_decode(const YAML::Node &node, byteorder_t &byteorder);
 YAML::Node yaml_encode(byteorder_t byteorder);
+inline ostream &operator<<(ostream &os, byteorder_t byteorder) {
+  return os << yaml_encode(byteorder);
+}
 
 constexpr uint16_t byteorder_magic = 1;
 inline byteorder_t host_byteorder() {

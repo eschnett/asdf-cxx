@@ -217,6 +217,9 @@ public:
 inline YAML::Node yaml_encode(const datatype_t &datatype) {
   return datatype.to_yaml();
 }
+inline ostream &operator<<(ostream &os, const datatype_t &datatype) {
+  return os << yaml_encode(datatype);
+}
 
 void parse_scalar(const YAML::Node &node, unsigned char *data,
                   const shared_ptr<datatype_t> &datatype,
