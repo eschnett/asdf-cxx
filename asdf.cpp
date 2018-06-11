@@ -96,7 +96,7 @@ YAML::Node asdf::from_yaml(istream &is) {
   const array<unsigned char, 5> magic{'#', 'A', 'S', 'D', 'F'};
   array<unsigned char, 5> header;
   is.read(reinterpret_cast<char *>(header.data()), header.size());
-  if (header != magic) {
+  if (!is || header != magic) {
     cerr << "This is not an ASDF file\n";
     exit(2);
   }
@@ -105,15 +105,15 @@ YAML::Node asdf::from_yaml(istream &is) {
   // TODO: Check format version
 
   // TODO: stream the file instead
-  for (;;) {
+  while (is) {
     string line;
     getline(is, line);
     doc << line << "\n";
     if (line == "...")
-      break;
+      return YAML::Load(doc.str());
   }
-
-  return YAML::Load(doc.str());
+  cerr << "Stream input error\n";
+  exit(2);
 }
 
 asdf::asdf(const shared_ptr<istream> &pis,
