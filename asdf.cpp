@@ -1,5 +1,7 @@
 #include "asdf_asdf.hpp"
 
+#include <array>
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 
@@ -89,11 +91,20 @@ writer &asdf::to_yaml(writer &w) const {
   return w;
 }
 
-asdf::asdf(const shared_ptr<istream> &pis,
-           const map<string, reader_t> &readers) {
-  istream &is = *pis;
-  // TODO: stream the file instead
+YAML::Node asdf::from_yaml(istream &is) {
   ostringstream doc;
+  const array<unsigned char, 5> magic{'#', 'A', 'S', 'D', 'F'};
+  array<unsigned char, 5> header;
+  is.read(reinterpret_cast<char *>(header.data()), header.size());
+  if (header != magic) {
+    cerr << "This is not an ASDF file\n";
+    exit(2);
+  }
+  for (auto ch : header)
+    doc << ch;
+  // TODO: Check format version
+
+  // TODO: stream the file instead
   for (;;) {
     string line;
     getline(is, line);
@@ -101,7 +112,13 @@ asdf::asdf(const shared_ptr<istream> &pis,
     if (line == "...")
       break;
   }
-  YAML::Node node = YAML::Load(doc.str());
+
+  return YAML::Load(doc.str());
+}
+
+asdf::asdf(const shared_ptr<istream> &pis,
+           const map<string, reader_t> &readers) {
+  auto node = from_yaml(*pis);
   reader_state rs(node, pis);
   *this = asdf(rs, node, readers);
 }

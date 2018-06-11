@@ -1,4 +1,4 @@
-#include <yaml-cpp/yaml.h>
+#include "asdf.hpp"
 
 #include <cassert>
 #include <fstream>
@@ -12,6 +12,7 @@ int main(int argc, char **argv) {
   cout << "asdf-ls: List content of ASDF files\n";
   // cout << "Syntax: " << argv[0] << " <filename>+\n";
 
+#if 0
   for (int arg = 1; arg < argc; ++arg) {
     string filename = argv[arg];
     assert(!filename.empty());
@@ -27,6 +28,19 @@ int main(int argc, char **argv) {
     }
     YAML::Node node = YAML::Load(doc.str());
     is.close();
+    cout << node << "\n";
+  }
+#endif
+
+  for (int arg = 1; arg < argc; ++arg) {
+    string filename = argv[arg];
+    assert(!filename.empty());
+
+    // Read project
+    ifstream is(filename, ios::binary | ios::in);
+    auto node = ASDF::asdf::from_yaml(is);
+
+    // Output project
     cout << node << "\n";
   }
 

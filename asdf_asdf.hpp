@@ -60,6 +60,7 @@ public:
     return proj.to_yaml(w);
   }
 
+  static YAML::Node from_yaml(istream &is);
   asdf(const shared_ptr<istream> &pis,
        const map<string, reader_t> &readers = {});
   asdf copy(const copy_state &cs) const;
