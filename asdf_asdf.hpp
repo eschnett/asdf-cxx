@@ -65,6 +65,8 @@ public:
        const map<string, reader_t> &readers = {});
   asdf copy(const copy_state &cs) const;
   void write(ostream &os) const;
+
+  shared_ptr<group> get_group() const { return grp; }
 };
 
 } // namespace ASDF

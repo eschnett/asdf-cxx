@@ -14,6 +14,8 @@ using namespace std;
 
 // Group and Entry
 
+// enum class entry_type { array, reference, sequence, group };
+
 class sequence;
 class group;
 
@@ -62,6 +64,13 @@ public:
   friend writer &operator<<(writer &w, const entry &ent) {
     return ent.to_yaml(w);
   }
+
+  string get_name() const { return name; }
+  shared_ptr<ndarray> get_array() const { return arr; }
+  shared_ptr<reference> get_reference() const { return ref; }
+  shared_ptr<sequence> get_sequence() const { return seq; }
+  shared_ptr<group> get_group() const { return grp; }
+  string get_description() const { return description; }
 };
 
 class sequence {
@@ -88,6 +97,8 @@ public:
   friend writer &operator<<(writer &w, const sequence &seq) {
     return seq.to_yaml(w);
   }
+
+  const vector<shared_ptr<entry>> &get_entries() const { return entries; }
 };
 
 class group {
@@ -114,6 +125,8 @@ public:
   friend writer &operator<<(writer &w, const group &grp) {
     return grp.to_yaml(w);
   }
+
+  const map<string, shared_ptr<entry>> &get_entries() const { return entries; }
 };
 
 } // namespace ASDF

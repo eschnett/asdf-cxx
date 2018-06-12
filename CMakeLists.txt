@@ -6,7 +6,7 @@ cmake_policy(SET CMP0048 NEW)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
-project(asdf-cxx VERSION 4.1.0 LANGUAGES CXX)
+project(asdf-cxx VERSION 5.0.0 LANGUAGES CXX)
 set(PROJECT_DESCRIPTION
   "asdf-cxx (Advanced Scientific Data Format), C++ implementation")
 set(PROJECT_URL "https://github.com/eschnett/asdf-cxx")
@@ -106,6 +106,9 @@ target_link_libraries(asdf-copy asdf-cxx ${LIBS})
 add_executable(asdf-demo demo.cpp)
 target_link_libraries(asdf-demo asdf-cxx ${LIBS})
 
+add_executable(asdf-demo-external demo-external.cpp)
+target_link_libraries(asdf-demo-external asdf-cxx ${LIBS})
+
 add_executable(asdf-demo-large demo-large.cpp)
 target_link_libraries(asdf-demo-large asdf-cxx ${LIBS})
 
@@ -122,6 +125,7 @@ add_test(NAME ls2 COMMAND ./asdf-ls demo2.asdf)
 add_test(NAME compare
   COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
             "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
+add_test(NAME external COMMAND ./asdf-demo-external)
 
 # Coverage
 
@@ -139,7 +143,8 @@ endif()
 install(FILES ${ASDF_HEADERS} DESTINATION include)
 install(FILES "${PROJECT_BINARY_DIR}/asdf_config.hpp" DESTINATION include)
 install(TARGETS asdf-cxx DESTINATION lib)
-install(TARGETS asdf-copy asdf-demo asdf-demo-large asdf-ls DESTINATION bin)
+install(TARGETS asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-ls
+  DESTINATION bin)
 
 set(PKG_CONFIG_REQUIRES "yaml-cpp")
 set(PKG_CONFIG_INCLUDEDIR "\${prefix}/include")
