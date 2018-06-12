@@ -23,18 +23,16 @@ class block_t;
 
 class reader_state {
   YAML::Node doc;
+
   // TODO: Store only the file position
   vector<memoized<block_t>> blocks;
-
-  friend YAML::Node resolve_reference(const reader_state &rs,
-                                      const vector<string> &doc_path);
 
 public:
   reader_state() = delete;
   reader_state(const reader_state &) = delete;
-  reader_state(reader_state &&) = delete;
+  reader_state(reader_state &&) = default;
   reader_state &operator=(const reader_state &) = delete;
-  reader_state &operator=(reader_state &&) = delete;
+  reader_state &operator=(reader_state &&) = default;
 
   reader_state(const YAML::Node &doc, const shared_ptr<istream> &pis);
 
@@ -42,6 +40,8 @@ public:
     assert(index >= 0);
     return blocks.at(index);
   }
+
+  YAML::Node resolve_reference(const vector<string> &doc_path) const;
 };
 
 struct copy_state {

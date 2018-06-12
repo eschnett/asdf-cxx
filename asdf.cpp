@@ -24,8 +24,9 @@ YAML::Node software(const string &name, const string &author,
   return node;
 }
 
-asdf::asdf(const reader_state &rs, const YAML::Node &node,
-           const map<string, reader_t> &readers) {
+asdf::asdf(shared_ptr<reader_state> rs1, const YAML::Node &node,
+           const map<string, reader_t> &readers)
+    : rs(move(rs1)) {
   assert(node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.0.0" ||
          node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.1.0");
   for (const auto &kv : node) {
@@ -37,13 +38,13 @@ asdf::asdf(const reader_state &rs, const YAML::Node &node,
     } else if (tag == "tag:stsci.edu:asdf/core/history_entry-1.0.0") {
       // TODO
     } else if (tag == "tag:github.com/eschnett/asdf-cxx/core/group-1.0.0") {
-      grp = make_shared<group>(rs, node);
+      grp = make_shared<group>(*rs, node);
       // } else if (key == "table") {
-      //   tab = make_shared<table>(rs, node["table"]);
+      //   tab = make_shared<table>(*rs, node["table"]);
     } else if (tag == "tag:stsci.edu:asdf/core/ndarray-1.0.0") {
-      data[key] = make_shared<ndarray>(rs, node);
+      data[key] = make_shared<ndarray>(*rs, node);
     } else if (readers.count(tag)) {
-      readers.at(tag)(rs, key, node);
+      readers.at(tag)(*rs, key, node);
     } else {
       cerr << "No handler for tag <" << tag << ">\n";
       if (readers.empty()) {
@@ -119,7 +120,7 @@ YAML::Node asdf::from_yaml(istream &is) {
 asdf::asdf(const shared_ptr<istream> &pis,
            const map<string, reader_t> &readers) {
   auto node = from_yaml(*pis);
-  reader_state rs(node, pis);
+  auto rs = make_shared<reader_state>(node, pis);
   *this = asdf(rs, node, readers);
 }
 

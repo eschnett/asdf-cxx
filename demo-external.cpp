@@ -54,28 +54,6 @@ void write_metadata() {
   os.close();
 }
 
-template <typename T>
-shared_ptr<T> read_reference(const shared_ptr<reader_state> &rs,
-                             const shared_ptr<reference> &ref,
-                             shared_ptr<reader_state> &newrs) {
-  const auto &tgt = ref->get_split_target();
-  const auto &doc = tgt.first;
-  const auto &path = tgt.second;
-
-  if (doc.empty()) {
-    // Read from same file
-    newrs = rs;
-  } else {
-    // Read from external file
-    auto pis = make_shared<ifstream>(doc, ios::binary | ios::in);
-    auto extnode = asdf::from_yaml(*pis);
-    newrs = make_shared<reader_state>(extnode, pis);
-  }
-
-  const auto &node = resolve_reference(*newrs, path);
-  return make_shared<T>(*newrs, node);
-}
-
 template <typename T> vector<T> read_array(const shared_ptr<ndarray> &arr) {
   auto datatype = arr->get_datatype();
   assert(datatype->is_scalar);
@@ -97,13 +75,8 @@ void read_metadata() {
   cout << "Reading metadata file...\n";
 
   auto pis = make_shared<ifstream>("metadata.asdf", ios::binary | ios::in);
-
-  // auto project = ASDF::asdf(pis);
-  // pis.reset();
-
-  auto node = asdf::from_yaml(*pis);
-  auto rs = make_shared<reader_state>(node, pis);
-  auto project = make_shared<asdf>(*rs, node);
+  auto project = make_shared<ASDF::asdf>(pis);
+  auto rs = project->get_reader_state();
   pis.reset();
 
   auto grp = project->get_group();
@@ -137,7 +110,7 @@ void read_metadata() {
     cout << "epsilon': [reference] " << ref->get_target() << "\n";
     shared_ptr<reader_state> rs2;
     auto arr = read_reference<ndarray>(rs1, ref, rs2);
-    cout << "epsilon''': [ndarray] " << yaml_encode(read_array<int64_t>(arr))
+    cout << "epsilon'': [ndarray] " << yaml_encode(read_array<int64_t>(arr))
          << "\n";
   }
 }

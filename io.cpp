@@ -21,6 +21,31 @@ reader_state::reader_state(const YAML::Node &doc,
   }
 }
 
+YAML::Node
+reader_state::resolve_reference(const vector<string> &doc_path) const {
+  // We allocate a new YAML node each time we take a step. If we don't
+  // do this, yaml-cpp will instead only create a reference (alias) to
+  // the new node, thus effectively overwriting the "doc" argument.
+  auto node = unique_ptr<YAML::Node>(new YAML::Node(doc));
+  assert(node->IsDefined());
+  for (const auto &elem : doc_path) {
+    if (node->IsSequence()) {
+      try {
+        int idx = stoi(elem);
+        node = unique_ptr<YAML::Node>(new YAML::Node((*node)[idx]));
+      } catch (exception &) {
+        assert(0);
+      }
+    } else if (node->IsMap()) {
+      node = unique_ptr<YAML::Node>(new YAML::Node((*node)[elem]));
+    } else {
+      assert(0);
+    }
+    assert(node->IsDefined());
+  }
+  return *node;
+}
+
 writer::writer(ostream &os, const map<string, string> &tags)
     : os(os), emitter(os) {
   // yaml-cpp does not support comments without leading space

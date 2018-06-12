@@ -4,6 +4,7 @@
 #include "asdf_config.hpp"
 #include "asdf_group.hpp"
 #include "asdf_ndarray.hpp"
+#include "asdf_reference.hpp"
 
 #include <yaml-cpp/yaml.h>
 
@@ -16,8 +17,13 @@ using namespace std;
 // ASDF
 
 class asdf {
+  // For reading
+  shared_ptr<reader_state> rs;
+
+  // For writing
   map<string, string> tags; // tag directives
 
+  // Content
   map<string, shared_ptr<ndarray>> data;
   // fits
   // wcs
@@ -52,7 +58,7 @@ public:
   typedef function<void(const reader_state &rs, const string &name,
                         const YAML::Node &node)>
       reader_t;
-  asdf(const reader_state &rs, const YAML::Node &node,
+  asdf(shared_ptr<reader_state> rs, const YAML::Node &node,
        const map<string, reader_t> &readers = {});
   asdf(const copy_state &cs, const asdf &project);
   writer &to_yaml(writer &w) const;
@@ -66,8 +72,32 @@ public:
   asdf copy(const copy_state &cs) const;
   void write(ostream &os) const;
 
+  shared_ptr<reader_state> get_reader_state() const { return rs; }
+
   shared_ptr<group> get_group() const { return grp; }
 };
+
+template <typename T>
+shared_ptr<T> read_reference(const shared_ptr<reader_state> &rs,
+                             const shared_ptr<reference> &ref,
+                             shared_ptr<reader_state> &refrs) {
+  const auto &tgt = ref->get_split_target();
+  const auto &docname = tgt.first;
+  const auto &path = tgt.second;
+
+  if (docname.empty()) {
+    // Read from same file
+    refrs = rs;
+  } else {
+    // Read from external file
+    auto pis = make_shared<ifstream>(docname, ios::binary | ios::in);
+    auto doc = asdf::from_yaml((istream &)*pis);
+    refrs = make_shared<reader_state>(doc, pis);
+  }
+
+  auto node = refrs->resolve_reference(path);
+  return make_shared<T>(*refrs, node);
+}
 
 } // namespace ASDF
 

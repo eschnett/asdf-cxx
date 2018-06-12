@@ -206,34 +206,4 @@ writer &reference::to_yaml(writer &w) const {
   return w;
 }
 
-YAML::Node resolve_reference(const YAML::Node &doc,
-                             const vector<string> &doc_path) {
-  // We allocate a new YAML node each time we take a step. If we don't
-  // do this, yaml-cpp will instead only create a reference (alias) to
-  // the new node, thus effectively overwriting the "doc" argument.
-  auto node = unique_ptr<YAML::Node>(new YAML::Node(doc));
-  assert(node->IsDefined());
-  for (const auto &elem : doc_path) {
-    if (node->IsSequence()) {
-      try {
-        int idx = stoi(elem);
-        node = unique_ptr<YAML::Node>(new YAML::Node((*node)[idx]));
-      } catch (exception &) {
-        assert(0);
-      }
-    } else if (node->IsMap()) {
-      node = unique_ptr<YAML::Node>(new YAML::Node((*node)[elem]));
-    } else {
-      assert(0);
-    }
-    assert(node->IsDefined());
-  }
-  return *node;
-}
-
-YAML::Node resolve_reference(const reader_state &rs,
-                             const vector<string> &doc_path) {
-  return resolve_reference(rs.doc, doc_path);
-}
-
 } // namespace ASDF
