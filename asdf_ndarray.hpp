@@ -71,21 +71,21 @@ public:
   virtual void resize(size_t nbytes) { data.resize(nbytes); }
 };
 
-class ptr_typed_block_t : public block_t {
+class ptr_block_t : public block_t {
   void *data;
   size_t size;
 
 public:
-  ptr_typed_block_t() = delete;
+  ptr_block_t() = delete;
 
-  ptr_typed_block_t(void *data, size_t size) : data(data), size(size) {
+  ptr_block_t(void *data, size_t size) : data(data), size(size) {
     assert(data);
   }
   template <typename T>
-  ptr_typed_block_t(vector<T> &data)
+  ptr_block_t(vector<T> &data)
       : data(data.data()), size(data.size() * sizeof(T)) {}
 
-  virtual ~ptr_typed_block_t() {}
+  virtual ~ptr_block_t() {}
 
   virtual const void *ptr() const { return data; }
   virtual void *ptr() { return data; }
