@@ -427,7 +427,9 @@ field_t::field_t(string name, shared_ptr<datatype_t> datatype,
   assert(datatype);
 }
 
-field_t::field_t(const reader_state &rs, const YAML::Node &node) { assert(0); }
+field_t::field_t(const shared_ptr<reader_state> &rs, const YAML::Node &node) {
+  assert(0);
+}
 
 field_t::field_t(const copy_state &cs, const field_t &field) { assert(0); }
 
@@ -458,7 +460,8 @@ size_t datatype_t::type_size() const {
   return size;
 }
 
-datatype_t::datatype_t(const reader_state &rs, const YAML::Node &node) {
+datatype_t::datatype_t(const shared_ptr<reader_state> &rs,
+                       const YAML::Node &node) {
   if (node.IsScalar()) {
     is_scalar = true;
     yaml_decode(node, scalar_type_id);

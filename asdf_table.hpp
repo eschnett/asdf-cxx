@@ -31,7 +31,7 @@ public:
     assert(data);
   }
 
-  column(const reader_state &rs, const YAML::Node &node);
+  column(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   column(const copy_state &cs, const column &col);
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const column &col) {
@@ -51,7 +51,7 @@ public:
 
   table(vector<shared_ptr<column>> columns1) : columns(move(columns1)) {}
 
-  table(const reader_state &rs, const YAML::Node &node);
+  table(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   table(const copy_state &cs, const table &tab);
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const table &tab) {

@@ -8,6 +8,7 @@
 #include <cassert>
 #include <functional>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -22,7 +23,9 @@ enum class compression_t { undefined, none, bzip2, zlib };
 class block_t;
 
 class reader_state {
-  YAML::Node doc;
+  YAML::Node tree;
+  // TODO: Share "other_files" with other reader_state objects
+  map<string, shared_ptr<reader_state>> other_files;
 
   // TODO: Store only the file position
   vector<memoized<block_t>> blocks;
@@ -34,14 +37,18 @@ public:
   reader_state &operator=(const reader_state &) = delete;
   reader_state &operator=(reader_state &&) = default;
 
-  reader_state(const YAML::Node &doc, const shared_ptr<istream> &pis);
+  reader_state(const YAML::Node &tree, const shared_ptr<istream> &pis);
 
   memoized<block_t> get_block(int64_t index) const {
     assert(index >= 0);
     return blocks.at(index);
   }
 
-  YAML::Node resolve_reference(const vector<string> &doc_path) const;
+  YAML::Node resolve_reference(const vector<string> &path) const;
+
+  static pair<shared_ptr<reader_state>, YAML::Node>
+  resolve_reference(const shared_ptr<reader_state> &rs, const string &filename,
+                    const vector<string> &path);
 };
 
 struct copy_state {

@@ -4,7 +4,7 @@ namespace ASDF {
 
 // Group and Entry
 
-entry::entry(const reader_state &rs, const YAML::Node &node) {
+entry::entry(const shared_ptr<reader_state> &rs, const YAML::Node &node) {
   assert(node.Tag() == "tag:github.com/eschnett/asdf-cxx/core/entry-1.0.0");
   name = node["name"].Scalar();
   if (node["data"].IsDefined())
@@ -50,7 +50,7 @@ writer &entry::to_yaml(writer &w) const {
   return w;
 }
 
-sequence::sequence(const reader_state &rs, const YAML::Node &node) {
+sequence::sequence(const shared_ptr<reader_state> &rs, const YAML::Node &node) {
   assert(node.Tag() == "tag:github.com/eschnett/asdf-cxx/core/sequence-1.0.0");
   for (const auto &ent : node)
     entries.push_back(make_shared<entry>(rs, ent));
@@ -70,7 +70,7 @@ writer &sequence::to_yaml(writer &w) const {
   return w;
 }
 
-group::group(const reader_state &rs, const YAML::Node &node) {
+group::group(const shared_ptr<reader_state> &rs, const YAML::Node &node) {
   assert(node.Tag() == "tag:github.com/eschnett/asdf-cxx/core/group-1.0.0");
   for (const auto &ent : node)
     entries[ent.first.Scalar()] = make_shared<entry>(rs, ent.second);

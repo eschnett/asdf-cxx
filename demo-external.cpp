@@ -76,7 +76,6 @@ void read_metadata() {
 
   auto pis = make_shared<ifstream>("metadata.asdf", ios::binary | ios::in);
   auto project = make_shared<ASDF::asdf>(pis);
-  auto rs = project->get_reader_state();
   pis.reset();
 
   auto grp = project->get_group();
@@ -84,8 +83,8 @@ void read_metadata() {
   {
     auto gamma = grp->get_entries().at("gamma")->get_reference();
     cout << "gamma: <" << gamma->get_target() << ">\n";
-    shared_ptr<reader_state> rs1;
-    auto arr = read_reference<ndarray>(rs, gamma, rs1);
+    auto rs_node = gamma->resolve();
+    auto arr = make_shared<ndarray>(rs_node.first, rs_node.second);
     cout << "gamma': [ndarray] " << yaml_encode(read_array<int64_t>(arr))
          << "\n";
   }
@@ -93,23 +92,23 @@ void read_metadata() {
   {
     auto delta = grp->get_entries().at("delta")->get_reference();
     cout << "delta: <" << delta->get_target() << ">\n";
-    shared_ptr<reader_state> rs1;
-    auto ref = read_reference<reference>(rs, delta, rs1);
+    auto rs_node = delta->resolve();
+    auto ref = make_shared<reference>(rs_node.first, rs_node.second);
     cout << "delta': [reference] " << ref->get_target() << "\n";
-    shared_ptr<reader_state> rs2;
-    auto arr = read_reference<ndarray>(rs1, ref, rs2);
-    cout << "delta''': [ndarray] " << yaml_encode(read_array<int64_t>(arr))
+    auto rs_node1 = ref->resolve();
+    auto arr = make_shared<ndarray>(rs_node1.first, rs_node1.second);
+    cout << "delta'': [ndarray] " << yaml_encode(read_array<int64_t>(arr))
          << "\n";
   }
 
   {
     auto epsilon = grp->get_entries().at("epsilon")->get_reference();
     cout << "epsilon: <" << epsilon->get_target() << ">\n";
-    shared_ptr<reader_state> rs1;
-    auto ref = read_reference<reference>(rs, epsilon, rs1);
+    auto rs_node = epsilon->resolve();
+    auto ref = make_shared<reference>(rs_node.first, rs_node.second);
     cout << "epsilon': [reference] " << ref->get_target() << "\n";
-    shared_ptr<reader_state> rs2;
-    auto arr = read_reference<ndarray>(rs1, ref, rs2);
+    auto rs_node1 = ref->resolve();
+    auto arr = make_shared<ndarray>(rs_node1.first, rs_node1.second);
     cout << "epsilon'': [ndarray] " << yaml_encode(read_array<int64_t>(arr))
          << "\n";
   }

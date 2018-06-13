@@ -1,3 +1,4 @@
+#include "asdf_io.hpp"
 #include "asdf_reference.hpp"
 
 #include <cassert>
@@ -63,20 +64,6 @@ string tilde_encode(const string &raw) {
   return cooked;
 }
 
-// unsigned int hex_decode(unsigned char dig) {
-//   if (dig >= '0' && dig <= '9')
-//     return dig - '0';
-//   if (dig >= 'a' && dig <= 'f')
-//     return dig - 'a' + 10;
-//   if (dig >= 'A' && dig <= 'F')
-//     return dig - 'A' + 10;
-//   assert(0);
-// }
-
-// unsigned int hex_decode(unsigned char dig1, unsigned char dig2) {
-//   return hex_decode(dig1) * 16 + hex_decode(dig2);
-// }
-
 string fragment_percent_decode(const string &cooked) {
   ostringstream buf;
   const size_t len = cooked.size();
@@ -85,12 +72,6 @@ string fragment_percent_decode(const string &cooked) {
     unsigned char ch = cooked[pos++];
     switch (ch) {
     case '%': {
-      // assert(pos < len);
-      // unsigned char dig1 = cooked[pos++];
-      // assert(pos < len);
-      // unsigned char dig2 = cooked[pos++];
-      // unsigned char ch2 = hex_decode(dig1, dig2);
-      // buf << ch2;
       assert(pos + 2 <= len);
       istringstream digs(cooked.substr(pos, 2));
       pos += 2;
@@ -185,7 +166,8 @@ pair<string, vector<string>> reference::get_split_target() const {
   return {move(base_target), move(doc_path)};
 }
 
-reference::reference(const reader_state &rs, const YAML::Node &node) {
+reference::reference(const shared_ptr<reader_state> &rs, const YAML::Node &node)
+    : rs(rs) {
   // assert(node.Tag() == "tag:stsci.edu:asdf/core/reference-1.0.0");
   assert(node.IsMap());
   assert(node.size() == 1);
@@ -204,6 +186,13 @@ writer &reference::to_yaml(writer &w) const {
   w << YAML::Key << "$ref" << YAML::Value << YAML::DoubleQuoted << target;
   w << YAML::EndMap;
   return w;
+}
+
+pair<shared_ptr<reader_state>, YAML::Node> reference::resolve() const {
+  const auto &tgt = get_split_target();
+  const auto &docname = tgt.first;
+  const auto &path = tgt.second;
+  return reader_state::resolve_reference(rs, docname, path);
 }
 
 } // namespace ASDF

@@ -165,7 +165,7 @@ public:
                 make_shared<datatype_t>(get_scalar_type_id<T>::value),
                 host_byteorder(), move(shape1), offset, move(strides1)) {}
 
-  ndarray(const reader_state &rs, const YAML::Node &node);
+  ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   ndarray(const copy_state &cs, const ndarray &arr);
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const ndarray &arr) {

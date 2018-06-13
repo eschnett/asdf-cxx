@@ -58,7 +58,7 @@ public:
     assert(seq);
   }
 
-  entry(const reader_state &rs, const YAML::Node &node);
+  entry(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   entry(const copy_state &cs, const entry &ent);
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const entry &ent) {
@@ -91,7 +91,7 @@ public:
       entries.push_back(f(*v));
   }
 
-  sequence(const reader_state &rs, const YAML::Node &node);
+  sequence(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   sequence(const copy_state &cs, const sequence &seq);
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const sequence &seq) {
@@ -119,7 +119,7 @@ public:
       entries[kv.first] = f(*kv.second);
   }
 
-  group(const reader_state &rs, const YAML::Node &node);
+  group(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   group(const copy_state &cs, const group &grp);
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const group &grp) {

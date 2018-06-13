@@ -182,7 +182,7 @@ public:
   field_t(string name, shared_ptr<datatype_t> datatype, bool have_byteorder,
           byteorder_t byteorder, vector<int64_t> shape);
 
-  field_t(const reader_state &rs, const YAML::Node &node);
+  field_t(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   field_t(const copy_state &cs, const field_t &field);
   YAML::Node to_yaml() const;
   YAML::Node to_yaml(writer &w) const { return to_yaml(); }
@@ -206,7 +206,7 @@ public:
   datatype_t(scalar_type_id_t scalar_type_id);
   datatype_t(vector<shared_ptr<field_t>> fields);
 
-  datatype_t(const reader_state &rs, const YAML::Node &node);
+  datatype_t(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   datatype_t(const copy_state &cs, const datatype_t &datatype);
   YAML::Node to_yaml() const;
   YAML::Node to_yaml(writer &w) const { return to_yaml(); }

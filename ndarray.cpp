@@ -505,7 +505,7 @@ void ndarray::write_block(ostream &os) const {
   os.write(padding.data(), padding.size());
 }
 
-ndarray::ndarray(const reader_state &rs, const YAML::Node &node)
+ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : block_format(block_format_t::undefined),
       compression(compression_t::undefined), byteorder(byteorder_t::undefined),
       offset(-1) {
@@ -542,7 +542,7 @@ ndarray::ndarray(const reader_state &rs, const YAML::Node &node)
         str *= shape.at(d);
       }
     }
-    mdata = rs.get_block(source);
+    mdata = rs->get_block(source);
     break;
   }
 
