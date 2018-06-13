@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 
+using namespace ASDF;
 using namespace std;
 
 int main(int argc, char **argv) {
@@ -38,7 +39,7 @@ int main(int argc, char **argv) {
 
     // Read project
     ifstream is(filename, ios::binary | ios::in);
-    auto node = ASDF::asdf::from_yaml(is);
+    auto node = asdf::from_yaml(is);
 
     // Output project
     cout << node << "\n";
