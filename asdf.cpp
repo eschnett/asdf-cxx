@@ -3,6 +3,7 @@
 #include <array>
 #include <cassert>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 
 namespace ASDF {
@@ -98,6 +99,17 @@ YAML::Node asdf::from_yaml(istream &is) {
   is.read(reinterpret_cast<char *>(header.data()), header.size());
   if (!is || header != magic) {
     cerr << "This is not an ASDF file\n";
+    if (is) {
+      cerr << "File header should be \"#ASDF\"; found instead \"";
+      for (auto ch : header)
+        if (ch == '\\' || ch == '"')
+          cerr << '\\' << ch;
+        else if (isprint(ch))
+          cerr << ch;
+        else
+          cerr << '\\' << oct << setw(3) << setfill('0') << int(ch);
+      cerr << "\"\n";
+    }
     exit(2);
   }
   for (auto ch : header)
