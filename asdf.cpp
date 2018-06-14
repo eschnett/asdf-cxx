@@ -128,10 +128,10 @@ YAML::Node asdf::from_yaml(istream &is) {
   exit(2);
 }
 
-asdf::asdf(const shared_ptr<istream> &pis,
+asdf::asdf(const shared_ptr<istream> &pis, const string &filename,
            const map<string, reader_t> &readers) {
   auto node = from_yaml(*pis);
-  auto rs = make_shared<reader_state>(node, pis);
+  auto rs = make_shared<reader_state>(node, pis, filename);
   *this = asdf(rs, node, readers);
 }
 

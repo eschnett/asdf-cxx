@@ -10,6 +10,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace ASDF {
@@ -25,6 +26,7 @@ class block_t;
 class reader_state {
   YAML::Node tree;
   // TODO: Share "other_files" with other reader_state objects
+  string filename;
   map<string, shared_ptr<reader_state>> other_files;
 
   // TODO: Store only the file position
@@ -37,7 +39,8 @@ public:
   reader_state &operator=(const reader_state &) = delete;
   reader_state &operator=(reader_state &&) = default;
 
-  reader_state(const YAML::Node &tree, const shared_ptr<istream> &pis);
+  reader_state(const YAML::Node &tree, const shared_ptr<istream> &pis,
+               const string &filename = {});
 
   memoized<block_t> get_block(int64_t index) const {
     assert(index >= 0);

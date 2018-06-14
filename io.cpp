@@ -14,8 +14,9 @@ const string asdf_standard_version = "1.1.0";
 // I/O
 
 reader_state::reader_state(const YAML::Node &tree,
-                           const shared_ptr<istream> &pis)
-    : tree(tree) {
+                           const shared_ptr<istream> &pis,
+                           const string &filename)
+    : filename(filename), tree(tree) {
   for (;;) {
     const auto &block = ndarray::read_block(pis);
     if (!block.valid())
@@ -60,12 +61,26 @@ reader_state::resolve_reference(const shared_ptr<reader_state> &rs,
     refrs = rs;
   } else {
     // Read from external file
+    assert(!rs->filename.empty());
+    string ref_filename;
     if (!rs->other_files.count(filename)) {
-      auto pis = make_shared<ifstream>(filename, ios::binary | ios::in);
+      if (!filename.empty() && filename[0] == '/') {
+        // absolute path
+        ref_filename = filename;
+      } else {
+        // preprend current path
+        auto slashpos = rs->filename.rfind('/');
+        if (slashpos == string::npos)
+          ref_filename = filename;
+        else
+          ref_filename = rs->filename.substr(0, slashpos + 1) + filename;
+      }
+      auto pis = make_shared<ifstream>(ref_filename, ios::binary | ios::in);
       auto doc = asdf::from_yaml((istream &)*pis);
-      rs->other_files[filename] = make_shared<reader_state>(doc, pis);
+      rs->other_files[ref_filename] =
+          make_shared<reader_state>(doc, pis, ref_filename);
     }
-    refrs = rs->other_files.at(filename);
+    refrs = rs->other_files.at(ref_filename);
   }
 
   auto node = refrs->resolve_reference(path);
