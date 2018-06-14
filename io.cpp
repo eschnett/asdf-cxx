@@ -61,20 +61,20 @@ reader_state::resolve_reference(const shared_ptr<reader_state> &rs,
     refrs = rs;
   } else {
     // Read from external file
-    assert(!rs->filename.empty());
     string ref_filename;
-    if (!rs->other_files.count(filename)) {
-      if (!filename.empty() && filename[0] == '/') {
-        // absolute path
+    if (!filename.empty() && filename[0] == '/') {
+      // absolute path
+      ref_filename = filename;
+    } else {
+      // preprend current path
+      assert(!rs->filename.empty()); // We could allow this
+      auto slashpos = rs->filename.rfind('/');
+      if (slashpos == string::npos)
         ref_filename = filename;
-      } else {
-        // preprend current path
-        auto slashpos = rs->filename.rfind('/');
-        if (slashpos == string::npos)
-          ref_filename = filename;
-        else
-          ref_filename = rs->filename.substr(0, slashpos + 1) + filename;
-      }
+      else
+        ref_filename = rs->filename.substr(0, slashpos + 1) + filename;
+    }
+    if (!rs->other_files.count(ref_filename)) {
       auto pis = make_shared<ifstream>(ref_filename, ios::binary | ios::in);
       auto doc = asdf::from_yaml((istream &)*pis);
       rs->other_files[ref_filename] =

@@ -75,7 +75,7 @@ void read_metadata() {
   cout << "Reading metadata file...\n";
 
   auto pis = make_shared<ifstream>("metadata.asdf", ios::binary | ios::in);
-  auto project = make_shared<ASDF::asdf>(pis);
+  auto project = make_shared<ASDF::asdf>(pis, "metadata.asdf");
   pis.reset();
 
   auto grp = project->get_group();
