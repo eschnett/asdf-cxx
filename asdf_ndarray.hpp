@@ -137,7 +137,7 @@ public:
       npoints *= shape[d];
     // Check mask
     if (!mask.empty())
-      assert(mask.size() == npoints);
+      assert(int64_t(mask.size()) == npoints);
     // offset
     assert(offset >= 0);
     // Check strides
@@ -149,7 +149,7 @@ public:
         str *= shape.at(d);
       }
     }
-    assert(strides.size() == rank);
+    assert(int(strides.size()) == rank);
     for (int d = 0; d < rank; ++d)
       assert(strides.at(d) >= 1 || strides.at(d) <= -1);
     // TODO: check that strides are multiples of the element size
@@ -191,20 +191,20 @@ public:
   vector<int64_t> get_strides() const { return strides; }
 
   int64_t linear_index(const vector<int64_t> &idx) const {
-    int dim = shape.size();
-    assert(idx.size() == dim);
+    int rank = shape.size();
+    assert(int(idx.size()) == rank);
     int64_t lin = offset;
-    for (int d = 0; d < dim; ++d) {
+    for (int d = 0; d < rank; ++d) {
       assert(idx[d] >= 0 && idx[d] < shape[d]);
       lin += strides[d] * idx[d];
     }
     return lin;
   }
   template <size_t D> int64_t linear_index(const array<int64_t, D> &idx) const {
-    int dim = shape.size();
-    assert(D == dim);
+    int rank = shape.size();
+    assert(int(D) == rank);
     int64_t lin = offset;
-    for (int d = 0; d < dim; ++d) {
+    for (int d = 0; d < rank; ++d) {
       assert(idx[d] >= 0 && idx[d] < shape[d]);
       lin += strides[d] * idx[d];
     }
