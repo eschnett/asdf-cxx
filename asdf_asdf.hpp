@@ -66,8 +66,10 @@ public:
   static YAML::Node from_yaml(istream &is);
   asdf(const shared_ptr<istream> &pis, const string &filename = {},
        const map<string, reader_t> &readers = {});
+  asdf(const string &filename, const map<string, reader_t> &readers = {});
   asdf copy(const copy_state &cs) const;
   void write(ostream &os) const;
+  void write(const string &filename) const;
 
   shared_ptr<group> get_group() const { return grp; }
 };

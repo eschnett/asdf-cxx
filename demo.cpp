@@ -3,7 +3,6 @@
 #include <yaml-cpp/yaml.h>
 
 #include <complex>
-#include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -52,9 +51,7 @@ int main(int argc, char **argv) {
                                                         {"eta", entr}});
   auto project = asdf({}, grp);
 
-  fstream os("demo.asdf", ios::binary | ios::trunc | ios::out);
-  project.write(os);
-  os.close();
+  project.write("demo.asdf");
 
   cout << "Done.\n";
   return 0;

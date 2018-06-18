@@ -4,7 +4,6 @@
 
 #include <cassert>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -38,9 +37,7 @@ int main(int argc, char **argv) {
   auto project = ASDF::asdf(rs, node);
   is.close();
   // Write output
-  ofstream os(outputfilename, ios::binary | ios::trunc | ios::out);
-  project.write(os);
-  os.close();
+  project.write(outputfilename);
   //
   cout << "Done.\n";
   return 0;

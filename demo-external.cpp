@@ -74,9 +74,7 @@ template <typename T> vector<T> read_array(const shared_ptr<ndarray> &arr) {
 void read_metadata() {
   cout << "Reading metadata file...\n";
 
-  auto pis = make_shared<ifstream>("metadata.asdf", ios::binary | ios::in);
-  auto project = make_shared<ASDF::asdf>(pis, "metadata.asdf");
-  pis.reset();
+  auto project = make_shared<ASDF::asdf>("metadata.asdf");
 
   auto grp = project->get_group();
 

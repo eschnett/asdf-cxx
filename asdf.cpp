@@ -3,6 +3,7 @@
 #include <array>
 #include <cassert>
 #include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 
@@ -135,12 +136,21 @@ asdf::asdf(const shared_ptr<istream> &pis, const string &filename,
   *this = asdf(rs, node, readers);
 }
 
+asdf::asdf(const string &filename, const map<string, reader_t> &readers)
+    : asdf(make_shared<ifstream>(filename, ios::binary | ios::in), filename,
+           readers) {}
+
 asdf asdf::copy(const copy_state &cs) const { return asdf(cs, *this); }
 
 void asdf::write(ostream &os) const {
   writer w(os, tags);
   w << *this;
   w.flush();
+}
+
+void asdf::write(const string &filename) const {
+  ofstream os(filename, ios::binary | ios::trunc | ios::out);
+  write(os);
 }
 
 } // namespace ASDF

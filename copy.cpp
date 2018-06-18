@@ -4,7 +4,6 @@
 
 #include <cassert>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -63,9 +62,7 @@ int main(int argc, char **argv) {
   check(!outputfilename.empty(), "Output file name is empty\n");
 
   // Read project
-  auto pis = make_shared<ifstream>(inputfilename, ios::binary | ios::in);
-  auto project = asdf(pis);
-  pis.reset();
+  auto project = asdf(inputfilename);
 
   // Copy project
   const copy_state cs{block_format != block_format_t::undefined, block_format,
@@ -73,9 +70,7 @@ int main(int argc, char **argv) {
   auto project2 = project.copy(cs);
 
   // Write project
-  ofstream os(outputfilename, ios::binary | ios::trunc | ios::out);
-  project2.write(os);
-  os.close();
+  project2.write(outputfilename);
 
   cout << "Done.\n";
   return 0;
