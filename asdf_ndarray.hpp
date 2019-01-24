@@ -176,7 +176,7 @@ private:
   void check_shape() const;
 
 public:
-  const memoized<block_t> &get_data() const {
+  memoized<block_t> get_data() const {
     // check_shape();
     return mdata;
   }
