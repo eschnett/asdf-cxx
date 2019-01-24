@@ -18,13 +18,14 @@ int main(int argc, char **argv) {
     if (cond)
       return;
     cerr << msg << "Syntax: " << argv[0]
-         << " [--array=(blockinline)] [--compression=(none|bzip2|zlib)] <input "
-            "file> <output file>\n"
+         << " [--array=(blockinline)] [--compression=(none|bzip2|zlib)] "
+            "[--compression-level=[0-9]] <input file> <output file>\n"
          << "Aborting.\n";
     exit(1);
   };
   block_format_t block_format = block_format_t::undefined;
   compression_t compression = compression_t::undefined;
+  int compression_level = -1;
   vector<string> args;
   for (int argi = 1; argi < argc; ++argi)
     args.push_back(argv[argi]);
@@ -50,6 +51,26 @@ int main(int argc, char **argv) {
       check(compression == compression_t::undefined,
             "Compression type already set\n");
       compression = compression_t::zlib;
+    } else if (opt == "--compression-level=0") { // Dont' judge me for this
+      compression_level = 0;
+    } else if (opt == "--compression-level=1") {
+      compression_level = 1;
+    } else if (opt == "--compression-level=2") {
+      compression_level = 2;
+    } else if (opt == "--compression-level=3") {
+      compression_level = 3;
+    } else if (opt == "--compression-level=4") {
+      compression_level = 4;
+    } else if (opt == "--compression-level=5") {
+      compression_level = 5;
+    } else if (opt == "--compression-level=6") {
+      compression_level = 6;
+    } else if (opt == "--compression-level=7") {
+      compression_level = 7;
+    } else if (opt == "--compression-level=8") {
+      compression_level = 8;
+    } else if (opt == "--compression-level=9") {
+      compression_level = 9;
     } else {
       assert(0);
     }
@@ -65,8 +86,12 @@ int main(int argc, char **argv) {
   auto project = asdf(inputfilename);
 
   // Copy project
-  const copy_state cs{block_format != block_format_t::undefined, block_format,
-                      compression != compression_t::undefined, compression};
+  const copy_state cs{block_format != block_format_t::undefined,
+                      block_format,
+                      compression != compression_t::undefined,
+                      compression,
+                      compression_level != -1,
+                      compression_level};
   auto project2 = project.copy(cs);
 
   // Write project

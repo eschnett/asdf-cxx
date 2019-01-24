@@ -365,7 +365,7 @@ void ndarray::write_block(ostream &os) const {
     // Allocate 600 bytes plus 1% more
     outdata = make_shared<typed_block_t<unsigned char>>(vector<unsigned char>(
         600 + get_data()->nbytes() + (get_data()->nbytes() + 99) / 100));
-    const int level = 9;
+    const int level = compression_level;
     bz_stream strm;
     strm.bzalloc = NULL;
     strm.bzfree = NULL;
@@ -413,7 +413,7 @@ void ndarray::write_block(ostream &os) const {
     outdata = make_shared<typed_block_t<unsigned char>>(
         vector<unsigned char>((6 + get_data()->nbytes() +
                                (get_data()->nbytes() + 16383) / 16384 * 5)));
-    const int level = 9;
+    const int level = compression_level;
     z_stream strm;
     strm.zalloc = Z_NULL;
     strm.zfree = Z_NULL;
@@ -507,8 +507,8 @@ void ndarray::write_block(ostream &os) const {
 
 ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : block_format(block_format_t::undefined),
-      compression(compression_t::undefined), byteorder(byteorder_t::undefined),
-      offset(-1) {
+      compression(compression_t::undefined), compression_level(-1),
+      byteorder(byteorder_t::undefined), offset(-1) {
   assert(node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.0.0");
   if (node["source"].IsDefined())
     block_format = block_format_t::block;
@@ -524,6 +524,7 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     yaml_decode(node["source"], source);
     // TODO: This is just a default choice
     compression = compression_t::zlib;
+    compression_level = 9;
     datatype = make_shared<datatype_t>(rs, node["datatype"]);
     yaml_decode(node["byteorder"], byteorder);
     yaml_decode(node["shape"], shape);
@@ -580,6 +581,8 @@ ndarray::ndarray(const copy_state &cs, const ndarray &arr) : ndarray(arr) {
     block_format = cs.block_format;
   if (cs.set_compression)
     compression = cs.compression;
+  if (cs.set_compression_level)
+    compression_level = cs.compression_level;
 }
 
 writer &ndarray::to_yaml(writer &w) const {

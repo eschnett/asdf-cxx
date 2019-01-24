@@ -59,6 +59,8 @@ struct copy_state {
   block_format_t block_format;
   bool set_compression;
   compression_t compression;
+  bool set_compression_level;
+  int compression_level;
 };
 
 class writer {

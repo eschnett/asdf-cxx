@@ -16,25 +16,25 @@ int main(int argc, char **argv) {
   cout << "asdf-demo: Create a simple ASDF file\n";
 
   auto array0d = make_shared<ndarray>(
-      vector<int64_t>{42}, block_format_t::inline_array, compression_t::none,
+      vector<int64_t>{42}, block_format_t::inline_array, compression_t::none, 0,
       vector<bool>(), vector<int64_t>{});
   auto ent0 = make_shared<entry>("alpha", array0d, string());
   auto array1d = make_shared<ndarray>(
-      vector<int64_t>{1, 2, 3}, block_format_t::block, compression_t::none,
+      vector<int64_t>{1, 2, 3}, block_format_t::block, compression_t::none, 0,
       vector<bool>(), vector<int64_t>{3});
   auto ent1 = make_shared<entry>("beta", array1d, string());
   auto array2d =
       make_shared<ndarray>(vector<float64_t>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0},
-                           block_format_t::inline_array, compression_t::none,
+                           block_format_t::inline_array, compression_t::none, 0,
                            vector<bool>(), vector<int64_t>{2, 3});
   auto ent2 = make_shared<entry>("gamma", array2d, string());
   auto array3d =
       make_shared<ndarray>(vector<complex128_t>{1, -2, 3i, -4i, 5 + 1i, 6 - 1i},
-                           block_format_t::block, compression_t::bzip2,
+                           block_format_t::block, compression_t::bzip2, 9,
                            vector<bool>(), vector<int64_t>{1, 2, 3});
   auto ent3 = make_shared<entry>("delta", array3d, string());
   auto array8d = make_shared<ndarray>(
-      vector<bool8_t>{true}, block_format_t::block, compression_t::zlib,
+      vector<bool8_t>{true}, block_format_t::block, compression_t::zlib, 9,
       vector<bool>(), vector<int64_t>{1, 1, 1, 1, 1, 1, 1, 1});
   auto ent8 = make_shared<entry>("epsilon", array8d, string());
   auto seq = make_shared<sequence>(vector<shared_ptr<entry>>{ent0, ent1, ent2});

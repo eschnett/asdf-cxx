@@ -15,7 +15,7 @@ void write_external() {
   // The actual dataset
   auto alpha = make_shared<ndarray>(
       vector<int64_t>{1, 2, 3}, block_format_t::inline_array,
-      compression_t::none, vector<bool>(), vector<int64_t>{3});
+      compression_t::none, 0, vector<bool>(), vector<int64_t>{3});
   // A local reference
   auto beta =
       make_shared<reference>("", vector<string>{"group", "alpha", "data"});

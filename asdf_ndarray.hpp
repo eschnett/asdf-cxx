@@ -100,6 +100,7 @@ class ndarray {
   memoized<block_t> mdata;
   block_format_t block_format;
   compression_t compression; // TODO: move to block_t
+  int compression_level;     // TODO: move to block_t
   vector<bool> mask;
   shared_ptr<datatype_t> datatype;
   byteorder_t byteorder; // TODO: move to block_t
@@ -119,12 +120,12 @@ public:
   ndarray &operator=(ndarray &&) = default;
 
   ndarray(memoized<block_t> mdata1, block_format_t block_format,
-          compression_t compression, vector<bool> mask1,
+          compression_t compression, int compression_level, vector<bool> mask1,
           shared_ptr<datatype_t> datatype1, byteorder_t byteorder,
           vector<int64_t> shape1, int64_t offset = 0,
           vector<int64_t> strides1 = {})
       : mdata(move(mdata1)), block_format(block_format),
-        compression(compression), mask(move(mask1)), datatype(move(datatype1)),
+        compression(compression), compression_level(compression_level),mask(move(mask1)), datatype(move(datatype1)),
         byteorder(byteorder), shape(move(shape1)), offset(offset),
         strides(move(strides1)) {
     // Check shape
@@ -157,11 +158,11 @@ public:
 
   template <typename T>
   ndarray(vector<T> data1, block_format_t block_format,
-          compression_t compression, vector<bool> mask1, vector<int64_t> shape1,
+          compression_t compression,int compression_level, vector<bool> mask1, vector<int64_t> shape1,
           int64_t offset = 0, vector<int64_t> strides1 = {})
       : ndarray(make_constant_memoized(shared_ptr<block_t>(
                     make_shared<typed_block_t<T>>(move(data1)))),
-                block_format, compression, move(mask1),
+                block_format, compression, compression_level,move(mask1),
                 make_shared<datatype_t>(get_scalar_type_id<T>::value),
                 host_byteorder(), move(shape1), offset, move(strides1)) {}
 
