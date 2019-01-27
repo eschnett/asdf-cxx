@@ -125,9 +125,9 @@ public:
           vector<int64_t> shape1, int64_t offset = 0,
           vector<int64_t> strides1 = {})
       : mdata(move(mdata1)), block_format(block_format),
-        compression(compression), compression_level(compression_level),mask(move(mask1)), datatype(move(datatype1)),
-        byteorder(byteorder), shape(move(shape1)), offset(offset),
-        strides(move(strides1)) {
+        compression(compression), compression_level(compression_level),
+        mask(move(mask1)), datatype(move(datatype1)), byteorder(byteorder),
+        shape(move(shape1)), offset(offset), strides(move(strides1)) {
     // Check shape
     int rank = shape.size();
     for (int d = 0; d < rank; ++d)
@@ -158,11 +158,12 @@ public:
 
   template <typename T>
   ndarray(vector<T> data1, block_format_t block_format,
-          compression_t compression,int compression_level, vector<bool> mask1, vector<int64_t> shape1,
-          int64_t offset = 0, vector<int64_t> strides1 = {})
+          compression_t compression, int compression_level, vector<bool> mask1,
+          vector<int64_t> shape1, int64_t offset = 0,
+          vector<int64_t> strides1 = {})
       : ndarray(make_constant_memoized(shared_ptr<block_t>(
                     make_shared<typed_block_t<T>>(move(data1)))),
-                block_format, compression, compression_level,move(mask1),
+                block_format, compression, compression_level, move(mask1),
                 make_shared<datatype_t>(get_scalar_type_id<T>::value),
                 host_byteorder(), move(shape1), offset, move(strides1)) {}
 
