@@ -57,6 +57,22 @@ else()
   set(HAVE_ZLIB 0)
 endif()
 
+set(Python_ADDITIONAL_VERSIONS 3.0)
+# This sets PYTHONINTERP_FOUND
+find_package(PythonInterp)
+# This sets PYTHONLIBS_FOUND
+find_package(PythonLibs)
+if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND)
+  include_directories(${PYTHON_INCLUDE_DIRS})
+endif()
+
+if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND)
+  find_package(SWIG)
+endif()
+if(SWIG_FOUND)
+  include(${SWIG_USE_FILE})
+endif()
+
 # Main project
 
 set(CMAKE_CXX_STANDARD 11)
@@ -115,6 +131,14 @@ target_link_libraries(asdf-demo-large asdf-cxx ${LIBS})
 add_executable(asdf-ls ls.cpp)
 target_link_libraries(asdf-ls asdf-cxx ${LIBS})
 
+# SWIG bindings
+
+if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND AND SWIG_FOUND)
+  set_source_files_properties(asdf.i PROPERTIES CPLUSPLUS ON)
+  swig_add_library(asdf LANGUAGE python SOURCES asdf.i)
+  swig_link_libraries(asdf asdf-cxx ${LIBS} ${PYTHON_LIBRARIES})
+endif()
+
 # Tests
 
 enable_testing()
@@ -124,8 +148,25 @@ add_test(NAME copy COMMAND ./asdf-copy demo.asdf demo2.asdf)
 add_test(NAME ls2 COMMAND ./asdf-ls demo2.asdf)
 add_test(NAME compare
   COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
-            "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
+  "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
 add_test(NAME external COMMAND ./asdf-demo-external)
+
+if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND AND SWIG_FOUND)
+  add_test(NAME demo-python
+    COMMAND
+    env "PYTHONPATH=${PROJECT_BINARY_DIR}:$ENV{PYTHONPATH}"
+    ${PYTHON_EXECUTABLE} "${PROJECT_SOURCE_DIR}/asdf-demo-python.py")
+  add_test(NAME compare
+    COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
+    "./asdf-ls demo.asdf" "./asdf-ls demo-python.asdf")
+  add_test(NAME demo-external-python
+    COMMAND
+    env "PYTHONPATH=${PROJECT_BINARY_DIR}:$ENV{PYTHONPATH}"
+    ${PYTHON_EXECUTABLE} "${PROJECT_SOURCE_DIR}/asdf-demo-external-python.py")
+  add_test(NAME compare
+    COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
+    "./asdf-ls demo-external.asdf" "./asdf-ls demo-external-python.asdf")
+endif()
 
 # Coverage
 
@@ -145,6 +186,10 @@ install(FILES "${PROJECT_BINARY_DIR}/asdf_config.hpp" DESTINATION include)
 install(TARGETS asdf-cxx DESTINATION lib)
 install(TARGETS asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-ls
   DESTINATION bin)
+if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND AND SWIG_FOUND)
+  install(PROGRAMS asdf-demo-python.py asdf-demo-external-python.py
+    DESTINATION bin)
+endif()
 
 set(PKG_CONFIG_REQUIRES "yaml-cpp")
 set(PKG_CONFIG_INCLUDEDIR "\${prefix}/include")
