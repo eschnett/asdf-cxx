@@ -67,6 +67,13 @@ template <> struct get_scalar_type_id<int32_t> {
 template <> struct get_scalar_type_id<int64_t> {
   constexpr static scalar_type_id_t value = id_int64;
 };
+template <> struct get_scalar_type_id<long> {
+  constexpr static scalar_type_id_t value =
+      sizeof(long) == sizeof(int32_t)
+          ? get_scalar_type_id<int32_t>::value
+          : sizeof(long) == sizeof(int64_t) ? get_scalar_type_id<int64_t>::value
+                                            : scalar_type_id_t(-1);
+};
 template <> struct get_scalar_type_id<uint8_t> {
   constexpr static scalar_type_id_t value = id_uint8;
 };
@@ -78,6 +85,14 @@ template <> struct get_scalar_type_id<uint32_t> {
 };
 template <> struct get_scalar_type_id<uint64_t> {
   constexpr static scalar_type_id_t value = id_uint64;
+};
+template <> struct get_scalar_type_id<unsigned long> {
+  constexpr static scalar_type_id_t value =
+      sizeof(unsigned long) == sizeof(uint32_t)
+          ? get_scalar_type_id<uint32_t>::value
+          : sizeof(unsigned long) == sizeof(uint64_t)
+                ? get_scalar_type_id<uint64_t>::value
+                : scalar_type_id_t(-1);
 };
 template <> struct get_scalar_type_id<float32_t> {
   constexpr static scalar_type_id_t value = id_float32;
