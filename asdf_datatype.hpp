@@ -60,51 +60,43 @@ template <typename T> struct is_complex<complex<T>> : is_floating_point<T> {};
 // is_complex<T>::value;
 } // namespace
 
-template <typename T> inline constexpr scalar_type_id_t get_scalar_type_id() {
-  if (is_same<T, bool8_t>::value)
-    return id_bool8;
-  if (is_integral<T>::value && is_signed<T>::value) {
-    if (sizeof(T) == 1)
-      return id_int8;
-    if (sizeof(T) == 2)
-      return id_int16;
-    if (sizeof(T) == 4)
-      return id_int32;
-    if (sizeof(T) == 8)
-      return id_int64;
-    return id_error;
-  }
-  if (is_integral<T>::value && is_unsigned<T>::value) {
-    if (sizeof(T) == 1)
-      return id_uint8;
-    if (sizeof(T) == 2)
-      return id_uint16;
-    if (sizeof(T) == 4)
-      return id_uint32;
-    if (sizeof(T) == 8)
-      return id_uint64;
-    return id_error;
-  }
-  if (is_floating_point<T>::value) {
-    if (sizeof(T) == 4)
-      return id_float32;
-    if (sizeof(T) == 8)
-      return id_float64;
-    return id_error;
-  }
-  if (is_complex<T>::value) {
-    if (sizeof(T) == 8)
-      return id_complex64;
-    if (sizeof(T) == 16)
-      return id_complex128;
-    return id_error;
-  }
-  if (is_same<T, ascii_t>::value)
-    return id_ascii;
-  if (is_same<T, ucs4_t>::value)
-    return id_ucs4;
-  return id_error;
-}
+template <typename T>
+struct get_scalar_type_id
+    : integral_constant<
+          scalar_type_id_t,
+          is_same<T, bool8_t>::value
+              ? id_bool8
+              : is_integral<T>::value && is_signed<T>::value
+                    ? (sizeof(T) == 1
+                           ? id_int8
+                           : sizeof(T) == 2
+                                 ? id_int16
+                                 : sizeof(T) == 4
+                                       ? id_int32
+                                       : sizeof(T) == 8 ? id_int64 : id_error)
+                    : is_integral<T>::value && is_unsigned<T>::value
+                          ? (sizeof(T) == 1
+                                 ? id_uint8
+                                 : sizeof(T) == 2
+                                       ? id_uint16
+                                       : sizeof(T) == 4
+                                             ? id_uint32
+                                             : sizeof(T) == 8 ? id_uint64
+                                                              : id_error)
+                          : is_floating_point<T>::value
+                                ? (sizeof(T) == 4
+                                       ? id_float32
+                                       : sizeof(T) == 8 ? id_float64 : id_error)
+                                : is_complex<T>::value
+                                      ? (sizeof(T) == 8
+                                             ? id_complex64
+                                             : sizeof(T) == 16 ? id_complex128
+                                                               : id_error)
+                                      : is_same<T, ascii_t>::value
+                                            ? id_ascii
+                                            : is_same<T, ucs4_t>::value
+                                                  ? id_ucs4
+                                                  : id_error> {};
 
 // Convert an enum id to its type
 template <size_t> struct get_scalar_type;
