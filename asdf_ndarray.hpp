@@ -187,6 +187,21 @@ public:
     return mdata;
   }
 
+  template <typename T> vector<T> get_data_vector() const {
+    assert(datatype->is_scalar);
+    assert(datatype->scalar_type_id == get_scalar_type_id<T>::value);
+    int64_t npoints = 1;
+    for (size_t d = 0; d < shape.size(); ++d)
+      npoints *= shape.at(d);
+    const T *ptr = static_cast<const T *>(mdata->ptr());
+    size_t nbytes = mdata->nbytes();
+    assert(nbytes == npoints * sizeof(T));
+    vector<T> data(npoints);
+    for (size_t i = 0; i < npoints; ++i)
+      data[i] = ptr[i];
+    return data;
+  }
+
   shared_ptr<datatype_t> get_datatype() const { return datatype; }
   vector<int64_t> get_shape() const { return shape; }
   int64_t get_offset() const { return offset; }
