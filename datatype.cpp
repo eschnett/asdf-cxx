@@ -271,12 +271,11 @@ YAML::Node yaml_encode(float64_t val) {
   return node;
 }
 template <typename T> YAML::Node yaml_encode(const complex<T> &val) {
+  auto val1(val);
   YAML::Emitter re;
-  // re << val.real();
-  re << real(val);
+  re << val1.real();
   YAML::Emitter im;
-  // im << val.imag();
-  im << imag(val);
+  im << val1.imag();
   ostringstream buf;
   buf << re.c_str();
   if (im.c_str()[0] != '-')
