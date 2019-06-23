@@ -271,6 +271,7 @@ YAML::Node yaml_encode(float64_t val) {
   return node;
 }
 template <typename T> YAML::Node yaml_encode(const complex<T> &val) {
+  // Work around libstdc++ const-handling bug in gcc 4.8
   auto val1(val);
   YAML::Emitter re;
   re << val1.real();

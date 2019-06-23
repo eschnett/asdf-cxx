@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
                            vector<bool>(), vector<int64_t>{2, 3});
   auto ent2 = make_shared<entry>("gamma", array2d, string());
   auto array3d = make_shared<ndarray>(
-      vector<complex128_t>{1, -2, 3i, -4i, 5.0 + 1i, 6.0 - 1i},
+      vector<complex128_t>{1.0, -2.0, 3.0i, -4.0i, 5.0 + 1.0i, 6.0 - 1.0i},
       block_format_t::block, compression_t::bzip2, 9, vector<bool>(),
       vector<int64_t>{1, 2, 3});
   auto ent3 = make_shared<entry>("delta", array3d, string());
