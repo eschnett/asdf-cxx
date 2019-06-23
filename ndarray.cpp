@@ -149,7 +149,7 @@ template <typename T> void input(istream &is, T &data) {
 }
 
 shared_ptr<block_t>
-read_block_data(const shared_ptr<istream> &pis, ios::streamoff block_begin,
+read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
                 uint64_t allocated_space, uint64_t data_space,
                 compression_t compression,
                 const array<unsigned char, 16> &want_checksum) {
@@ -319,7 +319,7 @@ memoized<block_t> ndarray::read_block(const shared_ptr<istream> &pis) {
   // fdata.fill_cache();
 
   // skip padding
-  is.seekg(block_begin + ios::streamoff(used_space));
+  is.seekg(block_begin + streamoff(used_space));
   return move(fdata);
 }
 

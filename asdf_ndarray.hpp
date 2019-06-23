@@ -164,7 +164,7 @@ public:
       : ndarray(make_constant_memoized(shared_ptr<block_t>(
                     make_shared<typed_block_t<T>>(move(data1)))),
                 block_format, compression, compression_level, move(mask1),
-                make_shared<datatype_t>(get_scalar_type_id<T>::value),
+                make_shared<datatype_t>(get_scalar_type_id<T>()),
                 host_byteorder(), move(shape1), offset, move(strides1)) {}
 
   ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node);
@@ -185,6 +185,21 @@ public:
   memoized<block_t> get_data() {
     // check_shape();
     return mdata;
+  }
+
+  template <typename T> vector<T> get_data_vector() const {
+    assert(datatype->is_scalar);
+    assert(datatype->scalar_type_id == get_scalar_type_id<T>());
+    int64_t npoints = 1;
+    for (size_t d = 0; d < shape.size(); ++d)
+      npoints *= shape.at(d);
+    const T *ptr = static_cast<const T *>(mdata->ptr());
+    size_t nbytes = mdata->nbytes();
+    assert(nbytes == npoints * sizeof(T));
+    vector<T> data(npoints);
+    for (size_t i = 0; i < npoints; ++i)
+      data[i] = ptr[i];
+    return data;
   }
 
   shared_ptr<datatype_t> get_datatype() const { return datatype; }

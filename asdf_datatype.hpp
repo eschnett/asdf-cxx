@@ -7,6 +7,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <complex>
+#include <type_traits>
 #include <vector>
 
 namespace ASDF {
@@ -16,6 +17,7 @@ using namespace std;
 
 // Define an id for every type
 enum scalar_type_id_t {
+  id_error = -1,
   id_bool8,
   id_int8,
   id_int16,
@@ -51,52 +53,50 @@ typedef vector<unsigned char> ascii_t;
 typedef vector<char32_t> ucs4_t;
 
 // Convert a type to its id enum
-template <typename> struct get_scalar_type_id;
-template <> struct get_scalar_type_id<bool8_t> {
-  constexpr static scalar_type_id_t value = id_bool8;
-};
-template <> struct get_scalar_type_id<int8_t> {
-  constexpr static scalar_type_id_t value = id_int8;
-};
-template <> struct get_scalar_type_id<int16_t> {
-  constexpr static scalar_type_id_t value = id_int16;
-};
-template <> struct get_scalar_type_id<int32_t> {
-  constexpr static scalar_type_id_t value = id_int32;
-};
-template <> struct get_scalar_type_id<int64_t> {
-  constexpr static scalar_type_id_t value = id_int64;
-};
-template <> struct get_scalar_type_id<uint8_t> {
-  constexpr static scalar_type_id_t value = id_uint8;
-};
-template <> struct get_scalar_type_id<uint16_t> {
-  constexpr static scalar_type_id_t value = id_uint16;
-};
-template <> struct get_scalar_type_id<uint32_t> {
-  constexpr static scalar_type_id_t value = id_uint32;
-};
-template <> struct get_scalar_type_id<uint64_t> {
-  constexpr static scalar_type_id_t value = id_uint64;
-};
-template <> struct get_scalar_type_id<float32_t> {
-  constexpr static scalar_type_id_t value = id_float32;
-};
-template <> struct get_scalar_type_id<float64_t> {
-  constexpr static scalar_type_id_t value = id_float64;
-};
-template <> struct get_scalar_type_id<complex64_t> {
-  constexpr static scalar_type_id_t value = id_complex64;
-};
-template <> struct get_scalar_type_id<complex128_t> {
-  constexpr static scalar_type_id_t value = id_complex128;
-};
-template <> struct get_scalar_type_id<ascii_t> {
-  constexpr static scalar_type_id_t value = id_ascii;
-};
-template <> struct get_scalar_type_id<ucs4_t> {
-  constexpr static scalar_type_id_t value = id_ucs4;
-};
+namespace {
+template <typename T> struct is_complex : false_type {};
+template <typename T> struct is_complex<complex<T>> : is_floating_point<T> {};
+// template <typename T> inline constexpr bool is_complex_v =
+// is_complex<T>::value;
+} // namespace
+
+template <typename T>
+struct get_scalar_type_id
+    : integral_constant<
+          scalar_type_id_t,
+          is_same<T, bool8_t>::value
+              ? id_bool8
+              : is_integral<T>::value && is_signed<T>::value
+                    ? (sizeof(T) == 1
+                           ? id_int8
+                           : sizeof(T) == 2
+                                 ? id_int16
+                                 : sizeof(T) == 4
+                                       ? id_int32
+                                       : sizeof(T) == 8 ? id_int64 : id_error)
+                    : is_integral<T>::value && is_unsigned<T>::value
+                          ? (sizeof(T) == 1
+                                 ? id_uint8
+                                 : sizeof(T) == 2
+                                       ? id_uint16
+                                       : sizeof(T) == 4
+                                             ? id_uint32
+                                             : sizeof(T) == 8 ? id_uint64
+                                                              : id_error)
+                          : is_floating_point<T>::value
+                                ? (sizeof(T) == 4
+                                       ? id_float32
+                                       : sizeof(T) == 8 ? id_float64 : id_error)
+                                : is_complex<T>::value
+                                      ? (sizeof(T) == 8
+                                             ? id_complex64
+                                             : sizeof(T) == 16 ? id_complex128
+                                                               : id_error)
+                                      : is_same<T, ascii_t>::value
+                                            ? id_ascii
+                                            : is_same<T, ucs4_t>::value
+                                                  ? id_ucs4
+                                                  : id_error> {};
 
 // Convert an enum id to its type
 template <size_t> struct get_scalar_type;

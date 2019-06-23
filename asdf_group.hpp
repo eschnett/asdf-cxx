@@ -46,16 +46,16 @@ public:
     assert(ref);
   }
 
-  entry(string name1, shared_ptr<group> grp1, string description1)
-      : name(move(name1)), grp(move(grp1)), description(move(description1)) {
-    assert(!name.empty());
-    assert(grp);
-  }
-
   entry(string name1, shared_ptr<sequence> seq1, string description1)
       : name(move(name1)), seq(move(seq1)), description(move(description1)) {
     assert(!name.empty());
     assert(seq);
+  }
+
+  entry(string name1, shared_ptr<group> grp1, string description1)
+      : name(move(name1)), grp(move(grp1)), description(move(description1)) {
+    assert(!name.empty());
+    assert(grp);
   }
 
   entry(const shared_ptr<reader_state> &rs, const YAML::Node &node);
