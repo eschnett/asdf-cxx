@@ -56,13 +56,14 @@ typedef vector<char32_t> ucs4_t;
 namespace {
 template <typename T> struct is_complex : false_type {};
 template <typename T> struct is_complex<complex<T>> : is_floating_point<T> {};
-template <typename T> inline constexpr bool is_complex_v = is_complex<T>::value;
+// template <typename T> inline constexpr bool is_complex_v =
+// is_complex<T>::value;
 } // namespace
 
 template <typename T> inline constexpr scalar_type_id_t get_scalar_type_id() {
-  if (is_same_v<T, bool8_t>)
+  if (is_same<T, bool8_t>::value)
     return id_bool8;
-  if (is_integral_v<T> && is_signed_v<T>) {
+  if (is_integral<T>::value && is_signed<T>::value) {
     if (sizeof(T) == 1)
       return id_int8;
     if (sizeof(T) == 2)
@@ -73,7 +74,7 @@ template <typename T> inline constexpr scalar_type_id_t get_scalar_type_id() {
       return id_int64;
     return id_error;
   }
-  if (is_integral_v<T> && is_unsigned_v<T>) {
+  if (is_integral<T>::value && is_unsigned<T>::value) {
     if (sizeof(T) == 1)
       return id_uint8;
     if (sizeof(T) == 2)
@@ -84,23 +85,23 @@ template <typename T> inline constexpr scalar_type_id_t get_scalar_type_id() {
       return id_uint64;
     return id_error;
   }
-  if (is_floating_point_v<T>) {
+  if (is_floating_point<T>::value) {
     if (sizeof(T) == 4)
       return id_float32;
     if (sizeof(T) == 8)
       return id_float64;
     return id_error;
   }
-  if (is_complex_v<T>) {
+  if (is_complex<T>::value) {
     if (sizeof(T) == 8)
       return id_complex64;
     if (sizeof(T) == 16)
       return id_complex128;
     return id_error;
   }
-  if (is_same_v<T, ascii_t>)
+  if (is_same<T, ascii_t>::value)
     return id_ascii;
-  if (is_same_v<T, ucs4_t>)
+  if (is_same<T, ucs4_t>::value)
     return id_ucs4;
   return id_error;
 }
