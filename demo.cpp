@@ -12,9 +12,6 @@
 using namespace std;
 using namespace ASDF;
 
-// Work around shortcomings in GCC 4.8
-template <typename T> constexpr complex<T> C(T re, T im) { return {re, im}; }
-
 int main(int argc, char **argv) {
   cout << "asdf-demo: Create a simple ASDF file\n";
 
