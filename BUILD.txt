@@ -1,0 +1,15 @@
+Redshift:
+
+mkdir build && cd build
+env "PATH=$HOME/src/spack-view/bin:$PATH" cmake -DCMAKE_INSTALL_PREFIX=$HOME/asdf-cxx -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -G Ninja ..
+
+env "PATH=$HOME/src/spack-view/bin:$PATH" cmake --build .
+for lib in *.so; do install_name_tool -change '@rpath/libyaml-cpp.0.6.dylib' "$HOME/src/spack-view/lib/libyaml-cpp.0.6.2.dylib" $lib; done
+for exe in ./asdf-*; do install_name_tool -change '@rpath/libyaml-cpp.0.6.dylib' "$HOME/src/spack-view/lib/libyaml-cpp.0.6.2.dylib" $exe; done
+
+env "PATH=$HOME/src/spack-view/bin:$PATH" "DYLD_LIBRARY_PATH=$HOME/src/spack-view/lib:$DYLD_LIBRARY_PATH" ./test_RegionCalculus
+env "PATH=$HOME/src/spack-view/bin:$PATH" "DYLD_LIBRARY_PATH=$HOME/src/spack-view/lib:$DYLD_LIBRARY_PATH" ./test_SimulationIO
+
+env "PATH=$HOME/src/spack-view/bin:$PATH" "DYLD_LIBRARY_PATH=$HOME/src/spack-view/lib:$DYLD_LIBRARY_PATH" "PYTHONHOME=$HOME/src/spack-view" "PYTHONPATH=$(pwd)" $HOME/src/spack-view/bin/python ../demo-python.py
+
+env "PATH=$HOME/src/spack-view/bin:$PATH" cmake --build . --target install
