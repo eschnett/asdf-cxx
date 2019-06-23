@@ -28,10 +28,10 @@ int main(int argc, char **argv) {
                            block_format_t::inline_array, compression_t::none, 0,
                            vector<bool>(), vector<int64_t>{2, 3});
   auto ent2 = make_shared<entry>("gamma", array2d, string());
-  auto array3d =
-      make_shared<ndarray>(vector<complex128_t>{1, -2, 3i, -4i, 5 + 1i, 6 - 1i},
-                           block_format_t::block, compression_t::bzip2, 9,
-                           vector<bool>(), vector<int64_t>{1, 2, 3});
+  auto array3d = make_shared<ndarray>(
+      vector<complex128_t>{1, -2, 3i, -4i, 5.0 + 1i, 6.0 - 1i},
+      block_format_t::block, compression_t::bzip2, 9, vector<bool>(),
+      vector<int64_t>{1, 2, 3});
   auto ent3 = make_shared<entry>("delta", array3d, string());
   auto array8d = make_shared<ndarray>(
       vector<bool8_t>{true}, block_format_t::block, compression_t::zlib, 9,

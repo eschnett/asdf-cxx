@@ -7,6 +7,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <complex>
+#include <type_traits>
 #include <vector>
 
 namespace ASDF {
@@ -16,6 +17,7 @@ using namespace std;
 
 // Define an id for every type
 enum scalar_type_id_t {
+  id_error = -1,
   id_bool8,
   id_int8,
   id_int16,
@@ -51,67 +53,57 @@ typedef vector<unsigned char> ascii_t;
 typedef vector<char32_t> ucs4_t;
 
 // Convert a type to its id enum
-template <typename> struct get_scalar_type_id;
-template <> struct get_scalar_type_id<bool8_t> {
-  constexpr static scalar_type_id_t value = id_bool8;
-};
-template <> struct get_scalar_type_id<int8_t> {
-  constexpr static scalar_type_id_t value = id_int8;
-};
-template <> struct get_scalar_type_id<int16_t> {
-  constexpr static scalar_type_id_t value = id_int16;
-};
-template <> struct get_scalar_type_id<int32_t> {
-  constexpr static scalar_type_id_t value = id_int32;
-};
-template <> struct get_scalar_type_id<int64_t> {
-  constexpr static scalar_type_id_t value = id_int64;
-};
-template <> struct get_scalar_type_id<long> {
-  constexpr static scalar_type_id_t value =
-      sizeof(long) == sizeof(int32_t)
-          ? get_scalar_type_id<int32_t>::value
-          : sizeof(long) == sizeof(int64_t) ? get_scalar_type_id<int64_t>::value
-                                            : scalar_type_id_t(-1);
-};
-template <> struct get_scalar_type_id<uint8_t> {
-  constexpr static scalar_type_id_t value = id_uint8;
-};
-template <> struct get_scalar_type_id<uint16_t> {
-  constexpr static scalar_type_id_t value = id_uint16;
-};
-template <> struct get_scalar_type_id<uint32_t> {
-  constexpr static scalar_type_id_t value = id_uint32;
-};
-template <> struct get_scalar_type_id<uint64_t> {
-  constexpr static scalar_type_id_t value = id_uint64;
-};
-template <> struct get_scalar_type_id<unsigned long> {
-  constexpr static scalar_type_id_t value =
-      sizeof(unsigned long) == sizeof(uint32_t)
-          ? get_scalar_type_id<uint32_t>::value
-          : sizeof(unsigned long) == sizeof(uint64_t)
-                ? get_scalar_type_id<uint64_t>::value
-                : scalar_type_id_t(-1);
-};
-template <> struct get_scalar_type_id<float32_t> {
-  constexpr static scalar_type_id_t value = id_float32;
-};
-template <> struct get_scalar_type_id<float64_t> {
-  constexpr static scalar_type_id_t value = id_float64;
-};
-template <> struct get_scalar_type_id<complex64_t> {
-  constexpr static scalar_type_id_t value = id_complex64;
-};
-template <> struct get_scalar_type_id<complex128_t> {
-  constexpr static scalar_type_id_t value = id_complex128;
-};
-template <> struct get_scalar_type_id<ascii_t> {
-  constexpr static scalar_type_id_t value = id_ascii;
-};
-template <> struct get_scalar_type_id<ucs4_t> {
-  constexpr static scalar_type_id_t value = id_ucs4;
-};
+namespace {
+template <typename T> struct is_complex : false_type {};
+template <typename T> struct is_complex<complex<T>> : is_floating_point<T> {};
+template <typename T> inline constexpr bool is_complex_v = is_complex<T>::value;
+} // namespace
+
+template <typename T> inline constexpr scalar_type_id_t get_scalar_type_id() {
+  if (is_same_v<T, bool8_t>)
+    return id_bool8;
+  if (is_integral_v<T> && is_signed_v<T>) {
+    if (sizeof(T) == 1)
+      return id_int8;
+    if (sizeof(T) == 2)
+      return id_int16;
+    if (sizeof(T) == 4)
+      return id_int32;
+    if (sizeof(T) == 8)
+      return id_int64;
+    return id_error;
+  }
+  if (is_integral_v<T> && is_unsigned_v<T>) {
+    if (sizeof(T) == 1)
+      return id_uint8;
+    if (sizeof(T) == 2)
+      return id_uint16;
+    if (sizeof(T) == 4)
+      return id_uint32;
+    if (sizeof(T) == 8)
+      return id_uint64;
+    return id_error;
+  }
+  if (is_floating_point_v<T>) {
+    if (sizeof(T) == 4)
+      return id_float32;
+    if (sizeof(T) == 8)
+      return id_float64;
+    return id_error;
+  }
+  if (is_complex_v<T>) {
+    if (sizeof(T) == 8)
+      return id_complex64;
+    if (sizeof(T) == 16)
+      return id_complex128;
+    return id_error;
+  }
+  if (is_same_v<T, ascii_t>)
+    return id_ascii;
+  if (is_same_v<T, ucs4_t>)
+    return id_ucs4;
+  return id_error;
+}
 
 // Convert an enum id to its type
 template <size_t> struct get_scalar_type;

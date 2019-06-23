@@ -83,19 +83,19 @@ enum scalar_type_id_t {
 };
 
 %{
-  constexpr scalar_type_id_t scalar_type_id_int32() { return get_scalar_type_id<int32_t>::value; }
-  constexpr scalar_type_id_t scalar_type_id_int64() { return get_scalar_type_id<int64_t>::value; }
-  constexpr scalar_type_id_t scalar_type_id_float32() { return get_scalar_type_id<float32_t>::value; }
-  constexpr scalar_type_id_t scalar_type_id_float64() { return get_scalar_type_id<float64_t>::value; }
-  constexpr scalar_type_id_t scalar_type_id_complex64() { return get_scalar_type_id<complex64_t>::value; }
-  constexpr scalar_type_id_t scalar_type_id_complex128() { return get_scalar_type_id<complex128_t>::value; }
+  constexpr scalar_type_id_t get_scalar_type_id_int32() { return get_scalar_type_id<int32_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_int64() { return get_scalar_type_id<int64_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_float32() { return get_scalar_type_id<float32_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_float64() { return get_scalar_type_id<float64_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_complex64() { return get_scalar_type_id<complex64_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_complex128() { return get_scalar_type_id<complex128_t>(); }
 %}
-constexpr scalar_type_id_t scalar_type_id_int32();
-constexpr scalar_type_id_t scalar_type_id_int64();
-constexpr scalar_type_id_t scalar_type_id_float32();
-constexpr scalar_type_id_t scalar_type_id_float64();
-constexpr scalar_type_id_t scalar_type_id_complex64();
-constexpr scalar_type_id_t scalar_type_id_complex128();
+constexpr scalar_type_id_t get_scalar_type_id_int32();
+constexpr scalar_type_id_t get_scalar_type_id_int64();
+constexpr scalar_type_id_t get_scalar_type_id_float32();
+constexpr scalar_type_id_t get_scalar_type_id_float64();
+constexpr scalar_type_id_t get_scalar_type_id_complex64();
+constexpr scalar_type_id_t get_scalar_type_id_complex128();
 
 class datatype_t;
 

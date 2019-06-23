@@ -57,7 +57,7 @@ void write_metadata() {
 template <typename T> vector<T> read_array(const shared_ptr<ndarray> &arr) {
   auto datatype = arr->get_datatype();
   assert(datatype->is_scalar);
-  assert(datatype->scalar_type_id == get_scalar_type_id<T>::value);
+  assert(datatype->scalar_type_id == get_scalar_type_id<T>());
   auto shape = arr->get_shape();
   assert(shape.size() == 1);
   auto npoints = shape.at(0);

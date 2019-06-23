@@ -75,7 +75,7 @@ endif()
 
 # Main project
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 string(REPLACE "-DNDEBUG" ""
@@ -146,7 +146,7 @@ add_test(NAME demo COMMAND ./asdf-demo)
 add_test(NAME ls COMMAND ./asdf-ls demo.asdf)
 add_test(NAME copy COMMAND ./asdf-copy demo.asdf demo2.asdf)
 add_test(NAME ls2 COMMAND ./asdf-ls demo2.asdf)
-add_test(NAME compare
+add_test(NAME compare-demo
   COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
   "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
 add_test(NAME external COMMAND ./asdf-demo-external)
@@ -156,14 +156,14 @@ if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND AND SWIG_FOUND)
     COMMAND
     env "PYTHONPATH=${PROJECT_BINARY_DIR}:$ENV{PYTHONPATH}"
     ${PYTHON_EXECUTABLE} "${PROJECT_SOURCE_DIR}/asdf-demo-python.py")
-  add_test(NAME compare
+  add_test(NAME compare-demo-python
     COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
     "./asdf-ls demo.asdf" "./asdf-ls demo-python.asdf")
   add_test(NAME demo-external-python
     COMMAND
     env "PYTHONPATH=${PROJECT_BINARY_DIR}:$ENV{PYTHONPATH}"
     ${PYTHON_EXECUTABLE} "${PROJECT_SOURCE_DIR}/asdf-demo-external-python.py")
-  add_test(NAME compare
+  add_test(NAME compare-demo-external-python
     COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
     "./asdf-ls demo-external.asdf" "./asdf-ls demo-external-python.asdf")
 endif()

@@ -164,7 +164,7 @@ public:
       : ndarray(make_constant_memoized(shared_ptr<block_t>(
                     make_shared<typed_block_t<T>>(move(data1)))),
                 block_format, compression, compression_level, move(mask1),
-                make_shared<datatype_t>(get_scalar_type_id<T>::value),
+                make_shared<datatype_t>(get_scalar_type_id<T>()),
                 host_byteorder(), move(shape1), offset, move(strides1)) {}
 
   ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node);
@@ -189,7 +189,7 @@ public:
 
   template <typename T> vector<T> get_data_vector() const {
     assert(datatype->is_scalar);
-    assert(datatype->scalar_type_id == get_scalar_type_id<T>::value);
+    assert(datatype->scalar_type_id == get_scalar_type_id<T>());
     int64_t npoints = 1;
     for (size_t d = 0; d < shape.size(); ++d)
       npoints *= shape.at(d);
