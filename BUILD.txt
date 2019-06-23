@@ -10,6 +10,7 @@ for exe in ./asdf-*; do install_name_tool -change '@rpath/libyaml-cpp.0.6.dylib'
 env "PATH=$HOME/src/spack-view/bin:$PATH" "DYLD_LIBRARY_PATH=$HOME/src/spack-view/lib:$DYLD_LIBRARY_PATH" ./asdf-demo
 env "PATH=$HOME/src/spack-view/bin:$PATH" "DYLD_LIBRARY_PATH=$HOME/src/spack-view/lib:$DYLD_LIBRARY_PATH" ./asdf-demo-external
 
-env "PATH=$HOME/src/spack-view/bin:$PATH" "DYLD_LIBRARY_PATH=$HOME/src/spack-view/lib:$DYLD_LIBRARY_PATH" "PYTHONHOME=$HOME/src/spack-view" "PYTHONPATH=$(pwd)" $HOME/src/spack-view/bin/python ../demo-python.py
+env "PATH=$HOME/src/spack-view/bin:$PATH" "DYLD_LIBRARY_PATH=$HOME/src/spack-view/lib:$DYLD_LIBRARY_PATH" "PYTHONHOME=$HOME/src/spack-view" "PYTHONPATH=$(pwd)" $HOME/src/spack-view/bin/python ../asdf-demo-python.py
+env "PATH=$HOME/src/spack-view/bin:$PATH" "DYLD_LIBRARY_PATH=$HOME/src/spack-view/lib:$DYLD_LIBRARY_PATH" "PYTHONHOME=$HOME/src/spack-view" "PYTHONPATH=$(pwd)" $HOME/src/spack-view/bin/python ../asdf-demo-external-python.py
 
 env "PATH=$HOME/src/spack-view/bin:$PATH" cmake --build . --target install
