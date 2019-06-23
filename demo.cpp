@@ -12,6 +12,9 @@
 using namespace std;
 using namespace ASDF;
 
+// Work around shortcomings in GCC 4.8
+template <typename T> constexpr complex<T> C(T re, T im) { return {re, im}; }
+
 int main(int argc, char **argv) {
   cout << "asdf-demo: Create a simple ASDF file\n";
 
@@ -29,7 +32,7 @@ int main(int argc, char **argv) {
                            vector<bool>(), vector<int64_t>{2, 3});
   auto ent2 = make_shared<entry>("gamma", array2d, string());
   auto array3d = make_shared<ndarray>(
-      vector<complex128_t>{1.0, -2.0, 3.0i, -4.0i, 5.0 + 1.0i, 6.0 - 1.0i},
+      vector<complex128_t>{{1, 0}, {-2, 0}, {0, 3}, {-4, 0}, {5, 1}, {6, -1}},
       block_format_t::block, compression_t::bzip2, 9, vector<bool>(),
       vector<int64_t>{1, 2, 3});
   auto ent3 = make_shared<entry>("delta", array3d, string());
