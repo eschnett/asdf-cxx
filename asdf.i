@@ -23,7 +23,6 @@ using std::string;
 %shared_ptr(ndarray);
 %shared_ptr(reference);
 %shared_ptr(sequence);
-%shared_ptr(std::vector<long long>);
 
 %template(map_string_string)
   std::map<string, string>;
@@ -33,16 +32,20 @@ using std::string;
   std::map<string, std::shared_ptr<ndarray>>;
 
 %template(vector_bool) std::vector<bool>;
-%template(vector_complex_float) std::vector<std::complex<float>>;
 %template(vector_complex_double) std::vector<std::complex<double>>;
+%template(vector_complex_float) std::vector<std::complex<float>>;
 %template(vector_double) std::vector<double>;
 %template(vector_float) std::vector<float>;
-// %template(vector_int32_t) std::vector<int32_t>;
-// %template(vector_int64_t) std::vector<int64_t>;
 %template(vector_int) std::vector<int>;
 %template(vector_long_long) std::vector<long long>;
 %template(vector_shared_ptr_entry) std::vector<std::shared_ptr<entry>>;
+%template(vector_short) std::vector<short>;
+%template(vector_signed_char) std::vector<signed char>;
 %template(vector_string) std::vector<string>;
+%template(vector_unsigned_char) std::vector<unsigned char>;
+%template(vector_unsigned_int) std::vector<unsigned int>;
+%template(vector_unsigned_long_long) std::vector<unsigned long long>;
+%template(vector_unsigned_short) std::vector<unsigned short>;
 
 %nodefaultctor;
 
@@ -178,29 +181,65 @@ class ndarray {
   }
 
   %extend {
+    std::vector<signed char> get_data_vector_int8() const
+    {
+      static_assert(sizeof(signed char) == sizeof(int8_t), "");
+      return self->get_data_vector<signed char>();
+    }
+    std::vector<short> get_data_vector_int16() const
+    {
+      static_assert(sizeof(short) == sizeof(int16_t), "");
+      return self->get_data_vector<short>();
+    }
     std::vector<int> get_data_vector_int32() const
     {
-      return self->get_data_vector<int32_t>();
+      static_assert(sizeof(int) == sizeof(int32_t), "");
+      return self->get_data_vector<int>();
     }
     std::vector<long long> get_data_vector_int64() const
     {
-      return self->get_data_vector<int64_t>();
+      static_assert(sizeof(long long) == sizeof(int64_t), "");
+      return self->get_data_vector<long long>();
+    }
+    std::vector<unsigned char> get_data_vector_uint8() const
+    {
+      static_assert(sizeof(unsigned char) == sizeof(uint8_t), "");
+      return self->get_data_vector<unsigned char>();
+    }
+    std::vector<unsigned short> get_data_vector_uint16() const
+    {
+      static_assert(sizeof(unsigned short) == sizeof(uint16_t), "");
+      return self->get_data_vector<unsigned short>();
+    }
+    std::vector<unsigned int> get_data_vector_uint32() const
+    {
+      static_assert(sizeof(unsigned int) == sizeof(uint32_t), "");
+      return self->get_data_vector<unsigned int>();
+    }
+    std::vector<unsigned long long> get_data_vector_uint64() const
+    {
+      static_assert(sizeof(unsigned long long) == sizeof(uint64_t), "");
+      return self->get_data_vector<unsigned long long>();
     }
     std::vector<float> get_data_vector_float32() const
     {
-      return self->get_data_vector<float32_t>();
+      static_assert(sizeof(float) == sizeof(float32_t), "");
+      return self->get_data_vector<float>();
     }
     std::vector<double> get_data_vector_float64() const
     {
-      return self->get_data_vector<float64_t>();
+      static_assert(sizeof(double) == sizeof(float64_t), "");
+      return self->get_data_vector<double>();
     }
     std::vector<std::complex<float>> get_data_vector_complex64() const
     {
-      return self->get_data_vector<complex64_t>();
+      static_assert(sizeof(std::complex<float>) == sizeof(complex64_t), "");
+      return self->get_data_vector<std::complex<float>>();
     }
     std::vector<std::complex<double>> get_data_vector_complex128() const
     {
-      return self->get_data_vector<complex128_t>();
+      static_assert(sizeof(std::complex<double>) == sizeof(complex128_t), "");
+      return self->get_data_vector<std::complex<double>>();
     }
   }
 
