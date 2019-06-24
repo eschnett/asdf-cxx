@@ -37,6 +37,7 @@ using std::string;
 %template(vector_double) std::vector<double>;
 %template(vector_float) std::vector<float>;
 %template(vector_int) std::vector<int>;
+%template(vector_long) std::vector<long>;
 %template(vector_long_long) std::vector<long long>;
 %template(vector_shared_ptr_entry) std::vector<std::shared_ptr<entry>>;
 %template(vector_short) std::vector<short>;
@@ -119,19 +120,56 @@ class ndarray {
  public:
 
   %extend {
-    // TODO: accept bool
+
     static std::shared_ptr<ndarray>
-      create_bool(const std::vector<long long>& data1,
+      create_bool(const std::vector<signed char>& data1,
                   block_format_t block_format,
                   compression_t compression,
                   int compression_level,
                   std::vector<bool> mask,
-                  std::vector<long long> shape)
+                  const std::vector<long>& shape1)
     {
       // TODO: Avoid this copy
       std::vector<bool> data(data1.size());
       for (size_t i=0; i<data.size(); ++i)
         data[i] = data1[i];
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
+      create_int32(std::vector<int> data,
+                   block_format_t block_format,
+                   compression_t compression,
+                   int compression_level,
+                   std::vector<bool> mask,
+                   const std::vector<long>& shape1)
+    {
+      static_assert(sizeof *data.data() == sizeof(int32_t), "");
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
+      create_int64(std::vector<long> data,
+                   block_format_t block_format,
+                   compression_t compression,
+                   int compression_level,
+                   std::vector<bool> mask,
+                   const std::vector<long>& shape1)
+    {
+      static_assert(sizeof *data.data() == sizeof(int64_t), "");
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
       return std::make_shared<ndarray>
         (std::move(data), block_format, compression, compression_level,
          std::move(mask), std::move(shape));
@@ -142,32 +180,46 @@ class ndarray {
                    compression_t compression,
                    int compression_level,
                    std::vector<bool> mask,
-                   std::vector<long long> shape)
+                   const std::vector<long>& shape1)
     {
+      static_assert(sizeof *data.data() == sizeof(int64_t), "");
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
       return std::make_shared<ndarray>
         (std::move(data), block_format, compression, compression_level,
          std::move(mask), std::move(shape));
     }
+
     static std::shared_ptr<ndarray>
       create_float64(std::vector<double> data,
                      block_format_t block_format,
                      compression_t compression,
                      int compression_level,
                      std::vector<bool> mask,
-                     std::vector<long long> shape)
+                     const std::vector<long>& shape1)
     {
+      static_assert(sizeof *data.data() == sizeof(float64_t), "");
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
       return std::make_shared<ndarray>
         (std::move(data), block_format, compression, compression_level,
          std::move(mask), std::move(shape));
     }
+
     static std::shared_ptr<ndarray>
       create_complex128(std::vector<std::complex<double>> data,
                         block_format_t block_format,
                         compression_t compression,
                         int compression_level,
                         std::vector<bool> mask,
-                        std::vector<long long> shape)
+                        const std::vector<long>& shape1)
     {
+      static_assert(sizeof *data.data() == sizeof(complex128_t), "");
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
       return std::make_shared<ndarray>
         (std::move(data), block_format, compression, compression_level,
          std::move(mask), std::move(shape));
@@ -244,9 +296,30 @@ class ndarray {
   }
 
   std::shared_ptr<datatype_t> get_datatype() const;
-  std::vector<long long> get_shape() const;
-  int64_t get_offset() const;
-  std::vector<long long> get_strides() const;
+
+  %extend {
+    std::vector<long> get_shape() const
+    {
+      auto shape = self->get_shape();
+      std::vector<long> r(shape.size());
+      for (size_t d=0; d<r.size(); ++d)
+        r[d] = shape[d];
+      return r;
+    }
+  }
+
+  long get_offset() const;
+
+  %extend {
+    std::vector<long> get_strides() const
+    {
+      auto strides = self->get_strides();
+      std::vector<long> r(strides.size());
+      for (size_t d=0; d<r.size(); ++d)
+        r[d] = strides[d];
+      return r;
+    }
+  }
 };
 
 
