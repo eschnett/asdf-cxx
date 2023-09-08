@@ -6,7 +6,7 @@ cmake_policy(SET CMP0048 NEW)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
-project(asdf-cxx VERSION 7.2.1 LANGUAGES CXX)
+project(asdf-cxx VERSION 7.2.2 LANGUAGES CXX)
 set(PROJECT_DESCRIPTION
   "asdf-cxx (Advanced Scientific Data Format), C++ implementation")
 set(PROJECT_URL "https://github.com/eschnett/asdf-cxx")
@@ -115,6 +115,7 @@ set(ASDF_SOURCES
 
 add_library(asdf-cxx ${ASDF_SOURCES})
 set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
+target_link_libraries(asdf-cxx ${LIBS})
 
 add_executable(asdf-copy copy.cpp)
 target_link_libraries(asdf-copy asdf-cxx ${LIBS})
