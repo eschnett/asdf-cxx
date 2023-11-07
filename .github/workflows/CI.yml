@@ -14,7 +14,7 @@ jobs:
     - name: Install dependencies
       run: sudo apt install -y libblosc-dev libbz2-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
     - name: Configure
-      run: cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install" -DCOVERALLS=ON
+      run: cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="$HOME/install" -DCOVERALLS=ON
     - name: Build
       run: cmake --build build --parallel $(nproc)
     - name: Install
