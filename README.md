@@ -1,35 +1,34 @@
-`asdf-cxx <https://github.com/eschnett/asdf-cxx>`_
-==================================================
+# [asdf-cxx](https://github.com/eschnett/asdf-cxx)
+
+[![CI](https://github.com/eschnett/asdf-cxx/actions/workflows/CI.yml/badge.svg)](https://github.com/eschnett/asdf-cxx/actions/workflows/CI.yml)
 
 |Build Status| |Coverage Status|
 
-asdf-cxx: A C++ implementation for ASDF, the Advanced Scientific Data Format
+asdf-cxx: A C++ implementation for ASDF, the Advanced Scientific Data
+Format
 
-Overview
---------
+## Overview
 
-`ASDF <https://github.com/spacetelescope/asdf-standard>` is an
+[ASDF](https://github.com/spacetelescope/asdf-standard) is an
 efficient file format for structure scientic data, backed by NASA's
-`Space Telescope Science Institute (STScI) <http://www.stsci.edu>`_.
+[Space Telescope Science Institute (STScI)](http://www.stsci.edu).
 ASDF stores both array data (supporting efficient binary
 representations) as well as accompanying metadata in "key-value" form.
-Metadata are stored in the human-readable `YAML <http://yaml.org>`_
+Metadata are stored in the human-readable [YAML](http://yaml.org)
 format.
 
 ASDF exists as standard, and there are (so far) implementations in
-`Python <https://github.com/spacetelescope/asdf>`_, `C++
-<https://github.com/spacetelescope/asdf-cpp>`_, and `Go
-<https://github.com/astrogo/asdf>`_.
+[Python](https://github.com/spacetelescope/asdf),
+[C++](https://github.com/spacetelescope/asdf-cpp), and
+[Go](https://github.com/astrogo/asdf).
 
-This library `asdf-cxx <https://github.com/eschnett/asdf-cxx>`_
-provides an independent implementation in C++, suitable for HPC
-environments. This library `asdf-cxx` and the other C++ library
-`asdf-cpp` are very similar in terms of the features they offer, while
-providing different APIs.
+This library [asdf-cxx](https://github.com/eschnett/asdf-cxx) provides
+an independent implementation in C++, suitable for HPC environments.
+This library `asdf-cxx` and the other C++ library `asdf-cpp` are very
+similar in terms of the features they offer while providing different
+APIs.
 
-
-Standard conformance
---------------------
+## Standard conformance
 
 asdf-cxx supports most of the "core" ASDF standard. Notable exceptions
 are:
@@ -57,15 +56,14 @@ Other minor limitations are:
 - JSON URI references are not percent encoded
 
 Things that should be improved:
-- Travis should test against the Python reference `asdf` library
+- Tests should compare to the Python reference `asdf` library
 
 Also, the `yaml-cpp` library outputs the YAML 1.2 format, whereas ASDF
 requires the YAML 1.1 format. The differences between these two
 version is small, and asdf-cxx currently "cheats" by declaring the
 output to be YAML 1.1 (which might not be true).
 
-Comments on the ASDF standard (version 1.1.0)
----------------------------------------------
+## Comments on the ASDF standard (version 1.1.0)
 
 These are random comments and ideas regarding the ASDF file format.
 Eventually, they need to be discussed with the ASDF standard
@@ -79,38 +77,36 @@ developers and/or others in the community.
   writing the index, the placeholder could be overwritten by the block
   index location. That would simplify finding the index and would
   provide an additional validity check.
-- There could be additional compression schemes, e.g. based on `Blosc
-  <http://www.blosc.org>`_.
+- There could be additional compression schemes, e.g. based on
+  [Blosc](http://www.blosc.org).
 - It would be interesting to be able to split arrays into multiple
   blocks. This would allow tiled representations (which can be much
   faster for partial reading), and would allow not storing large
   masked regions.
 
-Build instructions
-------------------
+## Build instructions
 
 Requirements:
 
-- C++11-capable C++ compiler (tested with `Clang
-  <https://clang.llvm.org>`_ and `GCC <https://gcc.gnu.org>`_)
-- `cmake <https://cmake.org>`_
-- `pkg-config <https://www.freedesktop.org/wiki/Software/pkg-config/>`_
-- `yaml-cpp <https://github.com/jbeder/yaml-cpp>`_ library
-- `bzip2 <http://bzip.org>`_ library (optional, for compression)
-- `OpenSSL <https://www.openssl.org>`_ (optional, for MD5 checksums)
-- `zlib <http://zlib.net>`_ library (optional, for compression)
+- C++14-capable C++ compiler (tested with
+  [Clang](https://clang.llvm.org) and [GCC](https://gcc.gnu.org))
+- [cmake](https://cmake.org)
+- [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/)
+- [yaml-cpp](https://github.com/jbeder/yaml-cpp) library
+- [bzip2](http://bzip.org) library (optional, for compression)
+- [OpenSSL](https://www.openssl.org) (optional, for MD5 checksums)
+- [zlib](http://zlib.net) library (optional, for compression)
 
-To build::
+To build:
 
-  git clone https://github.com/eschnett/asdf-cxx.git
-  cd asdf-cxx
-  mkdir build && cd build
-  cmake ..
-  make
-  make test
-  make install
+```sh
+git clone https://github.com/eschnett/asdf-cxx
+cd asdf-cxx
+cmake -B build -S .
+cmake --build build
+ctest --test-dir build
+cmake --install build
+```
 
-.. |Build Status| image:: https://travis-ci.org/eschnett/asdf-cxx.svg?branch=master
-   :target: https://travis-ci.org/eschnett/asdf-cxx
 .. |Coverage Status| image:: https://coveralls.io/repos/github/eschnett/asdf-cxx/badge.svg?branch=master
    :target: https://coveralls.io/github/eschnett/asdf-cxx?branch=master
