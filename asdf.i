@@ -1,5 +1,10 @@
 // SWIG interface file
 
+// See <https://github.com/swig/swig/issues/888>: Cast integer-values numpy arrays to std::vector
+%begin %{
+  #define SWIG_PYTHON_CAST_MODE
+%}
+
 %module asdf
 
 %{
@@ -53,7 +58,7 @@ using std::string;
 
 
 enum class block_format_t { undefined, block, inline_array };
-enum class compression_t { undefined, none, bzip2, zlib };
+enum class compression_t { undefined, none, blosc, blosc2, bzip2, zlib, zstd };
 
 
 
