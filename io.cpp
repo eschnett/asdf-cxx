@@ -21,7 +21,7 @@ reader_state::reader_state(const YAML::Node &tree,
     const auto &block = ndarray::read_block(pis);
     if (!block.valid())
       break;
-    blocks.push_back(move(block));
+    blocks.push_back(std::move(block));
   }
 }
 
@@ -111,7 +111,7 @@ void writer::flush() {
     index << YAML::BeginDoc << YAML::Flow << YAML::BeginSeq;
     for (auto &&task : tasks) {
       index << os.tellp();
-      move(task)(os);
+      std::move(task)(os);
     }
     tasks.clear();
     index << YAML::EndSeq << YAML::EndDoc;

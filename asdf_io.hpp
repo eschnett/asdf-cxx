@@ -19,7 +19,7 @@ using namespace std;
 // I/O
 
 enum class block_format_t { undefined, block, inline_array };
-enum class compression_t { undefined, none, bzip2, zlib };
+enum class compression_t { undefined, none, blosc, blosc2, bzip2, zlib, zstd };
 
 class block_t;
 
@@ -88,7 +88,7 @@ public:
 
   // TODO: rename this function
   int64_t add_task(function<void(ostream &)> &&task) {
-    tasks.push_back(move(task));
+    tasks.push_back(std::move(task));
     return tasks.size() - 1;
   }
 

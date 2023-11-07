@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   cout << "\n";
 
   cout << "  creating project..." << flush;
-  auto array3d = make_shared<ndarray>(move(rho), block_format_t::block,
+  auto array3d = make_shared<ndarray>(std::move(rho), block_format_t::block,
                                       compression_t::zlib, 9, vector<bool>(),
                                       vector<int64_t>{ni, nj, nk});
   assert(rho.empty());

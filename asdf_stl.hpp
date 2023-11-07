@@ -18,7 +18,7 @@ void yaml_decode(const YAML::Node &node, vector<T> &data) {
   for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni) {
     T value;
     yaml_decode(*ni, value);
-    data.push_back(move(value));
+    data.push_back(std::move(value));
   }
 }
 
@@ -29,7 +29,7 @@ void yaml_decode(const YAML::Node &node, map<K, T> &data) {
     yaml_decode(ni->first, key);
     T value;
     yaml_decode(ni->second, value);
-    data[move(key)] = move(value);
+    data[std::move(key)] = std::move(value);
   }
 }
 

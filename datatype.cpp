@@ -70,8 +70,9 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
     return sizeof(complex128_t);
     // case id_ascii
     // case id_ucs4
+  default:
+    assert(0);
   }
-  assert(0);
 }
 
 void yaml_decode(const YAML::Node &node,
@@ -408,8 +409,9 @@ YAML::Node emit_scalar(const unsigned char *data,
 field_t::field_t(string name, shared_ptr<datatype_t> datatype,
                  bool have_byteorder, byteorder_t byteorder,
                  vector<int64_t> shape)
-    : name(move(name)), datatype(move(datatype)),
-      have_byteorder(have_byteorder), byteorder(byteorder), shape(move(shape)) {
+    : name(std::move(name)), datatype(std::move(datatype)),
+      have_byteorder(have_byteorder), byteorder(byteorder),
+      shape(std::move(shape)) {
   assert(datatype);
 }
 
@@ -435,7 +437,7 @@ datatype_t::datatype_t(scalar_type_id_t scalar_type_id)
     : is_scalar(true), scalar_type_id(scalar_type_id) {}
 
 datatype_t::datatype_t(vector<shared_ptr<field_t>> fields)
-    : is_scalar(false), fields(move(fields)) {}
+    : is_scalar(false), fields(std::move(fields)) {}
 
 size_t datatype_t::type_size() const {
   if (is_scalar)

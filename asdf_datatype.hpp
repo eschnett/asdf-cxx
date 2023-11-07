@@ -64,59 +64,76 @@ template <typename T>
 struct get_scalar_type_id
     : integral_constant<
           scalar_type_id_t,
-          is_same<T, bool8_t>::value
-              ? id_bool8
-              : is_integral<T>::value && is_signed<T>::value
-                    ? (sizeof(T) == 1
-                           ? id_int8
-                           : sizeof(T) == 2
-                                 ? id_int16
-                                 : sizeof(T) == 4
-                                       ? id_int32
-                                       : sizeof(T) == 8 ? id_int64 : id_error)
-                    : is_integral<T>::value && is_unsigned<T>::value
-                          ? (sizeof(T) == 1
-                                 ? id_uint8
-                                 : sizeof(T) == 2
-                                       ? id_uint16
-                                       : sizeof(T) == 4
-                                             ? id_uint32
-                                             : sizeof(T) == 8 ? id_uint64
-                                                              : id_error)
-                          : is_floating_point<T>::value
-                                ? (sizeof(T) == 4
-                                       ? id_float32
-                                       : sizeof(T) == 8 ? id_float64 : id_error)
-                                : is_complex<T>::value
-                                      ? (sizeof(T) == 8
-                                             ? id_complex64
-                                             : sizeof(T) == 16 ? id_complex128
-                                                               : id_error)
-                                      : is_same<T, ascii_t>::value
-                                            ? id_ascii
-                                            : is_same<T, ucs4_t>::value
-                                                  ? id_ucs4
-                                                  : id_error> {};
+          is_same<T, bool8_t>::value ? id_bool8
+          : is_integral<T>::value && is_signed<T>::value
+              ? (sizeof(T) == 1   ? id_int8
+                 : sizeof(T) == 2 ? id_int16
+                 : sizeof(T) == 4 ? id_int32
+                 : sizeof(T) == 8 ? id_int64
+                                  : id_error)
+          : is_integral<T>::value && is_unsigned<T>::value
+              ? (sizeof(T) == 1   ? id_uint8
+                 : sizeof(T) == 2 ? id_uint16
+                 : sizeof(T) == 4 ? id_uint32
+                 : sizeof(T) == 8 ? id_uint64
+                                  : id_error)
+          : is_floating_point<T>::value ? (sizeof(T) == 4   ? id_float32
+                                           : sizeof(T) == 8 ? id_float64
+                                                            : id_error)
+          : is_complex<T>::value        ? (sizeof(T) == 8    ? id_complex64
+                                           : sizeof(T) == 16 ? id_complex128
+                                                             : id_error)
+          : is_same<T, ascii_t>::value  ? id_ascii
+          : is_same<T, ucs4_t>::value   ? id_ucs4
+                                        : id_error> {};
 
 // Convert an enum id to its type
 template <size_t> struct get_scalar_type;
-template <> struct get_scalar_type<id_bool8> { typedef bool8_t type; };
-template <> struct get_scalar_type<id_int8> { typedef int8_t type; };
-template <> struct get_scalar_type<id_int16> { typedef int16_t type; };
-template <> struct get_scalar_type<id_int32> { typedef int32_t type; };
-template <> struct get_scalar_type<id_int64> { typedef int64_t type; };
-template <> struct get_scalar_type<id_uint8> { typedef uint8_t type; };
-template <> struct get_scalar_type<id_uint16> { typedef uint16_t type; };
-template <> struct get_scalar_type<id_uint32> { typedef uint32_t type; };
-template <> struct get_scalar_type<id_uint64> { typedef uint64_t type; };
-template <> struct get_scalar_type<id_float32> { typedef float32_t type; };
-template <> struct get_scalar_type<id_float64> { typedef float64_t type; };
-template <> struct get_scalar_type<id_complex64> { typedef complex64_t type; };
+template <> struct get_scalar_type<id_bool8> {
+  typedef bool8_t type;
+};
+template <> struct get_scalar_type<id_int8> {
+  typedef int8_t type;
+};
+template <> struct get_scalar_type<id_int16> {
+  typedef int16_t type;
+};
+template <> struct get_scalar_type<id_int32> {
+  typedef int32_t type;
+};
+template <> struct get_scalar_type<id_int64> {
+  typedef int64_t type;
+};
+template <> struct get_scalar_type<id_uint8> {
+  typedef uint8_t type;
+};
+template <> struct get_scalar_type<id_uint16> {
+  typedef uint16_t type;
+};
+template <> struct get_scalar_type<id_uint32> {
+  typedef uint32_t type;
+};
+template <> struct get_scalar_type<id_uint64> {
+  typedef uint64_t type;
+};
+template <> struct get_scalar_type<id_float32> {
+  typedef float32_t type;
+};
+template <> struct get_scalar_type<id_float64> {
+  typedef float64_t type;
+};
+template <> struct get_scalar_type<id_complex64> {
+  typedef complex64_t type;
+};
 template <> struct get_scalar_type<id_complex128> {
   typedef complex128_t type;
 };
-template <> struct get_scalar_type<id_ascii> { typedef ascii_t type; };
-template <> struct get_scalar_type<id_ucs4> { typedef ucs4_t type; };
+template <> struct get_scalar_type<id_ascii> {
+  typedef ascii_t type;
+};
+template <> struct get_scalar_type<id_ucs4> {
+  typedef ucs4_t type;
+};
 template <size_t I> using get_scalar_type_t = typename get_scalar_type<I>::type;
 
 // Convert an enum id to its type size

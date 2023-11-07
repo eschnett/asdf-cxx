@@ -35,25 +35,29 @@ public:
   entry &operator=(entry &&) = default;
 
   entry(string name1, shared_ptr<ndarray> arr1, string description1)
-      : name(move(name1)), arr(move(arr1)), description(move(description1)) {
+      : name(std::move(name1)), arr(std::move(arr1)),
+        description(std::move(description1)) {
     assert(!name.empty());
     assert(arr);
   }
 
   entry(string name1, shared_ptr<reference> ref1, string description1)
-      : name(move(name1)), ref(move(ref1)), description(move(description1)) {
+      : name(std::move(name1)), ref(std::move(ref1)),
+        description(std::move(description1)) {
     assert(!name.empty());
     assert(ref);
   }
 
   entry(string name1, shared_ptr<sequence> seq1, string description1)
-      : name(move(name1)), seq(move(seq1)), description(move(description1)) {
+      : name(std::move(name1)), seq(std::move(seq1)),
+        description(std::move(description1)) {
     assert(!name.empty());
     assert(seq);
   }
 
   entry(string name1, shared_ptr<group> grp1, string description1)
-      : name(move(name1)), grp(move(grp1)), description(move(description1)) {
+      : name(std::move(name1)), grp(std::move(grp1)),
+        description(std::move(description1)) {
     assert(!name.empty());
     assert(grp);
   }
@@ -83,7 +87,7 @@ public:
   sequence &operator=(const sequence &) = default;
   sequence &operator=(sequence &&) = default;
 
-  sequence(vector<shared_ptr<entry>> entries1) : entries(move(entries1)) {}
+  sequence(vector<shared_ptr<entry>> entries1) : entries(std::move(entries1)) {}
   template <typename T>
   sequence(const vector<shared_ptr<T>> &data,
            const function<entry(const T &)> &f) {
@@ -111,7 +115,8 @@ public:
   group &operator=(const group &) = default;
   group &operator=(group &&) = default;
 
-  group(map<string, shared_ptr<entry>> entries1) : entries(move(entries1)) {}
+  group(map<string, shared_ptr<entry>> entries1)
+      : entries(std::move(entries1)) {}
   template <typename T>
   group(const map<string, shared_ptr<T>> &data,
         const function<entry(const T &)> &f) {

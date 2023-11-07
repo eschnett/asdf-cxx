@@ -18,7 +18,8 @@ int main(int argc, char **argv) {
     if (cond)
       return;
     cerr << msg << "Syntax: " << argv[0]
-         << " [--array=(blockinline)] [--compression=(none|bzip2|zlib)] "
+         << " [--array=(blockinline)] "
+            "[--compression=(none|blosc|blosc2|bzip2|zlib|zstd)] "
             "[--compression-level=[0-9]] <input file> <output file>\n"
          << "Aborting.\n";
     exit(1);
@@ -43,6 +44,14 @@ int main(int argc, char **argv) {
       check(compression == compression_t::undefined,
             "Compression type already set\n");
       compression = compression_t::none;
+    } else if (opt == "--compression=blosc") {
+      check(compression == compression_t::undefined,
+            "Compression type already set\n");
+      compression = compression_t::blosc;
+    } else if (opt == "--compression=blosc2") {
+      check(compression == compression_t::undefined,
+            "Compression type already set\n");
+      compression = compression_t::blosc2;
     } else if (opt == "--compression=bzip2") {
       check(compression == compression_t::undefined,
             "Compression type already set\n");
@@ -51,6 +60,10 @@ int main(int argc, char **argv) {
       check(compression == compression_t::undefined,
             "Compression type already set\n");
       compression = compression_t::zlib;
+    } else if (opt == "--compression=zstd") {
+      check(compression == compression_t::undefined,
+            "Compression type already set\n");
+      compression = compression_t::zstd;
     } else if (opt == "--compression-level=0") { // Dont' judge me for this
       compression_level = 0;
     } else if (opt == "--compression-level=1") {

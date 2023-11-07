@@ -18,7 +18,7 @@ template <typename T> class memoized_state {
 public:
   memoized_state() = delete;
   memoized_state(function<shared_ptr<T>()> fun1)
-      : fun(move(fun1)), have_value(false) {}
+      : fun(std::move(fun1)), have_value(false) {}
 
   bool ready() const { return have_value; }
   void make_ready() {
@@ -51,7 +51,7 @@ public:
   memoized &operator=(memoized &&) = default;
 
   memoized(function<shared_ptr<T>()> fun1)
-      : state(make_shared<memoized_state<T>>(move(fun1))) {}
+      : state(make_shared<memoized_state<T>>(std::move(fun1))) {}
 
   bool valid() const { return bool(state); }
   void reset() { state.reset(); }

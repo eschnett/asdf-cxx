@@ -36,7 +36,7 @@ template <typename T> class typed_block_t : public block_t {
 
 public:
   typed_block_t() = delete;
-  typed_block_t(vector<T> data1) : data(move(data1)) {}
+  typed_block_t(vector<T> data1) : data(std::move(data1)) {}
 
   virtual ~typed_block_t() {}
 
@@ -59,7 +59,7 @@ template <> class typed_block_t<bool> : public block_t {
 public:
   typed_block_t() = delete;
 
-  typed_block_t(vector<unsigned char> data1) : data(move(data1)) {}
+  typed_block_t(vector<unsigned char> data1) : data(std::move(data1)) {}
   typed_block_t(const vector<bool> &data);
 
   virtual ~typed_block_t() {}
@@ -124,10 +124,11 @@ public:
           shared_ptr<datatype_t> datatype1, byteorder_t byteorder,
           vector<int64_t> shape1, int64_t offset = 0,
           vector<int64_t> strides1 = {})
-      : mdata(move(mdata1)), block_format(block_format),
+      : mdata(std::move(mdata1)), block_format(block_format),
         compression(compression), compression_level(compression_level),
-        mask(move(mask1)), datatype(move(datatype1)), byteorder(byteorder),
-        shape(move(shape1)), offset(offset), strides(move(strides1)) {
+        mask(std::move(mask1)), datatype(std::move(datatype1)),
+        byteorder(byteorder), shape(std::move(shape1)), offset(offset),
+        strides(std::move(strides1)) {
     // Check shape
     int rank = shape.size();
     for (int d = 0; d < rank; ++d)
@@ -162,10 +163,11 @@ public:
           vector<int64_t> shape1, int64_t offset = 0,
           vector<int64_t> strides1 = {})
       : ndarray(make_constant_memoized(shared_ptr<block_t>(
-                    make_shared<typed_block_t<T>>(move(data1)))),
-                block_format, compression, compression_level, move(mask1),
+                    make_shared<typed_block_t<T>>(std::move(data1)))),
+                block_format, compression, compression_level, std::move(mask1),
                 make_shared<datatype_t>(get_scalar_type_id<T>()),
-                host_byteorder(), move(shape1), offset, move(strides1)) {}
+                host_byteorder(), std::move(shape1), offset,
+                std::move(strides1)) {}
 
   ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   ndarray(const copy_state &cs, const ndarray &arr);

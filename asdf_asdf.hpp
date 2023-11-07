@@ -37,20 +37,20 @@ public:
   asdf &operator=(asdf &&) = default;
 
   asdf(map<string, string> tags1, map<string, shared_ptr<ndarray>> data1)
-      : tags(move(tags1)), data(move(data1)) {}
+      : tags(std::move(tags1)), data(std::move(data1)) {}
   // asdf(const map<string, string> &tags, const shared_ptr<table> &tab)
   //     : tags(tags), tab(tab) {
   //   assert(tab);
   // }
   asdf(map<string, string> tags1, shared_ptr<group> grp1)
-      : tags(move(tags1)), grp(move(grp1)) {
+      : tags(std::move(tags1)), grp(std::move(grp1)) {
     assert(grp);
   }
   asdf(map<string, string> tags1, map<string, YAML::Node> nodes1)
-      : tags(move(tags1)), nodes(move(nodes1)) {}
+      : tags(std::move(tags1)), nodes(std::move(nodes1)) {}
   asdf(map<string, string> tags1,
        map<string, function<void(writer &w)>> writers1)
-      : tags(move(tags1)), writers(move(writers1)) {}
+      : tags(std::move(tags1)), writers(std::move(writers1)) {}
 
   typedef function<void(const shared_ptr<reader_state> &rs, const string &name,
                         const YAML::Node &node)>

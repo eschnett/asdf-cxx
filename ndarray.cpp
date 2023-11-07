@@ -94,7 +94,7 @@ void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
     data1.reserve(npoints * datatype->type_size());
     parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
   }
-  data = make_shared<typed_block_t<unsigned char>>(move(data1));
+  data = make_shared<typed_block_t<unsigned char>>(std::move(data1));
 }
 
 YAML::Node emit_inline_array(const unsigned char *data,
@@ -180,7 +180,7 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
 
   case compression_t::none:
     assert(data_space == allocated_space);
-    data = move(indata);
+    data = std::move(indata);
     break;
 
 #ifdef ASDF_HAVE_BZIP2
@@ -254,7 +254,7 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     assert(0);
   }
 
-  return make_shared<typed_block_t<unsigned char>>(move(data));
+  return make_shared<typed_block_t<unsigned char>>(std::move(data));
 }
 
 memoized<block_t> ndarray::read_block(const shared_ptr<istream> &pis) {
@@ -320,7 +320,7 @@ memoized<block_t> ndarray::read_block(const shared_ptr<istream> &pis) {
 
   // skip padding
   is.seekg(block_begin + streamoff(used_space));
-  return move(fdata);
+  return std::move(fdata);
 }
 
 template <typename T>

@@ -130,7 +130,7 @@ string fragment_percent_encode(const string &raw) {
 
 } // namespace
 
-reference::reference(string target1) : target(move(target1)) {}
+reference::reference(string target1) : target(std::move(target1)) {}
 
 reference::reference(const string &base_target,
                      const vector<string> &doc_path) {
@@ -163,7 +163,7 @@ pair<string, vector<string>> reference::get_split_target() const {
   assert(doc_path.size() > 0);
   assert(doc_path.at(0).size() == 0);
   doc_path.erase(doc_path.begin());
-  return {move(base_target), move(doc_path)};
+  return {std::move(base_target), std::move(doc_path)};
 }
 
 reference::reference(const shared_ptr<reader_state> &rs, const YAML::Node &node)
