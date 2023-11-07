@@ -1,8 +1,7 @@
 # [asdf-cxx](https://github.com/eschnett/asdf-cxx)
 
 [![CI](https://github.com/eschnett/asdf-cxx/actions/workflows/CI.yml/badge.svg)](https://github.com/eschnett/asdf-cxx/actions/workflows/CI.yml)
-
-|Build Status| |Coverage Status|
+[![codecov](https://codecov.io/gh/eschnett/asdf-cxx/graph/badge.svg?token=JOF2CKYN52)](https://codecov.io/gh/eschnett/asdf-cxx)
 
 asdf-cxx: A C++ implementation for ASDF, the Advanced Scientific Data
 Format
