@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install dependencies
-      run: sudo apt install -y libblosc-dev libbz2-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build zlib1g-dev
+      run: sudo apt install -y libblosc-dev libbz2-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
     - name: Configure
       run: cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install"
     - name: Build
