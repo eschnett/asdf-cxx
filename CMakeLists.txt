@@ -173,15 +173,18 @@ add_test(NAME external COMMAND ./asdf-demo-external)
 
 # Coverage
 
+# See <https://github.com/codecov/example-cpp11-cmake>
 option(CODE_COVERAGE "Enable coverage reporting" OFF)
 if(CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  # Add required flags (GCC & LLVM/Clang)
-  target_compile_options(coverage_config INTERFACE
-    -O0        # no optimization
-    -g         # generate debug info
-    --coverage # sets all required flags
-  )
-  target_link_options(coverage_config INTERFACE --coverage)
+  foreach(target asdf-cxx asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-ls)
+    # Add required flags (GCC & LLVM/Clang)
+    target_compile_options(${target} INTERFACE
+      -O0        # no optimization
+      -g         # generate debug info
+      --coverage # sets all required flags
+    )
+    target_link_options(${target} INTERFACE --coverage)
+  endforeach()
 endif()
 
 # Install
