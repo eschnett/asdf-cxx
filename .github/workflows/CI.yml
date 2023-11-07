@@ -21,6 +21,11 @@ jobs:
       run: cmake --install build
     - name: Test
       run: ctest --test-dir build --output-on-failure
+    - name: Collect code coverage
+      run: |
+        lcov --capture --directory . --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' --output-file coverage.info # filter system-files
+        lcov --list coverage.info # debug info
     - uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
