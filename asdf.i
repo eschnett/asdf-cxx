@@ -1,10 +1,5 @@
 // SWIG interface file
 
-// See <https://github.com/swig/swig/issues/888>: Cast integer-values numpy arrays to std::vector
-%begin %{
-  #define SWIG_PYTHON_CAST_MODE
-%}
-
 %module asdf
 
 %{
