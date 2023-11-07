@@ -107,6 +107,3 @@ cmake --build build
 ctest --test-dir build
 cmake --install build
 ```
-
-.. |Coverage Status| image:: https://coveralls.io/repos/github/eschnett/asdf-cxx/badge.svg?branch=master
-   :target: https://coveralls.io/github/eschnett/asdf-cxx?branch=master
