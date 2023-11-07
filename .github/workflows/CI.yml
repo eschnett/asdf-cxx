@@ -16,7 +16,7 @@ jobs:
     - name: Configure
       run: cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install"
     - name: Build
-      run: cmake --build build --jobs $(nproc)
+      run: cmake --build build --parallel $(nproc)
     - name: Install
       run: cmake --install build
     - name: Test
