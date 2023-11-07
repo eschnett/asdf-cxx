@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: sudo apt install -y libblosc-dev libbz2-dev libssl-dev libyaml-cpp-dev libzstd-dev zlib1g-dev
+    - name: Configure
+      run: cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install"
+    - name: Build
+      run: cmake --build build --jobs $(nproc)
+    - name: Install
+      run: cmake --install build
+    - name: Test
+      run: ctest --test-dir build --output-on-failure
