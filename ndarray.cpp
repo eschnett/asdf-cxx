@@ -3,6 +3,14 @@
 #include "asdf_config.hpp"
 #include "asdf_stl.hpp"
 
+#ifdef ASDF_HAVE_BLOSC
+#include <blosc.h>
+#endif
+
+#ifdef ASDF_HAVE_BLOSC2
+#include <blosc2.h>
+#endif
+
 #ifdef ASDF_HAVE_BZIP2
 #include <bzlib.h>
 #endif
@@ -13,6 +21,10 @@
 
 #ifdef ASDF_HAVE_ZLIB
 #include <zlib.h>
+#endif
+
+#ifdef ASDF_HAVE_ZSTD
+#include <zstd.h>
 #endif
 
 namespace ASDF {
@@ -182,6 +194,19 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     assert(data_space == allocated_space);
     data = std::move(indata);
     break;
+
+#ifdef ASDF_HAVE_BLOSC
+  case compression_t::blosc: {
+    data.resize(data_space);
+    assert(data.size() <= size_t(INT_MAX));
+    const int numinternalthreads = 1;
+    int dsize = blosc_decompress_ctx(indata.data(), data.data(), data.size(),
+                                     numinternalthreads);
+    assert(dsize > 0);
+    assert(dsize == data.size());
+    break;
+  }
+#endif
 
 #ifdef ASDF_HAVE_BZIP2
   case compression_t::bzip2: {
@@ -358,6 +383,33 @@ void ndarray::write_block(ostream &os) const {
     comp = {0, 0, 0, 0};
     outdata = get_data().get();
     break;
+
+#ifdef ASDF_HAVE_BLOSC
+  case compression_t::blosc: {
+    comp = {'b', 'l', 's', 'c'};
+    // Allocate `BLOSC_MAX_OVERHEAD` more
+    outdata = make_shared<typed_block_t<unsigned char>>(
+        vector<unsigned char>(get_data()->nbytes() + BLOSC_MAX_OVERHEAD));
+    const int level = compression_level;
+    const int doshuffle = BLOSC_BITSHUFFLE;
+    const size_t typesize = get_scalar_type_size(datatype->scalar_type_id);
+    const char *const compressor = BLOSC_BLOSCLZ_COMPNAME;
+    const int blocksize = 0;
+    const int numinternalthreads = 1;
+    assert(get_data()->nbytes() <= size_t(INT_MAX));
+    int nbytes =
+        blosc_compress_ctx(level, doshuffle, typesize, get_data()->nbytes(),
+                           get_data()->ptr(), outdata->ptr(), outdata->nbytes(),
+                           compressor, blocksize, numinternalthreads);
+    outdata->resize(nbytes);
+    if (outdata->nbytes() >= get_data()->nbytes()) {
+      // Skip compression if it does not reduce the size
+      comp = {0, 0, 0, 0};
+      outdata = get_data().get();
+    }
+    break;
+  }
+#endif
 
   case compression_t::bzip2: {
 #ifdef ASDF_HAVE_BZIP2

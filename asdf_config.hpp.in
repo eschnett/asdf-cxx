@@ -23,6 +23,22 @@ void checkVersion(const char *header_version);
 
 #define ASDF_CHECK_VERSION (::ASDF::checkVersion(ASDF_VERSION))
 
+// blosc support
+
+#if @HAVE_BLOSC@
+#define ASDF_HAVE_BLOSC 1
+#else
+#undef ASDF_HAVE_BLOSC
+#endif
+
+// blosc2 support
+
+#if @HAVE_BLOSC2@
+#define ASDF_HAVE_BLOSC2 1
+#else
+#undef ASDF_HAVE_BLOSC2
+#endif
+
 // bzip2 support
 
 #if @HAVE_BZIP2@
@@ -45,6 +61,14 @@ void checkVersion(const char *header_version);
 #define ASDF_HAVE_ZLIB 1
 #else
 #undef ASDF_HAVE_ZLIB
+#endif
+
+// zstd support
+
+#if @HAVE_ZSTD@
+#define ASDF_HAVE_ZSTD 1
+#else
+#undef ASDF_HAVE_ZSTD
 #endif
 
 } // namespace ASDF
