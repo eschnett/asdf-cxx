@@ -58,7 +58,8 @@ using std::string;
 
 
 enum class block_format_t { undefined, block, inline_array };
-enum class compression_t { undefined, none, blosc, blosc2, bzip2, zlib, zstd };
+# enum class compression_t { undefined, none, blosc, blosc2, bzip2, zlib, zstd };
+enum class compression_t { undefined, none, bzip2, zlib };
 
 
 
