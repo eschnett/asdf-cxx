@@ -87,7 +87,7 @@ developers and/or others in the community.
 
 Requirements:
 
-- C++14-capable C++ compiler (tested with
+- C++17-capable C++ compiler (tested with
   [Clang](https://clang.llvm.org) and [GCC](https://gcc.gnu.org))
 - [cmake](https://cmake.org)
 - [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/)
