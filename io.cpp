@@ -13,6 +13,36 @@ const string asdf_standard_version = "1.1.0";
 
 // I/O
 
+std::ostream &operator<<(std::ostream &os, block_format_t block_format) {
+  switch (block_format) {
+  case block_format_t::block:
+    return os << "block";
+  case block_format_t::inline_array:
+    return os << "inline_array";
+  default:
+    return os << "unknown";
+  }
+}
+
+std::ostream &operator<<(std::ostream &os, compression_t compression) {
+  switch (compression) {
+  case compression_t::none:
+    return os << "none";
+  case compression_t::blosc:
+    return os << "blosc";
+  case compression_t::blosc2:
+    return os << "blosc2";
+  case compression_t::bzip2:
+    return os << "bzip2";
+  case compression_t::zlib:
+    return os << "zlib";
+  case compression_t::zstd:
+    return os << "zstd";
+  default:
+    return os << "unknown";
+  }
+}
+
 reader_state::reader_state(const YAML::Node &tree,
                            const shared_ptr<istream> &pis,
                            const string &filename)
