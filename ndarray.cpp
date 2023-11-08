@@ -16,7 +16,7 @@
 #endif
 
 #ifdef ASDF_HAVE_OPENSSL
-#include <openssl/md5.h>
+#include <openssl/evp.h>
 #endif
 
 #ifdef ASDF_HAVE_ZLIB
@@ -186,10 +186,18 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   if (want_checksum != array<unsigned char, 16>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                                 0, 0, 0, 0, 0}) {
     array<unsigned char, 16> checksum;
-    MD5_CTX ctx;
-    MD5_Init(&ctx);
-    MD5_Update(&ctx, indata.data(), indata.size());
-    MD5_Final(checksum.data(), &ctx);
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    assert(mdctx);
+    int ires = EVP_DigestInit_ex(mdctx, EVP_md5(), NULL);
+    assert(ires == 1);
+    ires = EVP_DigestUpdate(mdctx, indata.data(), indata.size());
+    assert(ires == 1);
+    assert(EVP_MD_size(EVP_md5()) == checksum.size());
+    unsigned int digest_size;
+    ires = EVP_DigestFinal_ex(mdctx, checksum.data(), &digest_size);
+    assert(digest_size == checksum.size());
+    assert(ires == 1);
+    EVP_MD_CTX_free(mdctx);
     assert(checksum == want_checksum);
   }
 #endif
@@ -636,10 +644,18 @@ void ndarray::write_block(ostream &os) const {
   // checksum
   array<unsigned char, 16> checksum;
 #ifdef ASDF_HAVE_OPENSSL
-  MD5_CTX ctx;
-  MD5_Init(&ctx);
-  MD5_Update(&ctx, outdata->ptr(), outdata->nbytes());
-  MD5_Final(checksum.data(), &ctx);
+  EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+  assert(mdctx);
+  int ires = EVP_DigestInit_ex(mdctx, EVP_md5(), NULL);
+  assert(ires == 1);
+  ires = EVP_DigestUpdate(mdctx, outdata->ptr(), outdata->nbytes());
+  assert(ires == 1);
+  assert(EVP_MD_size(EVP_md5()) == checksum.size());
+  unsigned int digest_size;
+  ires = EVP_DigestFinal_ex(mdctx, checksum.data(), &digest_size);
+  assert(digest_size == checksum.size());
+  assert(ires == 1);
+  EVP_MD_CTX_free(mdctx);
 #else
   checksum = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 #endif
