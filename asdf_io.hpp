@@ -19,7 +19,7 @@ using namespace std;
 // I/O
 
 enum class block_format_t { undefined, block, inline_array };
-enum class compression_t { undefined, none, blosc, blosc2, bzip2, zlib, zstd };
+enum class compression_t { undefined, none, blosc, blosc2, bzip2, libzstd, zlib };
 
 std::ostream &operator<<(std::ostream &os, block_format_t block_format);
 std::ostream &operator<<(std::ostream &os, compression_t compression);

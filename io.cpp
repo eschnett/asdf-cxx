@@ -34,10 +34,10 @@ std::ostream &operator<<(std::ostream &os, compression_t compression) {
     return os << "blosc2";
   case compression_t::bzip2:
     return os << "bzip2";
+  case compression_t::libzstd:
+    return os << "libzstd";
   case compression_t::zlib:
     return os << "zlib";
-  case compression_t::zstd:
-    return os << "zstd";
   default:
     return os << "unknown";
   }

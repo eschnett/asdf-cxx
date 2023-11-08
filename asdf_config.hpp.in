@@ -63,12 +63,12 @@ void checkVersion(const char *header_version);
 #undef ASDF_HAVE_ZLIB
 #endif
 
-// zstd support
+// libzstd support
 
-#if @HAVE_ZSTD@
-#define ASDF_HAVE_ZSTD 1
+#if @HAVE_LIBZSTD@
+#define ASDF_HAVE_LIBZSTD 1
 #else
-#undef ASDF_HAVE_ZSTD
+#undef ASDF_HAVE_LIBZSTD
 #endif
 
 } // namespace ASDF

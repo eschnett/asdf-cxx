@@ -23,7 +23,7 @@
 #include <zlib.h>
 #endif
 
-#ifdef ASDF_HAVE_ZSTD
+#ifdef ASDF_HAVE_LIBZSTD
 #include <zstd.h>
 #endif
 
@@ -359,7 +359,7 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
   else if ((comp == array<unsigned char, 4>{'z', 'l', 'i', 'b'}))
     compression = compression_t::zlib;
   else if ((comp == array<unsigned char, 4>{'z', 's', 't', 'd'}))
-    compression = compression_t::zstd;
+    compression = compression_t::libzstd;
   else
     assert(0);
   // allocated_space
