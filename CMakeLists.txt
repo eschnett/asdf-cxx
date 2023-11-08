@@ -147,6 +147,9 @@ target_link_libraries(asdf-demo-external asdf-cxx ${LIBS})
 add_executable(asdf-demo-large demo-large.cpp)
 target_link_libraries(asdf-demo-large asdf-cxx ${LIBS})
 
+add_executable(asdf-demo-compression demo-compression.cpp)
+target_link_libraries(asdf-demo-compression asdf-cxx ${LIBS})
+
 add_executable(asdf-ls ls.cpp)
 target_link_libraries(asdf-ls asdf-cxx ${LIBS})
 
@@ -194,7 +197,7 @@ add_test(NAME external COMMAND ./asdf-demo-external)
 # See <https://github.com/codecov/example-cpp11-cmake>
 option(CODE_COVERAGE "Enable coverage reporting" OFF)
 if(CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  foreach(target asdf-cxx asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-ls)
+  foreach(target asdf-cxx asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-demo-compression asdf-ls)
     # Add required flags (GCC & LLVM/Clang)
     target_compile_options(${target} INTERFACE
       -O0        # no optimization
@@ -210,7 +213,7 @@ endif()
 install(FILES ${ASDF_HEADERS} DESTINATION include)
 install(FILES "${PROJECT_BINARY_DIR}/asdf_config.hpp" DESTINATION include)
 install(TARGETS asdf-cxx DESTINATION lib)
-install(TARGETS asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-ls
+install(TARGETS asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-demo-compression asdf-ls
   DESTINATION bin)
 if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND AND SWIG_FOUND)
   install(PROGRAMS asdf-demo-python.py asdf-demo-external-python.py

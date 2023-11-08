@@ -43,6 +43,8 @@ int main(int argc, char **argv) {
 
     // Output project
     cout << node << "\n";
+
+    // TODO: Output block info as well
   }
 
   cout << "Done.\n";
