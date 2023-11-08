@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -96,7 +97,8 @@ public:
 };
 
 // Information about a block
-// TODO: Rename block_t -> block_data_t, create new block_t as tuple<memoized<block>, block_info>
+// TODO: Rename block_t -> block_data_t, create new block_t as
+// tuple<memoized<block>, block_info>
 struct block_info_t {
   array<unsigned char, 4> token;
   uint16_t header_size;
@@ -114,6 +116,8 @@ struct block_info_t {
 
 class ndarray {
   memoized<block_t> mdata;
+  std::optional<block_info_t> block_info; // TODO: remove duplicate information
+
   block_format_t block_format;
   compression_t compression; // TODO: move to block_t
   int compression_level;     // TODO: move to block_t
@@ -136,16 +140,17 @@ public:
   ndarray &operator=(const ndarray &) = default;
   ndarray &operator=(ndarray &&) = default;
 
-  ndarray(memoized<block_t> mdata1, block_format_t block_format,
-          compression_t compression, int compression_level, vector<bool> mask1,
+  ndarray(memoized<block_t> mdata1, std::optional<block_info_t> block_info,
+          block_format_t block_format, compression_t compression,
+          int compression_level, vector<bool> mask1,
           shared_ptr<datatype_t> datatype1, byteorder_t byteorder,
           vector<int64_t> shape1, int64_t offset = 0,
           vector<int64_t> strides1 = {})
-      : mdata(std::move(mdata1)), block_format(block_format),
-        compression(compression), compression_level(compression_level),
-        mask(std::move(mask1)), datatype(std::move(datatype1)),
-        byteorder(byteorder), shape(std::move(shape1)), offset(offset),
-        strides(std::move(strides1)) {
+      : mdata(std::move(mdata1)), block_info(block_info),
+        block_format(block_format), compression(compression),
+        compression_level(compression_level), mask(std::move(mask1)),
+        datatype(std::move(datatype1)), byteorder(byteorder),
+        shape(std::move(shape1)), offset(offset), strides(std::move(strides1)) {
     // Check shape
     int rank = shape.size();
     for (int d = 0; d < rank; ++d)
@@ -181,7 +186,8 @@ public:
           vector<int64_t> strides1 = {})
       : ndarray(make_constant_memoized(shared_ptr<block_t>(
                     make_shared<typed_block_t<T>>(std::move(data1)))),
-                block_format, compression, compression_level, std::move(mask1),
+                std::optional<block_info_t>(), block_format, compression,
+                compression_level, std::move(mask1),
                 make_shared<datatype_t>(get_scalar_type_id<T>()),
                 host_byteorder(), std::move(shape1), offset,
                 std::move(strides1)) {}
@@ -205,6 +211,9 @@ public:
     // check_shape();
     return mdata;
   }
+
+  // Only available after reading a file, not available while writing
+  std::optional<block_info_t> get_block_info() const { return block_info; }
 
   template <typename T> vector<T> get_data_vector() const {
     assert(datatype->is_scalar);

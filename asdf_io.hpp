@@ -21,6 +21,9 @@ using namespace std;
 enum class block_format_t { undefined, block, inline_array };
 enum class compression_t { undefined, none, blosc, blosc2, bzip2, zlib, zstd };
 
+std::ostream &operator<<(std::ostream &os, block_format_t block_format);
+std::ostream &operator<<(std::ostream &os, compression_t compression);
+
 class block_t;
 class block_info_t;
 
@@ -49,7 +52,7 @@ public:
     return blocks.at(index);
   }
 
-  block_info_t get_block_info(int64_t index) const ;
+  block_info_t get_block_info(int64_t index) const;
 
   YAML::Node resolve_reference(const vector<string> &path) const;
 

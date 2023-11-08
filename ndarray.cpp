@@ -706,6 +706,7 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
       }
     }
     mdata = rs->get_block(source);
+    block_info = std::make_optional<block_info_t>(rs->get_block_info(source));
     break;
   }
 
