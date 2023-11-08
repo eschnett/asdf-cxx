@@ -27,6 +27,11 @@
 #include <zstd.h>
 #endif
 
+#include <algorithm>
+#include <cstdlib>
+#include <cstring>
+#include <type_traits>
+
 namespace ASDF {
 
 // Multi-dimensional array
@@ -153,10 +158,13 @@ constexpr array<unsigned char, 4> block_magic_token{0xd3, 0x42, 0x4c, 0x4b};
 
 template <typename T> void input(istream &is, T &data) {
   // Always input in big-endian as required for the header
+  static_assert(std::is_integral<T>::value, "");
+  using U = typename std::make_unsigned<T>::type;
+  data = 0;
   for (ptrdiff_t i = sizeof(T) - 1; i >= 0; --i) {
     unsigned char ch;
     is.read(reinterpret_cast<char *>(&ch), 1);
-    reinterpret_cast<unsigned char *>(&data)[i] = ch;
+    data = (U(data) << 8) | ch;
   }
 }
 
@@ -197,13 +205,38 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
 
 #ifdef ASDF_HAVE_BLOSC
   case compression_t::blosc: {
+    const int numinternalthreads = 1;
     data.resize(data_space);
     assert(data.size() <= size_t(INT_MAX));
-    const int numinternalthreads = 1;
     int dsize = blosc_decompress_ctx(indata.data(), data.data(), data.size(),
                                      numinternalthreads);
     assert(dsize > 0);
     assert(dsize == data.size());
+    break;
+  }
+#endif
+
+#ifdef ASDF_HAVE_BLOSC2
+  case compression_t::blosc2: {
+    blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
+    // TODO: Don't copy the data
+    blosc2_schunk *const schunk =
+        blosc2_schunk_from_buffer(indata.data(), indata.size(), false);
+    blosc2_schunk_avoid_cframe_free(schunk, true);
+    data.resize(data_space);
+    uint8_t *output_ptr = data.data();
+    int64_t total_output_size = data.size();
+    for (int chunk = 0; chunk < schunk->nchunks; ++chunk) {
+      using std::min;
+      const int output_size = blosc2_schunk_decompress_chunk(
+          schunk, chunk, output_ptr,
+          int(min(total_output_size, int64_t(INT_MAX))));
+      assert(output_size > 0);
+      assert(output_size <= total_output_size);
+      output_ptr += output_size;
+      total_output_size -= output_size;
+    }
+    blosc2_schunk_free(schunk);
     break;
   }
 #endif
@@ -282,7 +315,8 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   return make_shared<typed_block_t<unsigned char>>(std::move(data));
 }
 
-memoized<block_t> ndarray::read_block(const shared_ptr<istream> &pis) {
+std::tuple<memoized<block_t>, block_info_t>
+ndarray::read_block(const shared_ptr<istream> &pis) {
   istream &is = *pis;
   // block_magic_token
   array<unsigned char, 4> token;
@@ -308,10 +342,16 @@ memoized<block_t> ndarray::read_block(const shared_ptr<istream> &pis) {
   compression_t compression;
   if ((comp == array<unsigned char, 4>{0, 0, 0, 0}))
     compression = compression_t::none;
+  else if ((comp == array<unsigned char, 4>{'b', 'l', 's', 'c'}))
+    compression = compression_t::blosc;
+  else if ((comp == array<unsigned char, 4>{'b', 'l', 's', '2'}))
+    compression = compression_t::blosc2;
   else if ((comp == array<unsigned char, 4>{'b', 'z', 'p', '2'}))
     compression = compression_t::bzip2;
   else if ((comp == array<unsigned char, 4>{'z', 'l', 'i', 'b'}))
     compression = compression_t::zlib;
+  else if ((comp == array<unsigned char, 4>{'z', 's', 't', 'd'}))
+    compression = compression_t::zstd;
   else
     assert(0);
   // allocated_space
@@ -340,23 +380,32 @@ memoized<block_t> ndarray::read_block(const shared_ptr<istream> &pis) {
     return read_block_data(pis, block_begin, allocated_space, data_space,
                            compression, checksum);
   });
-  // This would ensure synchronous reading, which might be useful for debugging
+  // This would ensure synchronous reading, which might be useful for
+  // debugging
   // fdata.fill_cache();
 
   // skip padding
   is.seekg(block_begin + streamoff(used_space));
-  return std::move(fdata);
+
+  block_info_t block_info{
+      token,       header_size,     header_read, flags,      comp,
+      compression, allocated_space, used_space,  data_space, checksum,
+  };
+
+  return {fdata, block_info};
 }
 
 template <typename T>
 void output(vector<unsigned char> &header, const T &data) {
   // Always output in big-endian as required for the header
+  static_assert(std::is_integral<T>::value, "");
+  using U = typename std::make_unsigned<T>::type;
   for (ptrdiff_t i = sizeof(T) - 1; i >= 0; --i)
-    header.push_back(reinterpret_cast<const unsigned char *>(&data)[i]);
+    header.push_back((U(data) >> (8 * i)) & 0xff);
 }
 
-// TODO: stream the block (e.g. when compressing), then write the correct header
-// later
+// TODO: stream the block (e.g. when compressing), then write the correct
+// header later
 void ndarray::write_block(ostream &os) const {
   vector<unsigned char> header;
   // block_magic_token
@@ -384,32 +433,93 @@ void ndarray::write_block(ostream &os) const {
     outdata = get_data().get();
     break;
 
-#ifdef ASDF_HAVE_BLOSC
   case compression_t::blosc: {
+#ifdef ASDF_HAVE_BLOSC
     comp = {'b', 'l', 's', 'c'};
-    // Allocate `BLOSC_MAX_OVERHEAD` more
-    outdata = make_shared<typed_block_t<unsigned char>>(
-        vector<unsigned char>(get_data()->nbytes() + BLOSC_MAX_OVERHEAD));
     const int level = compression_level;
     const int doshuffle = BLOSC_BITSHUFFLE;
     const size_t typesize = get_scalar_type_size(datatype->scalar_type_id);
     const char *const compressor = BLOSC_BLOSCLZ_COMPNAME;
     const int blocksize = 0;
     const int numinternalthreads = 1;
+
     assert(get_data()->nbytes() <= size_t(INT_MAX));
-    int nbytes =
+
+    // Allocate `BLOSC_MAX_OVERHEAD` more
+    outdata = make_shared<typed_block_t<unsigned char>>(
+        vector<unsigned char>(get_data()->nbytes() + BLOSC_MAX_OVERHEAD));
+    int bytes_written =
         blosc_compress_ctx(level, doshuffle, typesize, get_data()->nbytes(),
                            get_data()->ptr(), outdata->ptr(), outdata->nbytes(),
                            compressor, blocksize, numinternalthreads);
-    outdata->resize(nbytes);
+    assert(bytes_written > 0);
+    outdata->resize(bytes_written);
     if (outdata->nbytes() >= get_data()->nbytes()) {
       // Skip compression if it does not reduce the size
       comp = {0, 0, 0, 0};
       outdata = get_data().get();
     }
+#else
+    // Fall back to no compression if bzip2 is not available
+    comp = {0, 0, 0, 0};
+    outdata = get_data().get();
+#endif
     break;
   }
+
+  case compression_t::blosc2: {
+#ifdef ASDF_HAVE_BLOSC2
+    comp = {'b', 'l', 's', '2'};
+
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.compcode = BLOSC_BLOSCLZ;
+    cparams.clevel = compression_level;
+    cparams.typesize = get_scalar_type_size(datatype->scalar_type_id);
+    cparams.nthreads = 1;
+    cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
+
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+
+    blosc2_storage storage = {.cparams = &cparams,
+                              .dparams = &dparams,
+                              .contiguous = true,
+                              .urlpath = NULL};
+
+    blosc2_schunk *const schunk = blosc2_schunk_new(&storage);
+
+    const int64_t chunk_size = INT_MAX;
+    uint8_t *input_ptr = static_cast<uint8_t *>(get_data()->ptr());
+    int64_t total_input_size = get_data()->nbytes();
+    while (total_input_size > 0) {
+      using std::min;
+      const int64_t input_size = min(total_input_size, chunk_size);
+      const int64_t nchunks =
+          blosc2_schunk_append_buffer(schunk, input_ptr, input_size);
+      assert(nchunks > 0);
+      input_ptr += input_size;
+      total_input_size -= input_size;
+    }
+
+    uint8_t *cframe;
+    bool needs_free;
+    const int64_t size = blosc2_schunk_to_buffer(schunk, &cframe, &needs_free);
+
+    // TODO: Reuse `cframe`, at least of `needs_free== true`
+    outdata =
+        make_shared<typed_block_t<unsigned char>>(vector<unsigned char>(size));
+    std::memcpy(outdata->ptr(), cframe, outdata->nbytes());
+
+    blosc2_schunk_free(schunk);
+    if (needs_free)
+      std::free(cframe);
+
+#else
+    // Fall back to no compression if bzip2 is not available
+    comp = {0, 0, 0, 0};
+    outdata = get_data().get();
 #endif
+    break;
+  }
 
   case compression_t::bzip2: {
 #ifdef ASDF_HAVE_BZIP2
