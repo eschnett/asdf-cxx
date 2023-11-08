@@ -109,7 +109,7 @@ void yaml_decode(const YAML::Node &node,
     // case id_ascii
     // case id_ucs4
     assert(0);
-    scalar_typ_id = id_error;
+    scalar_type_id = id_error;
   }
 }
 
