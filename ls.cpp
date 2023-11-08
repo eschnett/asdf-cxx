@@ -36,7 +36,7 @@ void output(std::ostream &os, const int indent,
      << "compressed size:   " << block_info.used_space << "\n";
   using std::lrint;
   os << std::string(indent + indent_step, ' ') << "compression ratio: "
-     << floor(1000 * block_info.used_space / block_info.data_space) / 10
+     << floor(1000.0 * block_info.used_space / block_info.data_space) / 10
      << "%\n";
   os << std::string(indent + indent_step, ' ') << "checksum: ";
   for (const unsigned char ch : block_info.checksum)
