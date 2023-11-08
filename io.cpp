@@ -18,11 +18,17 @@ reader_state::reader_state(const YAML::Node &tree,
                            const string &filename)
     : filename(filename), tree(tree) {
   for (;;) {
-    const auto &block = ndarray::read_block(pis);
+    const auto [block, block_info] = ndarray::read_block(pis);
     if (!block.valid())
       break;
     blocks.push_back(std::move(block));
+    block_infos.push_back(std::move(block_info));
   }
+}
+
+block_info_t reader_state::get_block_info(int64_t index) const {
+  assert(index >= 0);
+  return block_infos.at(index);
 }
 
 YAML::Node reader_state::resolve_reference(const vector<string> &path) const {

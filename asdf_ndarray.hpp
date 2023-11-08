@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <tuple>
 #include <vector>
 
 namespace ASDF {
@@ -94,6 +95,21 @@ public:
   virtual void resize(size_t nbytes) { assert(0); }
 };
 
+// Information about a block
+// TODO: Rename block_t -> block_data_t, create new block_t as tuple<memoized<block>, block_info>
+struct block_info_t {
+  array<unsigned char, 4> token;
+  uint16_t header_size;
+  int64_t header_read;
+  uint32_t flags;
+  array<unsigned char, 4> comp;
+  compression_t compression;
+  uint64_t allocated_space;
+  uint64_t used_space;
+  uint64_t data_space;
+  array<unsigned char, 16> checksum;
+};
+
 // ndarray
 
 class ndarray {
@@ -111,7 +127,8 @@ class ndarray {
   void write_block(ostream &os) const;
 
 public:
-  static memoized<block_t> read_block(const shared_ptr<istream> &is);
+  static std::tuple<memoized<block_t>, block_info_t>
+  read_block(const shared_ptr<istream> &is);
 
   ndarray() = delete;
   ndarray(const ndarray &) = default;

@@ -22,6 +22,7 @@ enum class block_format_t { undefined, block, inline_array };
 enum class compression_t { undefined, none, blosc, blosc2, bzip2, zlib, zstd };
 
 class block_t;
+class block_info_t;
 
 class reader_state {
   YAML::Node tree;
@@ -31,6 +32,7 @@ class reader_state {
 
   // TODO: Store only the file position
   vector<memoized<block_t>> blocks;
+  vector<block_info_t> block_infos;
 
 public:
   reader_state() = delete;
@@ -46,6 +48,8 @@ public:
     assert(index >= 0);
     return blocks.at(index);
   }
+
+  block_info_t get_block_info(int64_t index) const ;
 
   YAML::Node resolve_reference(const vector<string> &path) const;
 
