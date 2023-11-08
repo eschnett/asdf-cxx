@@ -488,10 +488,9 @@ void ndarray::write_block(ostream &os) const {
 
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
 
-    blosc2_storage storage = {.cparams = &cparams,
-                              .dparams = &dparams,
-                              .contiguous = true,
-                              .urlpath = NULL};
+    blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
+    storage.contiguous = true;
+    storage.cparams = &cparams;
 
     blosc2_schunk *const schunk = blosc2_schunk_new(&storage);
 

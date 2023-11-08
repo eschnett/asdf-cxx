@@ -72,6 +72,7 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
     // case id_ucs4
   default:
     assert(0);
+    return -1;
   }
 }
 
@@ -104,10 +105,12 @@ void yaml_decode(const YAML::Node &node,
     scalar_type_id = id_complex64;
   else if (str == "complex128")
     scalar_type_id = id_complex128;
-  else
+  else {
     // case id_ascii
     // case id_ucs4
     assert(0);
+    scalar_typ_id = id_error;
+  }
 }
 
 YAML::Node yaml_encode(scalar_type_id_t scalar_type_id) {
