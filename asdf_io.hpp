@@ -25,7 +25,7 @@ std::ostream &operator<<(std::ostream &os, block_format_t block_format);
 std::ostream &operator<<(std::ostream &os, compression_t compression);
 
 class block_t;
-class block_info_t;
+struct block_info_t;
 
 class reader_state {
   YAML::Node tree;
