@@ -220,7 +220,8 @@ if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND AND SWIG_FOUND)
     DESTINATION bin)
 endif()
 
-set(PKG_CONFIG_REQUIRES "yaml-cpp")
+# `bzip2` is also required
+set(PKG_CONFIG_REQUIRES "blosc blosc2 libzstd yaml-cpp zlib")
 set(PKG_CONFIG_INCLUDEDIR "\${prefix}/include")
 set(PKG_CONFIG_LIBDIR "\${prefix}/lib")
 set(PKG_CONFIG_CFLAGS "-I\${includedir}")
