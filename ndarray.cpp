@@ -468,6 +468,7 @@ void ndarray::write_block(ostream &os) const {
       outdata = get_data().get();
     }
 #else
+    assert(0);
     // Fall back to no compression if bzip2 is not available
     comp = {0, 0, 0, 0};
     outdata = get_data().get();
@@ -521,6 +522,7 @@ void ndarray::write_block(ostream &os) const {
       std::free(cframe);
 
 #else
+    assert(0);
     // Fall back to no compression if bzip2 is not available
     comp = {0, 0, 0, 0};
     outdata = get_data().get();
@@ -568,6 +570,7 @@ void ndarray::write_block(ostream &os) const {
       outdata = get_data().get();
     }
 #else
+    assert(0);
     // Fall back to no compression if bzip2 is not available
     comp = {0, 0, 0, 0};
     outdata = get_data().get();
@@ -617,6 +620,7 @@ void ndarray::write_block(ostream &os) const {
       outdata = get_data().get();
     }
 #else
+    assert(0);
     // Fall back to no compression if zlib is not available
     comp = {0, 0, 0, 0};
     outdata = get_data().get();
