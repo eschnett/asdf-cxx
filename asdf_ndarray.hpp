@@ -225,7 +225,7 @@ public:
     size_t nbytes = mdata->nbytes();
     assert(nbytes == npoints * sizeof(T));
     vector<T> data(npoints);
-    for (size_t i = 0; i < npoints; ++i)
+    for (int64_t i = 0; i < npoints; ++i)
       data[i] = ptr[i];
     return data;
   }
