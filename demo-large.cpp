@@ -33,9 +33,12 @@ int main(int argc, char **argv) {
   cout << "\n";
 
   cout << "  creating project..." << flush;
+  const auto compression = compression_t::blosc2;
+  // const auto compression = compression_t::zlib;
+  const int level = 9;
   auto array3d = make_shared<ndarray>(std::move(rho), block_format_t::block,
-                                      compression_t::zlib, 9, vector<bool>(),
-                                      vector<int64_t>{ni, nj, nk});
+                                      compression, level, std::vector<bool>(),
+                                      std::vector<int64_t>{ni, nj, nk});
   assert(rho.empty());
   auto ent = make_shared<entry>("rho", array3d, string());
   auto grp = make_shared<group>(map<string, shared_ptr<entry>>{{"rho", ent}});

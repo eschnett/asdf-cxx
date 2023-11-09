@@ -494,13 +494,13 @@ void ndarray::write_block(ostream &os) const {
 
     blosc2_schunk *const schunk = blosc2_schunk_new(&storage);
 
-    const int64_t chunk_size = INT_MAX;
+    const int64_t chunk_size = INT_MAX - BLOSC2_MAX_OVERHEAD;
     uint8_t *input_ptr = static_cast<uint8_t *>(get_data()->ptr());
     int64_t total_input_size = get_data()->nbytes();
     while (total_input_size > 0) {
       using std::min;
-      const int64_t input_size = min(total_input_size, chunk_size);
-      const int64_t nchunks =
+      const int input_size = min(total_input_size, chunk_size);
+      const int nchunks =
           blosc2_schunk_append_buffer(schunk, input_ptr, input_size);
       assert(nchunks > 0);
       input_ptr += input_size;
