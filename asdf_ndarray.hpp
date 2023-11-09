@@ -42,14 +42,14 @@ public:
 
   virtual ~typed_block_t() {}
 
-  virtual const void *ptr() const { return data.data(); }
-  virtual void *ptr() { return data.data(); }
-  virtual size_t nbytes() const { return data.size() * sizeof(T); }
-  virtual void reserve(size_t nbytes) {
+  virtual const void *ptr() const override { return data.data(); }
+  virtual void *ptr() override { return data.data(); }
+  virtual size_t nbytes() const override { return data.size() * sizeof(T); }
+  virtual void reserve(size_t nbytes) override {
     assert(nbytes % sizeof(T) == 0);
     data.reserve(nbytes / sizeof(T));
   }
-  virtual void resize(size_t nbytes) {
+  virtual void resize(size_t nbytes) override {
     assert(nbytes % sizeof(T) == 0);
     data.resize(nbytes / sizeof(T));
   }
