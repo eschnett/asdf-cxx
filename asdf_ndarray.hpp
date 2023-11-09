@@ -66,11 +66,11 @@ public:
 
   virtual ~typed_block_t() {}
 
-  virtual const void *ptr() const { return data.data(); }
-  virtual void *ptr() { return data.data(); }
-  virtual size_t nbytes() const { return data.size(); }
-  virtual void reserve(size_t nbytes) { data.resize(nbytes); }
-  virtual void resize(size_t nbytes) { data.resize(nbytes); }
+  virtual const void *ptr() const override { return data.data(); }
+  virtual void *ptr() override { return data.data(); }
+  virtual size_t nbytes() const override { return data.size(); }
+  virtual void reserve(size_t nbytes) override { data.resize(nbytes); }
+  virtual void resize(size_t nbytes) override { data.resize(nbytes); }
 };
 
 class ptr_block_t : public block_t {
@@ -89,11 +89,11 @@ public:
 
   virtual ~ptr_block_t() {}
 
-  virtual const void *ptr() const { return data; }
-  virtual void *ptr() { return data; }
-  virtual size_t nbytes() const { return size; }
-  virtual void reserve(size_t nbytes) { assert(0); }
-  virtual void resize(size_t nbytes) { assert(0); }
+  virtual const void *ptr() const override { return data; }
+  virtual void *ptr() override { return data; }
+  virtual size_t nbytes() const override { return size; }
+  virtual void reserve(size_t nbytes) override { assert(0); }
+  virtual void resize(size_t nbytes) override { assert(0); }
 };
 
 // Information about a block
