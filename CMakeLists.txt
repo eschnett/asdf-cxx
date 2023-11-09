@@ -225,7 +225,7 @@ set(PKG_CONFIG_REQUIRES "blosc blosc2 libzstd yaml-cpp zlib")
 set(PKG_CONFIG_INCLUDEDIR "\${prefix}/include")
 set(PKG_CONFIG_LIBDIR "\${prefix}/lib")
 set(PKG_CONFIG_CFLAGS "-I\${includedir}")
-set(PKG_CONFIG_LIBS "-L\${libdir} -lasdf-cxx")
+set(PKG_CONFIG_LIBS "-L\${libdir} -lasdf-cxx -lblosc -lblosc2 -lyaml-cpp -lz -lzstd")
 
 configure_file(
   "${PROJECT_SOURCE_DIR}/pkg-config.pc.in"
