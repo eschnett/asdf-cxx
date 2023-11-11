@@ -76,8 +76,6 @@ developers and/or others in the community.
   writing the index, the placeholder could be overwritten by the block
   index location. That would simplify finding the index and would
   provide an additional validity check.
-- There could be additional compression schemes, e.g. based on
-  [Blosc](http://www.blosc.org).
 - It would be interesting to be able to split arrays into multiple
   blocks. This would allow tiled representations (which can be much
   faster for partial reading), and would allow not storing large
