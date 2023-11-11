@@ -92,9 +92,13 @@ Requirements:
 - [cmake](https://cmake.org)
 - [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp) library
-- [bzip2](http://bzip.org) library (optional, for compression)
 - [OpenSSL](https://www.openssl.org) (optional, for MD5 checksums)
+- [bzip2](http://bzip.org) library (optional, for compression)
+- [c-blosc](https://www.blosc.org) library (optional, for compression)
+- [c-blosc2](https://www.blosc.org) library (optional, for compression)
+- [lz4](https://lz4.org) library (optional, for compression)
 - [zlib](http://zlib.net) library (optional, for compression)
+- [zstd](https://github.com/facebook/zstd) library (optional, for compression)
 
 To build:
 
