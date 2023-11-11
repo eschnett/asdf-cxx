@@ -14,51 +14,51 @@ const string asdf_standard_version = "1.1.0";
 
 bool have_checksum() {
 #ifdef ASDF_HAVE_OPENSSL
-  return 1;
+  return true;
 #else
-  return 0;
+  return false;
 #endif
 }
 bool have_compression_blosc() {
 #ifdef ASDF_HAVE_BLOSC
-  return 1;
+  return true;
 #else
-  return 0;
+  return false;
 #endif
 }
 bool have_compression_blosc2() {
 #ifdef ASDF_HAVE_BLOSC2
-  return 1;
+  return true;
 #else
-  return 0;
+  return false;
 #endif
 }
 bool have_compression_bzip2() {
 #ifdef ASDF_HAVE_BZIP2
-  return 1;
+  return true;
 #else
-  return 0;
+  return false;
 #endif
 }
 bool have_compression_liblz4() {
 #ifdef ASDF_HAVE_LIBLZ4
-  return 1;
+  return true;
 #else
-  return 0;
+  return false;
 #endif
 }
 bool have_compression_libzstd() {
 #ifdef ASDF_HAVE_LIBZSTD
-  return 1;
+  return true;
 #else
-  return 0;
+  return false;
 #endif
 }
 bool have_compression_zlib() {
 #ifdef ASDF_HAVE_ZLIB
-  return 1;
+  return true;
 #else
-  return 0;
+  return false;
 #endif
 }
 

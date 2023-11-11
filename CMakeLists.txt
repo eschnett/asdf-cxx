@@ -108,6 +108,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 string(REPLACE "-DNDEBUG" ""
   CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 
+include(CheckCXXSourceCompiles)
+  check_cxx_source_compiles(
+    "
+      int main() {
+        _Float16 f16;
+      }
+    "
+    ASDF_HAVE_FLOAT16)
+  check_cxx_source_compiles(
+    "
+      int main() {
+        __int128 i128;
+      }
+    "
+    ASDF_HAVE_INT128)
+
 configure_file(
   "${PROJECT_SOURCE_DIR}/include/asdf/config.hxx.in"
   "${PROJECT_BINARY_DIR}/asdf/config.hxx"
