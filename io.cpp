@@ -12,13 +12,13 @@ namespace ASDF {
 const string asdf_format_version = "1.0.0";
 const string asdf_standard_version = "1.1.0";
 
-bool have_checksum() { return ASDF_HAVE_OPENSSL; }
-bool have_compression_blosc() { return ASDF_HAVE_BLOSC; }
-bool have_compression_blosc2() { return ASDF_HAVE_BLOSC2; }
-bool have_compression_bzip2() { return ASDF_HAVE_BZIP2; }
-bool have_compression_liblz4() { return ASDF_HAVE_LIBLZ4; }
-bool have_compression_libzstd() { return ASDF_HAVE_LIBZSTD; }
-bool have_compression_zlib() { return ASDF_HAVE_ZLIB; }
+bool have_checksum() { return ASDF_HAVE_OPENSSL + 0; }
+bool have_compression_blosc() { return ASDF_HAVE_BLOSC + 0; }
+bool have_compression_blosc2() { return ASDF_HAVE_BLOSC2 + 0; }
+bool have_compression_bzip2() { return ASDF_HAVE_BZIP2 + 0; }
+bool have_compression_liblz4() { return ASDF_HAVE_LIBLZ4 + 0; }
+bool have_compression_libzstd() { return ASDF_HAVE_LIBZSTD + 0; }
+bool have_compression_zlib() { return ASDF_HAVE_ZLIB + 0; }
 
 // I/O
 
