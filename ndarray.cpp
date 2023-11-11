@@ -15,16 +15,21 @@
 #include <bzlib.h>
 #endif
 
+#ifdef ASDF_HAVE_LIBLZ4
+#include <lz4.h>
+#include <lz4frame.h>
+#endif
+
+#ifdef ASDF_HAVE_LIBZSTD
+#include <zstd.h>
+#endif
+
 #ifdef ASDF_HAVE_OPENSSL
 #include <openssl/evp.h>
 #endif
 
 #ifdef ASDF_HAVE_ZLIB
 #include <zlib.h>
-#endif
-
-#ifdef ASDF_HAVE_LIBZSTD
-#include <zstd.h>
 #endif
 
 #include <algorithm>
@@ -283,6 +288,39 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   }
 #endif
 
+#ifdef ASDF_HAVE_LIBLZ4
+  case compression_t::liblz4: {
+    data.resize(data_space);
+
+    const LZ4F_decompressOptions_t dOpt{
+        .stableDst = true,
+#ifdef ASDF_HAVE_OPENSSL
+        .skipChecksums = true, // this is faster, and we have our own checksum
+#else
+        .skipChecksums = false,
+#endif
+        .reserved1 = 0,
+        .reserved0 = 0,
+    };
+
+    LZ4F_dctx *dctx;
+    LZ4F_errorCode_t ierr =
+        LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
+    assert(!LZ4F_isError(ierr));
+    assert(dctx);
+
+    size_t dstSize = data.size();
+    size_t srcSize = indata.size();
+    const std::size_t nbytes_expected = LZ4F_decompress(
+        dctx, data.data(), &dstSize, indata.data(), &srcSize, &dOpt);
+    assert(nbytes_expected == 0);
+
+    ierr = LZ4F_freeDecompressionContext(dctx);
+    assert(!LZ4F_isError(ierr));
+    break;
+  }
+#endif
+
 #ifdef ASDF_HAVE_ZLIB
   case compression_t::zlib: {
     data.resize(data_space);
@@ -356,10 +394,12 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
     compression = compression_t::blosc2;
   else if ((comp == array<unsigned char, 4>{'b', 'z', 'p', '2'}))
     compression = compression_t::bzip2;
-  else if ((comp == array<unsigned char, 4>{'z', 'l', 'i', 'b'}))
-    compression = compression_t::zlib;
+  else if ((comp == array<unsigned char, 4>{'l', 'z', '4', 'f'}))
+    compression = compression_t::liblz4;
   else if ((comp == array<unsigned char, 4>{'z', 's', 't', 'd'}))
     compression = compression_t::libzstd;
+  else if ((comp == array<unsigned char, 4>{'z', 'l', 'i', 'b'}))
+    compression = compression_t::zlib;
   else
     assert(0);
   // allocated_space
@@ -441,8 +481,8 @@ void ndarray::write_block(ostream &os) const {
     outdata = get_data().get();
     break;
 
-  case compression_t::blosc: {
 #ifdef ASDF_HAVE_BLOSC
+  case compression_t::blosc: {
     comp = {'b', 'l', 's', 'c'};
     const int level = compression_level;
     const int doshuffle = BLOSC_BITSHUFFLE;
@@ -467,17 +507,12 @@ void ndarray::write_block(ostream &os) const {
       comp = {0, 0, 0, 0};
       outdata = get_data().get();
     }
-#else
-    assert(0);
-    // Fall back to no compression if bzip2 is not available
-    comp = {0, 0, 0, 0};
-    outdata = get_data().get();
-#endif
     break;
   }
+#endif
 
-  case compression_t::blosc2: {
 #ifdef ASDF_HAVE_BLOSC2
+  case compression_t::blosc2: {
     comp = {'b', 'l', 's', '2'};
 
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -521,17 +556,12 @@ void ndarray::write_block(ostream &os) const {
     if (needs_free)
       std::free(cframe);
 
-#else
-    assert(0);
-    // Fall back to no compression if bzip2 is not available
-    comp = {0, 0, 0, 0};
-    outdata = get_data().get();
-#endif
     break;
   }
+#endif
 
-  case compression_t::bzip2: {
 #ifdef ASDF_HAVE_BZIP2
+  case compression_t::bzip2: {
     comp = {'b', 'z', 'p', '2'};
     // Allocate 600 bytes plus 1% more
     outdata = make_shared<typed_block_t<unsigned char>>(vector<unsigned char>(
@@ -569,17 +599,32 @@ void ndarray::write_block(ostream &os) const {
       comp = {0, 0, 0, 0};
       outdata = get_data().get();
     }
-#else
-    assert(0);
-    // Fall back to no compression if bzip2 is not available
-    comp = {0, 0, 0, 0};
-    outdata = get_data().get();
-#endif
     break;
   }
+#endif
 
-  case compression_t::zlib: {
+#ifdef ASDF_HAVE_LIBLZ4
+  case compression_t::liblz4: {
+    comp = {'l', 'z', '4', 'f'};
+
+    LZ4F_preferences_t preferences = LZ4F_INIT_PREFERENCES;
+    preferences.compressionLevel = compression_level;
+
+    const size_t max_nbytes =
+        LZ4F_compressFrameBound(get_data()->nbytes(), &preferences);
+    outdata = make_shared<typed_block_t<unsigned char>>(
+        vector<unsigned char>(max_nbytes));
+
+    const size_t nbytes =
+        LZ4F_compressFrame(outdata->ptr(), outdata->nbytes(), get_data()->ptr(),
+                           get_data()->nbytes(), &preferences);
+    outdata->resize(nbytes);
+    break;
+  }
+#endif
+
 #ifdef ASDF_HAVE_ZLIB
+  case compression_t::zlib: {
     comp = {'z', 'l', 'i', 'b'};
     // Allocate 6 bytes plus 5 bytes per 16 kByte more
     outdata = make_shared<typed_block_t<unsigned char>>(
@@ -619,14 +664,9 @@ void ndarray::write_block(ostream &os) const {
       comp = {0, 0, 0, 0};
       outdata = get_data().get();
     }
-#else
-    assert(0);
-    // Fall back to no compression if zlib is not available
-    comp = {0, 0, 0, 0};
-    outdata = get_data().get();
-#endif
     break;
   }
+#endif
 
   default:
     assert(0);
