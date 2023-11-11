@@ -42,36 +42,51 @@ void write_file(const std::vector<int64_t> &shape,
                 const std::vector<T> &data3d) {
   std::cout << "writing file...\n";
 
+  auto grp = make_shared<group>();
+
   auto array3d_none =
       make_shared<ndarray>(data3d, block_format_t::block, compression_t::none,
                            0, std::vector<bool>(), shape);
-  auto array3d_blosc =
-      make_shared<ndarray>(data3d, block_format_t::block, compression_t::blosc,
-                           9, std::vector<bool>(), shape);
-  auto array3d_blosc2 =
-      make_shared<ndarray>(data3d, block_format_t::block, compression_t::blosc2,
-                           9, std::vector<bool>(), shape);
-  auto array3d_bzip2 =
-      make_shared<ndarray>(data3d, block_format_t::block, compression_t::bzip2,
-                           9, std::vector<bool>(), shape);
-  auto array3d_zlib =
-      make_shared<ndarray>(data3d, block_format_t::block, compression_t::zlib,
-                           9, std::vector<bool>(), shape);
-  auto grp = make_shared<group>(std::map<std::string, std::shared_ptr<entry>>{
-      {"array3d_none",
-       std::make_shared<entry>("array3d_none0", array3d_none, string())},
-      {"array3d_blosc",
-       std::make_shared<entry>("array3d_blosc0", array3d_blosc, string())},
-      {"array3d_blosc2",
-       std::make_shared<entry>("array3d_blosc20", array3d_blosc2, string())},
-      {"array3d_bzip2",
-       std::make_shared<entry>("array3d_bzip20", array3d_bzip2, string())},
-      {"array3d_zlib",
-       std::make_shared<entry>("array3d_zlib0", array3d_zlib, string())},
-  });
-  auto project = asdf({}, grp);
+  grp->emplace("array3d_none", array3d_none);
 
-  project.write("compression.asdf");
+  if (have_compression_blosc()) {
+    auto array3d_blosc = make_shared<ndarray>(data3d, block_format_t::block,
+                                              compression_t::blosc, 9,
+                                              std::vector<bool>(), shape);
+    grp->emplace("array3d_blosc", array3d_blosc);
+  }
+
+  if (have_compression_blosc2()) {
+    auto array3d_blosc2 = make_shared<ndarray>(data3d, block_format_t::block,
+                                               compression_t::blosc2, 9,
+                                               std::vector<bool>(), shape);
+    grp->emplace("array3d_blosc2", array3d_blosc2);
+  }
+
+  if (have_compression_bzip2()) {
+    auto array3d_bzip2 = make_shared<ndarray>(data3d, block_format_t::block,
+                                              compression_t::bzip2, 9,
+                                              std::vector<bool>(), shape);
+    grp->emplace("array3d_bzip2", array3d_bzip2);
+  }
+
+  if (have_compression_liblz4()) {
+    auto array3d_liblz4 = make_shared<ndarray>(data3d, block_format_t::block,
+                                               compression_t::liblz4, 9,
+                                               std::vector<bool>(), shape);
+    grp->emplace("array3d_liblz4", array3d_liblz4);
+  }
+
+  if (have_compression_zlib()) {
+    auto array3d_zlib =
+        make_shared<ndarray>(data3d, block_format_t::block, compression_t::zlib,
+                             9, std::vector<bool>(), shape);
+    grp->emplace("array3d_zlib", array3d_zlib);
+  }
+
+  auto project = make_shared<asdf>(map<string, string>(), grp);
+
+  project->write("compression.asdf");
 }
 
 template <typename T>
@@ -84,44 +99,64 @@ void read_file(const std::vector<int64_t> &shape,
       std::make_shared<asdf>("compression.asdf");
   const std::shared_ptr<group> grp = project->get_group();
 
+  for (const auto &[k, v] : *grp->get_group())
+    std::cout << "[" << k << "]\n";
   const std::shared_ptr<ndarray> array3d_none =
-      grp->get_entries().at("array3d_none")->get_array();
+      grp->at("array3d_none")->get_maybe_ndarray();
   const std::vector<T> data3d_none = array3d_none->get_data_vector<T>();
   if (!data_equal(shape, data3d, data3d_none)) {
     std::cerr << "Dataset \"array3d_none\" is incorrect\n";
     std::exit(1);
   }
 
-  const std::shared_ptr<ndarray> array3d_blosc =
-      grp->get_entries().at("array3d_blosc")->get_array();
-  const std::vector<T> data3d_blosc = array3d_blosc->get_data_vector<T>();
-  if (!data_equal(shape, data3d, data3d_blosc)) {
-    std::cerr << "Dataset \"array3d_blosc\" is incorrect\n";
-    std::exit(1);
+  if (have_compression_blosc()) {
+    const std::shared_ptr<ndarray> array3d_blosc =
+        grp->at("array3d_blosc")->get_maybe_ndarray();
+    const std::vector<T> data3d_blosc = array3d_blosc->get_data_vector<T>();
+    if (!data_equal(shape, data3d, data3d_blosc)) {
+      std::cerr << "Dataset \"array3d_blosc\" is incorrect\n";
+      std::exit(1);
+    }
   }
 
-  const std::shared_ptr<ndarray> array3d_blosc2 =
-      grp->get_entries().at("array3d_blosc2")->get_array();
-  const std::vector<T> data3d_blosc2 = array3d_blosc2->get_data_vector<T>();
-  if (!data_equal(shape, data3d, data3d_blosc2)) {
-    std::cerr << "Dataset \"array3d_blosc2\" is incorrect\n";
-    std::exit(1);
+  if (have_compression_blosc2()) {
+    const std::shared_ptr<ndarray> array3d_blosc2 =
+        grp->at("array3d_blosc2")->get_maybe_ndarray();
+    const std::vector<T> data3d_blosc2 = array3d_blosc2->get_data_vector<T>();
+    if (!data_equal(shape, data3d, data3d_blosc2)) {
+      std::cerr << "Dataset \"array3d_blosc2\" is incorrect\n";
+      std::exit(1);
+    }
   }
 
-  const std::shared_ptr<ndarray> array3d_bzip2 =
-      grp->get_entries().at("array3d_bzip2")->get_array();
-  const std::vector<T> data3d_bzip2 = array3d_bzip2->get_data_vector<T>();
-  if (!data_equal(shape, data3d, data3d_bzip2)) {
-    std::cerr << "Dataset \"array3d_bzip2\" is incorrect\n";
-    std::exit(1);
+  if (have_compression_bzip2()) {
+    const std::shared_ptr<ndarray> array3d_bzip2 =
+        grp->at("array3d_bzip2")->get_maybe_ndarray();
+    const std::vector<T> data3d_bzip2 = array3d_bzip2->get_data_vector<T>();
+    if (!data_equal(shape, data3d, data3d_bzip2)) {
+      std::cerr << "Dataset \"array3d_bzip2\" is incorrect\n";
+      std::exit(1);
+    }
   }
 
-  const std::shared_ptr<ndarray> array3d_zlib =
-      grp->get_entries().at("array3d_zlib")->get_array();
-  const std::vector<T> data3d_zlib = array3d_zlib->get_data_vector<T>();
-  if (!data_equal(shape, data3d, data3d_zlib)) {
-    std::cerr << "Dataset \"array3d_zlib\" is incorrect\n";
-    std::exit(1);
+  if (have_compression_liblz4()) {
+    const std::shared_ptr<ndarray> array3d_liblz4 =
+        grp->at("array3d_liblz4")->get_maybe_ndarray();
+    const std::vector<T> data3d_liblz4 = array3d_liblz4->get_data_vector<T>();
+    if (!data_equal(shape, data3d, data3d_liblz4)) {
+      std::cerr << "Dataset \"array3d_liblz4\" is incorrect\n";
+      std::exit(1);
+    }
+  }
+
+  if (have_compression_zlib()) {
+    const std::shared_ptr<ndarray> array3d_zlib =
+        grp->at("array3d_zlib")->get_maybe_ndarray();
+    const std::vector<T> data3d_zlib = array3d_zlib->get_data_vector<T>();
+    if (!data_equal(shape, data3d, data3d_zlib)) {
+      std::cerr << "Dataset \"array3d_zlib\" is incorrect\n";
+      std::exit(1);
+    }
   }
 }
 

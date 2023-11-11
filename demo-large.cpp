@@ -40,15 +40,13 @@ int main(int argc, char **argv) {
                                       compression, level, std::vector<bool>(),
                                       std::vector<int64_t>{ni, nj, nk});
   assert(rho.empty());
-  auto ent = make_shared<entry>("rho", array3d, string());
-  auto grp = make_shared<group>(map<string, shared_ptr<entry>>{{"rho", ent}});
-  auto project = asdf({}, grp);
+  auto grp = make_shared<group>();
+  grp->emplace("rho", array3d);
+  auto project = make_shared<asdf>(map<string, string>(), grp);
   cout << "\n";
 
   cout << "  writing project..." << flush;
-  fstream os("large.asdf", ios::binary | ios::trunc | ios::out);
-  project.write(os);
-  os.close();
+  project->write("large.asdf");
   cout << "\n";
 
   cout << "Done.\n";

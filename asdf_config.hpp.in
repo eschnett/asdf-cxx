@@ -7,19 +7,24 @@ namespace ASDF {
 
 // Software version
 
+#define ASDF_NAME "asdf-cxx"
+#define ASDF_AUTHOR "Erik Schnetter"
+#define ASDF_HOMEPAGE "https://github.com/eschnett/asdf-cxx"
+
 #define ASDF_VERSION_MAJOR @asdf-cxx_VERSION_MAJOR@
 #define ASDF_VERSION_MINOR @asdf-cxx_VERSION_MINOR@
 #define ASDF_VERSION_PATCH @asdf-cxx_VERSION_PATCH@
 
-#define ASDF_VERSION "@asdf-cxx_VERSION_MAJOR@.@asdf-cxx_VERSION_MINOR@.@asdf-cxx_VERSION_PATCH@"
+#define ASDF_VERSION                                                           \
+  "@asdf-cxx_VERSION_MAJOR@.@asdf-cxx_VERSION_MINOR@.@asdf-cxx_VERSION_PATCH@"
 
-int versionMajor();
-int versionMinor();
-int versionPatch();
+int version_major();
+int version_minor();
+int version_patch();
 
-std::string Version();
+std::string version();
 
-void checkVersion(const char *header_version);
+void check_version(const char *header_version);
 
 #define ASDF_CHECK_VERSION (::ASDF::checkVersion(ASDF_VERSION))
 
@@ -47,6 +52,22 @@ void checkVersion(const char *header_version);
 #undef ASDF_HAVE_BZIP2
 #endif
 
+// liblz4 support
+
+#if @HAVE_LIBLZ4@
+#define ASDF_HAVE_LIBLZ4 1
+#else
+#undef ASDF_HAVE_LIBLZ4
+#endif
+
+// libzstd support
+
+#if @HAVE_LIBZSTD@
+#define ASDF_HAVE_LIBZSTD 1
+#else
+#undef ASDF_HAVE_LIBZSTD
+#endif
+
 // OpenSSL support
 
 #if @HAVE_OPENSSL@
@@ -61,14 +82,6 @@ void checkVersion(const char *header_version);
 #define ASDF_HAVE_ZLIB 1
 #else
 #undef ASDF_HAVE_ZLIB
-#endif
-
-// libzstd support
-
-#if @HAVE_LIBZSTD@
-#define ASDF_HAVE_LIBZSTD 1
-#else
-#undef ASDF_HAVE_LIBZSTD
 #endif
 
 } // namespace ASDF

@@ -4,7 +4,7 @@
 #include "asdf_asdf.hpp"
 #include "asdf_byteorder.hpp"
 #include "asdf_datatype.hpp"
-#include "asdf_group.hpp"
+#include "asdf_entry.hpp"
 #include "asdf_io.hpp"
 #include "asdf_ndarray.hpp"
 #include "asdf_reference.hpp"

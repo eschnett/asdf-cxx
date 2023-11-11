@@ -1,5 +1,6 @@
-#include "asdf_asdf.hpp"
 #include "asdf_io.hpp"
+
+#include "asdf_asdf.hpp"
 #include "asdf_ndarray.hpp"
 
 #include <yaml-cpp/yaml.h>
@@ -10,6 +11,14 @@ namespace ASDF {
 
 const string asdf_format_version = "1.0.0";
 const string asdf_standard_version = "1.1.0";
+
+bool have_checksum() { return ASDF_HAVE_OPENSSL; }
+bool have_compression_blosc() { return ASDF_HAVE_BLOSC; }
+bool have_compression_blosc2() { return ASDF_HAVE_BLOSC2; }
+bool have_compression_bzip2() { return ASDF_HAVE_BZIP2; }
+bool have_compression_liblz4() { return ASDF_HAVE_LIBLZ4; }
+bool have_compression_libzstd() { return ASDF_HAVE_LIBZSTD; }
+bool have_compression_zlib() { return ASDF_HAVE_ZLIB; }
 
 // I/O
 
@@ -34,6 +43,8 @@ std::ostream &operator<<(std::ostream &os, compression_t compression) {
     return os << "blosc2";
   case compression_t::bzip2:
     return os << "bzip2";
+  case compression_t::liblz4:
+    return os << "liblz4";
   case compression_t::libzstd:
     return os << "libzstd";
   case compression_t::zlib:
@@ -80,6 +91,8 @@ YAML::Node reader_state::resolve_reference(const vector<string> &path) const {
     } else if (node->IsMap()) {
       node = unique_ptr<YAML::Node>(new YAML::Node((*node)[elem]));
     } else {
+      // Could not resolve reference
+      // TODO: Output an actual error message
       assert(0);
     }
     assert(node->IsDefined());
@@ -132,7 +145,8 @@ writer::writer(ostream &os, const map<string, string> &tags)
      // yaml-cpp does not support writing a YAML tag
      << "%YAML 1.1\n"
      << "%TAG ! tag:stsci.edu:asdf/\n"
-     << "%TAG !asdf-cxx! tag:github.com/eschnett/asdf-cxx/\n";
+      // << "%TAG !asdf-cxx! tag:github.com/eschnett/asdf-cxx/\n"
+      ;
   for (const auto &kv : tags)
     os << "%TAG !" << kv.first << "! " << kv.second << "\n";
   emitter << YAML::BeginDoc;

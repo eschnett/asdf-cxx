@@ -17,41 +17,34 @@ void write_external() {
       vector<int64_t>{1, 2, 3}, block_format_t::inline_array,
       compression_t::none, 0, vector<bool>(), vector<int64_t>{3});
   // A local reference
-  auto beta =
-      make_shared<reference>("", vector<string>{"group", "alpha", "data"});
+  auto beta = make_shared<reference>("", vector<string>{"alpha"});
 
-  auto grp = make_shared<group>(map<string, shared_ptr<entry>>{
-      {"alpha", make_shared<entry>("alpha", alpha, string())},
-      {"beta", make_shared<entry>("beta", beta, string())}});
-  auto project = asdf({}, grp);
+  auto grp = make_shared<group>();
+  grp->emplace("alpha", alpha);
+  grp->emplace("beta", beta);
+  auto project = make_shared<asdf>(map<string, string>(), grp);
 
-  fstream os("external.asdf", ios::binary | ios::trunc | ios::out);
-  project.write(os);
-  os.close();
+  project->write("external.asdf");
 }
 
 void write_metadata() {
   cout << "Writing metadata file...\n";
 
   // A remote reference
-  auto gamma = make_shared<reference>("external.asdf",
-                                      vector<string>{"group", "alpha", "data"});
+  auto gamma = make_shared<reference>("external.asdf", vector<string>{"alpha"});
   // A local reference
-  auto delta =
-      make_shared<reference>("", vector<string>{"group", "gamma", "reference"});
+  auto delta = make_shared<reference>("", vector<string>{"gamma"});
   // A remote reference to a local reference
-  auto epsilon = make_shared<reference>(
-      "external.asdf", vector<string>{"group", "beta", "reference"});
+  auto epsilon =
+      make_shared<reference>("external.asdf", vector<string>{"beta"});
 
-  auto grp = make_shared<group>(map<string, shared_ptr<entry>>{
-      {"gamma", make_shared<entry>("gamma", gamma, string())},
-      {"delta", make_shared<entry>("delta", delta, string())},
-      {"epsilon", make_shared<entry>("epsilon", epsilon, string())}});
-  auto project = asdf({}, grp);
+  auto grp = make_shared<group>();
+  grp->emplace("gamma", gamma);
+  grp->emplace("delta", delta);
+  grp->emplace("epsilon", epsilon);
+  auto project = make_shared<asdf>(map<string, string>(), grp);
 
-  fstream os("metadata.asdf", ios::binary | ios::trunc | ios::out);
-  project.write(os);
-  os.close();
+  project->write("metadata.asdf");
 }
 
 template <typename T> vector<T> read_array(const shared_ptr<ndarray> &arr) {
@@ -79,7 +72,7 @@ void read_metadata() {
   auto grp = project->get_group();
 
   {
-    auto gamma = grp->get_entries().at("gamma")->get_reference();
+    auto gamma = grp->at("gamma")->get_maybe_reference();
     cout << "gamma: <" << gamma->get_target() << ">\n";
     auto rs_node = gamma->resolve();
     auto arr = make_shared<ndarray>(rs_node.first, rs_node.second);
@@ -88,7 +81,7 @@ void read_metadata() {
   }
 
   {
-    auto delta = grp->get_entries().at("delta")->get_reference();
+    auto delta = grp->at("delta")->get_maybe_reference();
     cout << "delta: <" << delta->get_target() << ">\n";
     auto rs_node = delta->resolve();
     auto ref = make_shared<reference>(rs_node.first, rs_node.second);
@@ -100,7 +93,7 @@ void read_metadata() {
   }
 
   {
-    auto epsilon = grp->get_entries().at("epsilon")->get_reference();
+    auto epsilon = grp->at("epsilon")->get_maybe_reference();
     cout << "epsilon: <" << epsilon->get_target() << ">\n";
     auto rs_node = epsilon->resolve();
     auto ref = make_shared<reference>(rs_node.first, rs_node.second);

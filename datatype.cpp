@@ -199,7 +199,7 @@ void yaml_decode(const YAML::Node &node, float64_t &val) {
 template <typename T>
 void yaml_decode(const YAML::Node &node, complex<T> &val) {
   assert(node.Tag() == "tag:stsci.edu:asdf/core/complex-1.0.0");
-  static const string ieee = "[-+]?([0-9]*\\.?[0-9]+(e[-+]?[0-9]+)?|inf|nan)";
+  static const string ieee = "([-+]?[0-9]*\\.?[0-9]+(e[-+]?[0-9]+)?|inf|nan)";
   static const regex cmplx("\\(?(" + ieee + ")?((" + ieee + ")[ij])?\\)?",
                            regex::icase | regex::optimize);
   assert(cmplx.mark_count() == 7);
@@ -286,7 +286,9 @@ template <typename T> YAML::Node yaml_encode(const complex<T> &val) {
   if (im.c_str()[0] != '-')
     buf << "+";
   buf << im.c_str() << "i";
+
   YAML::Node node;
+  // TODO: Use a local tag
   node.SetTag("tag:stsci.edu:asdf/core/complex-1.0.0");
   node = buf.str();
   return node;

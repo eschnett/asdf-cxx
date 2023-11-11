@@ -34,10 +34,10 @@ int main(int argc, char **argv) {
   }
   YAML::Node node = YAML::Load(doc.str());
   ASDF::reader_state rs(is);
-  auto project = ASDF::asdf(rs, node);
+  auto project = make_shared<ASDF::asdf>(rs, node);
   is.close();
   // Write output
-  project.write(outputfilename);
+  project->write(outputfilename);
   //
   cout << "Done.\n";
   return 0;

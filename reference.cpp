@@ -168,7 +168,6 @@ pair<string, vector<string>> reference::get_split_target() const {
 
 reference::reference(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : rs(rs) {
-  // assert(node.Tag() == "tag:stsci.edu:asdf/core/reference-1.0.0");
   assert(node.IsMap());
   assert(node.size() == 1);
   target = node["$ref"].Scalar();
@@ -179,7 +178,6 @@ reference::reference(const copy_state &cs, const reference &ref) {
 }
 
 writer &reference::to_yaml(writer &w) const {
-  // w << YAML::LocalTag("core/reference-1.0.0");
   w << YAML::Flow << YAML::BeginMap;
   // We need to double-quote the string to make Python's YAML accept it;
   // Python's YAML parser does not accept plain strings that contain colons ":"

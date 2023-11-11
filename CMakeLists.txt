@@ -6,7 +6,7 @@ cmake_policy(SET CMP0048 NEW)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
-project(asdf-cxx VERSION 7.3.2 LANGUAGES CXX)
+project(asdf-cxx VERSION 8.0.0 LANGUAGES CXX)
 set(PROJECT_DESCRIPTION
   "asdf-cxx (Advanced Scientific Data Format), C++ implementation")
 set(PROJECT_URL "https://github.com/eschnett/asdf-cxx")
@@ -84,6 +84,14 @@ else()
   set(HAVE_ZLIB 0)
 endif()
 
+#TODO set(Python_ADDITIONAL_VERSIONS 3.0)
+#TODO # This sets PYTHONINTERP_FOUND
+#TODO find_package(PythonInterp)
+#TODO # This sets PYTHONLIBS_FOUND
+#TODO find_package(PythonLibs)
+#TODO if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND)
+#TODO   include_directories(${PYTHON_INCLUDE_DIRS})
+#TODO endif()
 
 if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND)
   find_package(SWIG)
@@ -112,7 +120,7 @@ set(ASDF_HEADERS
   asdf_asdf.hpp
   asdf_byteorder.hpp
   asdf_datatype.hpp
-  asdf_group.hpp
+  asdf_entry.hpp
   asdf_io.hpp
   asdf_memoized.hpp
   asdf_ndarray.hpp
@@ -125,7 +133,7 @@ set(ASDF_SOURCES
   byteorder.cpp
   config.cpp
   datatype.cpp
-  group.cpp
+  entry.cpp
   io.cpp
   ndarray.cpp
   reference.cpp

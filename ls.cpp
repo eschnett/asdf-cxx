@@ -16,13 +16,31 @@ using namespace std;
 const int indent_step = 2;
 
 void output(std::ostream &os, const int indent,
+            const std::shared_ptr<entry> &ent);
+void output(std::ostream &os, const int indent,
             const std::shared_ptr<ndarray> &arr);
 void output(std::ostream &os, const int indent,
             const std::shared_ptr<reference> &ref);
 void output(std::ostream &os, const int indent,
-            const std::shared_ptr<group> &grp);
+            const std::shared_ptr<std::vector<std::shared_ptr<entry>>> &seq);
+void output(
+    std::ostream &os, const int indent,
+    const std::shared_ptr<std::map<std::string, std::shared_ptr<entry>>> &grp);
 void output(std::ostream &os, const int indent,
             const std::shared_ptr<asdf> &project);
+
+void output(std::ostream &os, const int indent,
+            const std::shared_ptr<entry> &ent) {
+  // TODO: Handle scalars
+  if (ent->get_maybe_ndarray())
+    output(os, indent, ent->get_maybe_ndarray());
+  if (ent->get_maybe_reference())
+    output(os, indent, ent->get_maybe_reference());
+  if (ent->get_maybe_sequence())
+    output(os, indent, ent->get_maybe_sequence());
+  if (ent->get_maybe_group())
+    output(os, indent, ent->get_maybe_group());
+}
 
 void output(std::ostream &os, const int indent,
             const std::shared_ptr<ndarray> &arr) {
@@ -52,32 +70,19 @@ void output(std::ostream &os, const int indent,
 }
 
 void output(std::ostream &os, const int indent,
-            const std::shared_ptr<sequence> &seq) {
-  for (const auto &entry : seq->get_entries()) {
+            const std::shared_ptr<std::vector<std::shared_ptr<entry>>> &seq) {
+  for (const auto &entry : *seq) {
     os << std::string(indent, ' ') << "-\n";
-    if (entry->get_array())
-      output(os, indent + indent_step, entry->get_array());
-    if (entry->get_reference())
-      output(os, indent + indent_step, entry->get_reference());
-    if (entry->get_sequence())
-      output(os, indent + indent_step, entry->get_sequence());
-    if (entry->get_group())
-      output(os, indent + indent_step, entry->get_group());
+    output(os, indent + indent_step, entry);
   }
 }
 
-void output(std::ostream &os, const int indent,
-            const std::shared_ptr<group> &grp) {
-  for (const auto &[name, entry] : grp->get_entries()) {
+void output(
+    std::ostream &os, const int indent,
+    const std::shared_ptr<std::map<std::string, std::shared_ptr<entry>>> &grp) {
+  for (const auto &[name, entry] : *grp) {
     os << std::string(indent, ' ') << name << ":\n";
-    if (entry->get_array())
-      output(os, indent + indent_step, entry->get_array());
-    if (entry->get_reference())
-      output(os, indent + indent_step, entry->get_reference());
-    if (entry->get_sequence())
-      output(os, indent + indent_step, entry->get_sequence());
-    if (entry->get_group())
-      output(os, indent + indent_step, entry->get_group());
+    output(os, indent + indent_step, entry);
   }
 }
 

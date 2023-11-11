@@ -16,20 +16,34 @@
 using std::string;
 
 %shared_ptr(asdf);
+%shared_ptr(complex_entry);
 %shared_ptr(datatype_t);
 %shared_ptr(entry);
 %shared_ptr(field_t);
+%shared_ptr(float_entry);
 %shared_ptr(group);
+%shared_ptr(int_entry);
 %shared_ptr(ndarray);
+%shared_ptr(ndarray_entry);
+%shared_ptr(null_entry);
 %shared_ptr(reference);
+%shared_ptr(reference_entry);
 %shared_ptr(sequence);
+%shared_ptr(string_entry);
 
 %template(map_string_string)
   std::map<string, string>;
-%template(map_string_shared_ptr_entry)
-  std::map<string, std::shared_ptr<entry>>;
 %template(map_string_shared_ptr_ndarray)
   std::map<string, std::shared_ptr<ndarray>>;
+
+%template(vector_shared_ptr_entry)
+  std::vector<std::shared_ptr<entry>>;
+%template(map_string_shared_ptr_entry)
+  std::map<string, std::shared_ptr<entry>>;
+%template(shared_ptr_vector_shared_ptr_entry)
+  std::shared_ptr<std::vector<std::shared_ptr<entry>>>;
+%template(shared_ptr_map_string_shared_ptr_entry)
+  std::shared_ptr<std::map<string, std::shared_ptr<entry>>>;
 
 %template(vector_bool) std::vector<bool>;
 %template(vector_complex_double) std::vector<std::complex<double>>;
@@ -475,12 +489,12 @@ class asdf {
  public:
 
   %extend {
-    static std::shared_ptr<asdf>
-      create_from_ndarrays(std::map<string, string> tags,
-                           std::map<string, std::shared_ptr<ndarray>> data)
-    {
-      return std::make_shared<asdf>(std::move(tags), std::move(data));
-    }
+    // static std::shared_ptr<asdf>
+    //   create_from_ndarrays(std::map<string, string> tags,
+    //                        std::map<string, std::shared_ptr<ndarray>> data)
+    // {
+    //   return std::make_shared<asdf>(std::move(tags), std::move(data));
+    // }
     static std::shared_ptr<asdf>
       create_from_group(std::map<string, string> tags,
                         std::shared_ptr<group> grp)

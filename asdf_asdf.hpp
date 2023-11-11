@@ -2,7 +2,7 @@
 #define ASDF_ASDF_HPP
 
 #include "asdf_config.hpp"
-#include "asdf_group.hpp"
+#include "asdf_entry.hpp"
 #include "asdf_ndarray.hpp"
 #include "asdf_reference.hpp"
 
@@ -21,11 +21,12 @@ class asdf {
   map<string, string> tags; // tag directives
 
   // Content
-  map<string, shared_ptr<ndarray>> data;
-  // fits
-  // wcs
-  // shared_ptr<table> tab;
+  // map<string, shared_ptr<ndarray>> data;
+  // // fits
+  // // wcs
+  // // shared_ptr<table> tab;
   shared_ptr<group> grp;
+
   map<string, YAML::Node> nodes;
   map<string, function<void(writer &w)>> writers;
 
@@ -36,12 +37,12 @@ public:
   asdf &operator=(const asdf &) = default;
   asdf &operator=(asdf &&) = default;
 
-  asdf(map<string, string> tags1, map<string, shared_ptr<ndarray>> data1)
-      : tags(std::move(tags1)), data(std::move(data1)) {}
-  // asdf(const map<string, string> &tags, const shared_ptr<table> &tab)
-  //     : tags(tags), tab(tab) {
-  //   assert(tab);
-  // }
+  // asdf(map<string, string> tags1, map<string, shared_ptr<ndarray>> data1)
+  //     : tags(std::move(tags1)), data(std::move(data1)) {}
+  // // asdf(const map<string, string> &tags, const shared_ptr<table> &tab)
+  // //     : tags(tags), tab(tab) {
+  // //   assert(tab);
+  // // }
   asdf(map<string, string> tags1, shared_ptr<group> grp1)
       : tags(std::move(tags1)), grp(std::move(grp1)) {
     assert(grp);

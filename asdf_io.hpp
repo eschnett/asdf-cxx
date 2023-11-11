@@ -6,6 +6,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <cassert>
+#include <complex>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -25,9 +26,18 @@ enum class compression_t {
   blosc,
   blosc2,
   bzip2,
+  liblz4,
   libzstd,
   zlib
 };
+
+bool have_checksum();
+bool have_compression_blosc();
+bool have_compression_blosc2();
+bool have_compression_bzip2();
+bool have_compression_liblz4();
+bool have_compression_libzstd();
+bool have_compression_zlib();
 
 std::ostream &operator<<(std::ostream &os, block_format_t block_format);
 std::ostream &operator<<(std::ostream &os, compression_t compression);
@@ -98,6 +108,23 @@ public:
 
   template <typename T> friend writer &operator<<(writer &w, const T &value) {
     w.emitter << value;
+    return w;
+  }
+
+  template <typename T>
+  friend writer &operator<<(writer &w, const std::complex<T> &value) {
+    // see `yaml_encode(const complex<T> &val)`
+    YAML::Emitter re;
+    re << value.real();
+    YAML::Emitter im;
+    im << value.imag();
+    ostringstream buf;
+    buf << re.c_str();
+    if (im.c_str()[0] != '-')
+      buf << "+";
+    buf << im.c_str() << "i";
+
+    w << YAML::LocalTag("core/complex-1.0.0") << buf.str();
     return w;
   }
 
