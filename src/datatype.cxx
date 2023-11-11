@@ -1,5 +1,6 @@
 #include <asdf/datatype.hxx>
 
+#include <limits>
 #include <regex>
 
 namespace ASDF {
@@ -12,12 +13,16 @@ static_assert(is_same<get_scalar_type_t<id_int8>, int8_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_int16>, int16_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_int32>, int32_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_int64>, int64_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_int128>, int128_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_uint8>, uint8_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_uint16>, uint16_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_uint32>, uint32_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_uint64>, uint64_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_uint128>, uint128_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_float16>, float16_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_float32>, float32_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_float64>, float64_t>::value, "");
+static_assert(is_same<get_scalar_type_t<id_complex32>, complex32_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_complex64>, complex64_t>::value, "");
 static_assert(is_same<get_scalar_type_t<id_complex128>, complex128_t>::value,
               "");
@@ -29,12 +34,16 @@ static_assert(get_scalar_type_id<int8_t>() == id_int8, "");
 static_assert(get_scalar_type_id<int16_t>() == id_int16, "");
 static_assert(get_scalar_type_id<int32_t>() == id_int32, "");
 static_assert(get_scalar_type_id<int64_t>() == id_int64, "");
+static_assert(get_scalar_type_id<int128_t>() == id_int128, "");
 static_assert(get_scalar_type_id<uint8_t>() == id_uint8, "");
 static_assert(get_scalar_type_id<uint16_t>() == id_uint16, "");
 static_assert(get_scalar_type_id<uint32_t>() == id_uint32, "");
 static_assert(get_scalar_type_id<uint64_t>() == id_uint64, "");
+static_assert(get_scalar_type_id<uint128_t>() == id_uint128, "");
+static_assert(get_scalar_type_id<float16_t>() == id_float16, "");
 static_assert(get_scalar_type_id<float32_t>() == id_float32, "");
 static_assert(get_scalar_type_id<float64_t>() == id_float64, "");
+static_assert(get_scalar_type_id<complex32_t>() == id_complex32, "");
 static_assert(get_scalar_type_id<complex64_t>() == id_complex64, "");
 static_assert(get_scalar_type_id<complex128_t>() == id_complex128, "");
 static_assert(get_scalar_type_id<ascii_t>() == id_ascii, "");
@@ -52,6 +61,8 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
     return sizeof(int32_t);
   case id_int64:
     return sizeof(int64_t);
+  case id_int128:
+    return sizeof(int128_t);
   case id_uint8:
     return sizeof(uint8_t);
   case id_uint16:
@@ -60,10 +71,16 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
     return sizeof(uint32_t);
   case id_uint64:
     return sizeof(uint64_t);
+  case id_uint128:
+    return sizeof(uint128_t);
+  case id_float16:
+    return sizeof(float16_t);
   case id_float32:
     return sizeof(float32_t);
   case id_float64:
     return sizeof(float64_t);
+  case id_complex32:
+    return sizeof(complex32_t);
   case id_complex64:
     return sizeof(complex64_t);
   case id_complex128:
@@ -89,6 +106,8 @@ void yaml_decode(const YAML::Node &node,
     scalar_type_id = id_int32;
   else if (str == "int64")
     scalar_type_id = id_int64;
+  else if (str == "int128")
+    scalar_type_id = id_int128;
   else if (str == "uint8")
     scalar_type_id = id_uint8;
   else if (str == "uint16")
@@ -97,10 +116,16 @@ void yaml_decode(const YAML::Node &node,
     scalar_type_id = id_uint32;
   else if (str == "uint64")
     scalar_type_id = id_uint64;
+  else if (str == "uint128")
+    scalar_type_id = id_uint128;
+  else if (str == "float16")
+    scalar_type_id = id_float16;
   else if (str == "float32")
     scalar_type_id = id_float32;
   else if (str == "float64")
     scalar_type_id = id_float64;
+  else if (str == "complex32")
+    scalar_type_id = id_complex32;
   else if (str == "complex64")
     scalar_type_id = id_complex64;
   else if (str == "complex128")
@@ -131,6 +156,9 @@ YAML::Node yaml_encode(scalar_type_id_t scalar_type_id) {
   case id_int64:
     node = "int64";
     break;
+  case id_int128:
+    node = "int128";
+    break;
   case id_uint8:
     node = "uint8";
     break;
@@ -143,11 +171,20 @@ YAML::Node yaml_encode(scalar_type_id_t scalar_type_id) {
   case id_uint64:
     node = "uint64";
     break;
+  case id_uint128:
+    node = "uint128";
+    break;
+  case id_float16:
+    node = "float16";
+    break;
   case id_float32:
     node = "float32";
     break;
   case id_float64:
     node = "float64";
+    break;
+  case id_complex32:
+    node = "complex32";
     break;
   case id_complex64:
     node = "complex64";
@@ -178,6 +215,13 @@ void yaml_decode(const YAML::Node &node, int32_t &val) {
 void yaml_decode(const YAML::Node &node, int64_t &val) {
   val = node.as<int64_t>();
 }
+void yaml_decode(const YAML::Node &node, int128_t &val) {
+  // yaml-cpp does not support `int128_t`
+  // TODO: Parse as string, then convert ourselves
+  assert(val >= std::numeric_limits<int64_t>::min() &&
+         val <= std::numeric_limits<int64_t>::max());
+  val = int128_t(node.as<int64_t>());
+}
 void yaml_decode(const YAML::Node &node, uint8_t &val) {
   val = node.as<uint8_t>();
 }
@@ -189,6 +233,15 @@ void yaml_decode(const YAML::Node &node, uint32_t &val) {
 }
 void yaml_decode(const YAML::Node &node, uint64_t &val) {
   val = node.as<uint64_t>();
+}
+void yaml_decode(const YAML::Node &node, uint128_t &val) {
+  // yaml-cpp does not support `uint128_t`
+  // TODO: Parse as string, then convert ourselves
+  val = node.as<uint64_t>();
+}
+void yaml_decode(const YAML::Node &node, float16_t &val) {
+  // yaml-cpp does not support `float16_t`
+  val = float16_t(node.as<float32_t>());
 }
 void yaml_decode(const YAML::Node &node, float32_t &val) {
   val = node.as<float32_t>();
@@ -244,6 +297,14 @@ YAML::Node yaml_encode(int64_t val) {
   node = val;
   return node;
 }
+YAML::Node yaml_encode(int128_t val) {
+  YAML::Node node;
+  // TODO: Represent as string
+  assert(val >= std::numeric_limits<int64_t>::min() &&
+         val <= std::numeric_limits<int64_t>::max());
+  node = int64_t(val);
+  return node;
+}
 YAML::Node yaml_encode(uint8_t val) {
   YAML::Node node;
   node = (unsigned int)(val);
@@ -262,6 +323,19 @@ YAML::Node yaml_encode(uint32_t val) {
 YAML::Node yaml_encode(uint64_t val) {
   YAML::Node node;
   node = val;
+  return node;
+}
+YAML::Node yaml_encode(uint128_t val) {
+  YAML::Node node;
+  // TODO: Represent as string
+  assert(val <= std::numeric_limits<uint64_t>::max());
+  node = uint64_t(val);
+  return node;
+}
+YAML::Node yaml_encode(float16_t val) {
+  YAML::Node node;
+  // yaml-cpp does not support `float16_t`
+  node = float32_t(val);
   return node;
 }
 YAML::Node yaml_encode(float32_t val) {
@@ -293,6 +367,11 @@ template <typename T> YAML::Node yaml_encode(const complex<T> &val) {
   node = buf.str();
   return node;
 }
+YAML::Node yaml_encode(const complex<float16_t> &val) {
+  // yaml-cpp does not support `float16_t`
+  return yaml_encode(
+      complex<float32_t>(float32_t(val.real()), float32_t(val.imag())));
+}
 
 void parse_scalar(const YAML::Node &node, unsigned char *data,
                   scalar_type_id_t scalar_type_id, byteorder_t byteorder) {
@@ -317,6 +396,10 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
     yaml_decode(node, *reinterpret_cast<int64_t *>(data));
     htox<sizeof(int64_t)>(data, byteorder);
     break;
+  case id_int128:
+    yaml_decode(node, *reinterpret_cast<int128_t *>(data));
+    htox<sizeof(int128_t)>(data, byteorder);
+    break;
   case id_uint8:
     yaml_decode(node, *reinterpret_cast<uint8_t *>(data));
     htox<sizeof(uint8_t)>(data, byteorder);
@@ -333,6 +416,14 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
     yaml_decode(node, *reinterpret_cast<uint64_t *>(data));
     htox<sizeof(uint64_t)>(data, byteorder);
     break;
+  case id_uint128:
+    yaml_decode(node, *reinterpret_cast<uint128_t *>(data));
+    htox<sizeof(uint128_t)>(data, byteorder);
+    break;
+  case id_float16:
+    yaml_decode(node, *reinterpret_cast<float16_t *>(data));
+    htox<sizeof(float16_t)>(data, byteorder);
+    break;
   case id_float32:
     yaml_decode(node, *reinterpret_cast<float32_t *>(data));
     htox<sizeof(float32_t)>(data, byteorder);
@@ -340,6 +431,10 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
   case id_float64:
     yaml_decode(node, *reinterpret_cast<float64_t *>(data));
     htox<sizeof(float64_t)>(data, byteorder);
+    break;
+  case id_complex32:
+    yaml_decode(node, *reinterpret_cast<complex32_t *>(data));
+    htox<sizeof(complex32_t)>(data, byteorder);
     break;
   case id_complex64:
     yaml_decode(node, *reinterpret_cast<complex64_t *>(data));
@@ -375,6 +470,9 @@ YAML::Node emit_scalar(const unsigned char *data,
   case id_int64:
     node = yaml_encode(xtoh<int64_t>(data, byteorder));
     break;
+  case id_int128:
+    node = yaml_encode(xtoh<int128_t>(data, byteorder));
+    break;
   case id_uint8:
     node = yaml_encode(xtoh<uint8_t>(data, byteorder));
     break;
@@ -387,11 +485,20 @@ YAML::Node emit_scalar(const unsigned char *data,
   case id_uint64:
     node = yaml_encode(xtoh<uint64_t>(data, byteorder));
     break;
+  case id_uint128:
+    node = yaml_encode(xtoh<uint128_t>(data, byteorder));
+    break;
+  case id_float16:
+    node = yaml_encode(xtoh<float16_t>(data, byteorder));
+    break;
   case id_float32:
     node = yaml_encode(xtoh<float32_t>(data, byteorder));
     break;
   case id_float64:
     node = yaml_encode(xtoh<float64_t>(data, byteorder));
+    break;
+  case id_complex32:
+    node = yaml_encode(xtoh<complex32_t>(data, byteorder));
     break;
   case id_complex64:
     node = yaml_encode(xtoh<complex64_t>(data, byteorder));

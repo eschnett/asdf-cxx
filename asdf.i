@@ -92,8 +92,10 @@ enum scalar_type_id_t {
   id_uint16,
   id_uint32,
   id_uint64,
+  id_float16,
   id_float32,
   id_float64,
+  id_complex32,
   id_complex64,
   id_complex128,
   id_ascii,
@@ -105,8 +107,10 @@ enum scalar_type_id_t {
   constexpr scalar_type_id_t get_scalar_type_id_int16() { return get_scalar_type_id<int16_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_int32() { return get_scalar_type_id<int32_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_int64() { return get_scalar_type_id<int64_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_float16() { return get_scalar_type_id<float16_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_float32() { return get_scalar_type_id<float32_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_float64() { return get_scalar_type_id<float64_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_complex32() { return get_scalar_type_id<complex32_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_complex64() { return get_scalar_type_id<complex64_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_complex128() { return get_scalar_type_id<complex128_t>(); }
 %}
@@ -114,8 +118,10 @@ constexpr scalar_type_id_t get_scalar_type_id_int8();
 constexpr scalar_type_id_t get_scalar_type_id_int16();
 constexpr scalar_type_id_t get_scalar_type_id_int32();
 constexpr scalar_type_id_t get_scalar_type_id_int64();
+constexpr scalar_type_id_t get_scalar_type_id_float16();
 constexpr scalar_type_id_t get_scalar_type_id_float32();
 constexpr scalar_type_id_t get_scalar_type_id_float64();
+constexpr scalar_type_id_t get_scalar_type_id_complex32();
 constexpr scalar_type_id_t get_scalar_type_id_complex64();
 constexpr scalar_type_id_t get_scalar_type_id_complex128();
 
@@ -224,6 +230,22 @@ class ndarray {
     }
 
     static std::shared_ptr<ndarray>
+      create_float16(std::vector<float16_t> data,
+                     block_format_t block_format,
+                     compression_t compression,
+                     int compression_level,
+                     std::vector<bool> mask,
+                     const std::vector<long>& shape1)
+    {
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
       create_float32(std::vector<float32_t> data,
                      block_format_t block_format,
                      compression_t compression,
@@ -246,6 +268,22 @@ class ndarray {
                      int compression_level,
                      std::vector<bool> mask,
                      const std::vector<long>& shape1)
+    {
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
+      create_complex32(std::vector<std::complex<float16_t>> data,
+                       block_format_t block_format,
+                       compression_t compression,
+                       int compression_level,
+                       std::vector<bool> mask,
+                       const std::vector<long>& shape1)
     {
       std::vector<int64_t> shape(shape1.size());
       for (size_t d=0; d<shape.size(); ++d)
@@ -327,6 +365,10 @@ class ndarray {
     {
       return self->get_data_vector<uint64_t>();
     }
+    std::vector<float16_t> get_data_vector_float32() const
+    {
+      return self->get_data_vector<float16_t>();
+    }
     std::vector<float32_t> get_data_vector_float32() const
     {
       return self->get_data_vector<float32_t>();
@@ -334,6 +376,10 @@ class ndarray {
     std::vector<float64_t> get_data_vector_float64() const
     {
       return self->get_data_vector<float64_t>();
+    }
+    std::vector<std::complex<float16_t>> get_data_vector_complex32() const
+    {
+      return self->get_data_vector<std::complex<float16_t>>();
     }
     std::vector<std::complex<float32_t>> get_data_vector_complex64() const
     {

@@ -33,11 +33,33 @@ int main(int argc, char **argv) {
                            vector<bool>(), vector<int64_t>{2, 3});
   grp->emplace("gamma", array2d);
 
+  auto array2d16 =
+      make_shared<ndarray>(vector<float16_t>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0},
+                           block_format_t::inline_array, compression_t::none, 0,
+                           vector<bool>(), vector<int64_t>{2, 3});
+  grp->emplace("gamma16", array2d16);
+
+  auto array2d128 = make_shared<ndarray>(
+      vector<int128_t>{1, 2, 3, 4, 5, 6}, block_format_t::inline_array,
+      compression_t::none, 0, vector<bool>(), vector<int64_t>{2, 3});
+  grp->emplace("gamma128", array2d16);
+
   auto array3d = make_shared<ndarray>(
       vector<complex128_t>{{1, 0}, {-2, 0}, {0, 3}, {-4, 0}, {5, 1}, {6, -1}},
       block_format_t::block, compression_t::bzip2, 9, vector<bool>(),
       vector<int64_t>{1, 2, 3});
   grp->emplace("delta", array3d);
+
+  auto array3d16 = make_shared<ndarray>(
+      vector<complex32_t>{{1, 0}, {-2, 0}, {0, 3}, {-4, 0}, {5, 1}, {6, -1}},
+      block_format_t::block, compression_t::blosc, 9, vector<bool>(),
+      vector<int64_t>{1, 2, 3});
+  grp->emplace("delta16", array3d16);
+
+  auto array3d128 = make_shared<ndarray>(
+      vector<int128_t>{1, -2, 3, -4, 5, 6}, block_format_t::block,
+      compression_t::blosc, 9, vector<bool>(), vector<int64_t>{1, 2, 3});
+  grp->emplace("delta128", array3d128);
 
   auto array3db = make_shared<ndarray>(
       vector<complex128_t>{{1, 0}, {-2, 0}, {0, 3}, {-4, 0}, {5, 1}, {6, -1}},
