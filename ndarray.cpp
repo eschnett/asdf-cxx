@@ -292,19 +292,14 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   case compression_t::liblz4: {
     data.resize(data_space);
 
-    const LZ4F_decompressOptions_t dOpt {
-      .stableDst = true,
+    LZ4F_decompressOptions_t dOpt;
+    std::memset(&dOpt, 0, sizeof dOpt);
+    dOpt.stableDst = true,
 #if LZ4_VERSION_NUMBER >= 10904
 #ifdef ASDF_HAVE_OPENSSL
-      .skipChecksums = true, // this is faster, and we have our own checksum
-#else
-      .skipChecksums = false,
+    dOpt.skipChecksums = true; // this is faster, and we have our own checksum
 #endif
-          .reserved1 = 0, .reserved0 = 0,
-#else
-      .reserved = {0, 0, 0},
 #endif
-    };
 
     LZ4F_dctx *dctx;
     LZ4F_errorCode_t ierr =
