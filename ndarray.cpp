@@ -294,7 +294,7 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
 
     LZ4F_decompressOptions_t dOpt;
     std::memset(&dOpt, 0, sizeof dOpt);
-    dOpt.stableDst = true,
+    dOpt.stableDst = true;
 #if LZ4_VERSION_NUMBER >= 10904
 #ifdef ASDF_HAVE_OPENSSL
     dOpt.skipChecksums = true; // this is faster, and we have our own checksum
