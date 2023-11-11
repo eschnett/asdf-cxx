@@ -12,13 +12,55 @@ namespace ASDF {
 const string asdf_format_version = "1.0.0";
 const string asdf_standard_version = "1.1.0";
 
-bool have_checksum() { return ASDF_HAVE_OPENSSL + 0; }
-bool have_compression_blosc() { return ASDF_HAVE_BLOSC + 0; }
-bool have_compression_blosc2() { return ASDF_HAVE_BLOSC2 + 0; }
-bool have_compression_bzip2() { return ASDF_HAVE_BZIP2 + 0; }
-bool have_compression_liblz4() { return ASDF_HAVE_LIBLZ4 + 0; }
-bool have_compression_libzstd() { return ASDF_HAVE_LIBZSTD + 0; }
-bool have_compression_zlib() { return ASDF_HAVE_ZLIB + 0; }
+bool have_checksum() {
+#ifdef ASDF_HAVE_OPENSSL
+  return 1;
+#else
+  return 0;
+#endif
+}
+bool have_compression_blosc() {
+#ifdef ASDF_HAVE_BLOSC
+  return 1;
+#else
+  return 0;
+#endif
+}
+bool have_compression_blosc2() {
+#ifdef ASDF_HAVE_BLOSC2
+  return 1;
+#else
+  return 0;
+#endif
+}
+bool have_compression_bzip2() {
+#ifdef ASDF_HAVE_BZIP2
+  return 1;
+#else
+  return 0;
+#endif
+}
+bool have_compression_liblz4() {
+#ifdef ASDF_HAVE_LIBLZ4
+  return 1;
+#else
+  return 0;
+#endif
+}
+bool have_compression_libzstd() {
+#ifdef ASDF_HAVE_LIBZSTD
+  return 1;
+#else
+  return 0;
+#endif
+}
+bool have_compression_zlib() {
+#ifdef ASDF_HAVE_ZLIB
+  return 1;
+#else
+  return 0;
+#endif
+}
 
 // I/O
 
