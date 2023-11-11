@@ -116,7 +116,6 @@ configure_file(
 include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
 
 set(ASDF_HEADERS
-  # asdf.hxx
   include/asdf/asdf.hxx
   include/asdf/byteorder.hxx
   include/asdf/datatype.hxx
