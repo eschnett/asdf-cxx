@@ -1,7 +1,7 @@
-#ifndef ASDF_IO_HPP
-#define ASDF_IO_HPP
+#ifndef ASDF_IO_HXX
+#define ASDF_IO_HXX
 
-#include "asdf_memoized.hpp"
+#include "asdf/memoized.hxx"
 
 #include <yaml-cpp/yaml.h>
 
@@ -139,8 +139,8 @@ public:
 
 } // namespace ASDF
 
-#define ASDF_IO_HPP_DONE
-#endif // #ifndef ASDF_IO_HPP
-#ifndef ASDF_IO_HPP_DONE
+#define ASDF_IO_HXX_DONE
+#endif // #ifndef ASDF_IO_HXX
+#ifndef ASDF_IO_HXX_DONE
 #error "Cyclic include depencency"
 #endif

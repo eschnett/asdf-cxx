@@ -1,5 +1,6 @@
-#include "asdf_io.hpp"
-#include "asdf_reference.hpp"
+#include <asdf/reference.hxx>
+
+#include <asdf/io.hxx>
 
 #include <cassert>
 #include <exception>

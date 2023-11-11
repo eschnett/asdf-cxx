@@ -1,9 +1,9 @@
-#ifndef ASDF_ENTRY_HPP
-#define ASDF_ENTRY_HPP
+#ifndef ASDF_ENTRY_HXX
+#define ASDF_ENTRY_HXX
 
-#include "asdf_datatype.hpp"
-#include "asdf_ndarray.hpp"
-#include "asdf_reference.hpp"
+#include "asdf/datatype.hxx"
+#include "asdf/ndarray.hxx"
+#include "asdf/reference.hxx"
 
 #include <yaml-cpp/yaml.h>
 
@@ -632,8 +632,8 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
 
 } // namespace ASDF
 
-#define ASDF_ENTRY_HPP_DONE
-#endif // #ifndef ASDF_ENTRY_HPP
-#ifndef ASDF_ENTRY_HPP_DONE
+#define ASDF_ENTRY_HXX_DONE
+#endif // #ifndef ASDF_ENTRY_HXX
+#ifndef ASDF_ENTRY_HXX_DONE
 #error "Cyclic include depencency"
 #endif

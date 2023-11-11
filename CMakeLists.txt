@@ -109,58 +109,59 @@ string(REPLACE "-DNDEBUG" ""
   CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 
 configure_file(
-  "${PROJECT_SOURCE_DIR}/asdf_config.hpp.in"
-  "${PROJECT_BINARY_DIR}/asdf_config.hpp"
+  "${PROJECT_SOURCE_DIR}/include/asdf/config.hxx.in"
+  "${PROJECT_BINARY_DIR}/asdf/config.hxx"
   )
 
 include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
 
 set(ASDF_HEADERS
-  asdf.hpp
-  asdf_asdf.hpp
-  asdf_byteorder.hpp
-  asdf_datatype.hpp
-  asdf_entry.hpp
-  asdf_io.hpp
-  asdf_memoized.hpp
-  asdf_ndarray.hpp
-  asdf_reference.hpp
-  asdf_stl.hpp
-  asdf_table.hpp
-  )
+  # asdf.hxx
+  include/asdf/asdf.hxx
+  include/asdf/byteorder.hxx
+  include/asdf/datatype.hxx
+  include/asdf/entry.hxx
+  include/asdf/io.hxx
+  include/asdf/memoized.hxx
+  include/asdf/ndarray.hxx
+  include/asdf/reference.hxx
+  include/asdf/stl.hxx
+  include/asdf/table.hxx
+)
 set(ASDF_SOURCES
-  asdf.cpp
-  byteorder.cpp
-  config.cpp
-  datatype.cpp
-  entry.cpp
-  io.cpp
-  ndarray.cpp
-  reference.cpp
-  table.cpp
-  )
+  src/asdf.cxx
+  src/byteorder.cxx
+  src/config.cxx
+  src/datatype.cxx
+  src/entry.cxx
+  src/io.cxx
+  src/ndarray.cxx
+  src/reference.cxx
+  src/table.cxx
+)
 
-add_library(asdf-cxx ${ASDF_SOURCES})
+add_library(asdf-cxx ${ASDF_HEADERS} ${ASDF_SOURCES})
 set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
+target_include_directories(asdf-cxx PUBLIC include)
 target_link_libraries(asdf-cxx ${LIBS})
 
-add_executable(asdf-copy copy.cpp)
+add_executable(asdf-copy utils/copy.cxx)
 target_link_libraries(asdf-copy asdf-cxx ${LIBS})
 
-add_executable(asdf-demo demo.cpp)
+add_executable(asdf-ls utils/ls.cxx)
+target_link_libraries(asdf-ls asdf-cxx ${LIBS})
+
+add_executable(asdf-demo demo/demo.cxx)
 target_link_libraries(asdf-demo asdf-cxx ${LIBS})
 
-add_executable(asdf-demo-external demo-external.cpp)
+add_executable(asdf-demo-external demo/demo-external.cxx)
 target_link_libraries(asdf-demo-external asdf-cxx ${LIBS})
 
-add_executable(asdf-demo-large demo-large.cpp)
+add_executable(asdf-demo-large demo/demo-large.cxx)
 target_link_libraries(asdf-demo-large asdf-cxx ${LIBS})
 
-add_executable(asdf-demo-compression demo-compression.cpp)
+add_executable(asdf-demo-compression demo/demo-compression.cxx)
 target_link_libraries(asdf-demo-compression asdf-cxx ${LIBS})
-
-add_executable(asdf-ls ls.cpp)
-target_link_libraries(asdf-ls asdf-cxx ${LIBS})
 
 # SWIG bindings
 
@@ -220,7 +221,7 @@ endif()
 # Install
 
 install(FILES ${ASDF_HEADERS} DESTINATION include)
-install(FILES "${PROJECT_BINARY_DIR}/asdf_config.hpp" DESTINATION include)
+install(FILES "${PROJECT_BINARY_DIR}/asdf/config.hxx" DESTINATION include)
 install(TARGETS asdf-cxx DESTINATION lib)
 install(TARGETS asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-demo-compression asdf-ls
   DESTINATION bin)

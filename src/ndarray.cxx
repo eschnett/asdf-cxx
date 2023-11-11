@@ -1,7 +1,7 @@
-#include "asdf_ndarray.hpp"
+#include <asdf/ndarray.hxx>
 
-#include "asdf_config.hpp"
-#include "asdf_stl.hpp"
+#include <asdf/config.hxx>
+#include <asdf/stl.hxx>
 
 #ifdef ASDF_HAVE_BLOSC
 #include <blosc.h>

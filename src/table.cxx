@@ -1,4 +1,4 @@
-#include "asdf_table.hpp"
+#include <asdf/table.hxx>
 
 namespace ASDF {
 

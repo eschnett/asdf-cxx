@@ -1,5 +1,5 @@
-#ifndef ASDF_MEMOIZED_HPP
-#define ASDF_MEMOIZED_HPP
+#ifndef ASDF_MEMOIZED_HXX
+#define ASDF_MEMOIZED_HXX
 
 #include <functional>
 #include <memory>
@@ -91,4 +91,4 @@ memoized<T> make_constant_memoized(const shared_ptr<T> &arg) {
 
 } // namespace ASDF
 
-#endif // #ifndef ASDF_MEMOIZED_HPP
+#endif // #ifndef ASDF_MEMOIZED_HXX

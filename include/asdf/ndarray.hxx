@@ -1,9 +1,9 @@
-#ifndef ASDF_NDARRAY_HPP
-#define ASDF_NDARRAY_HPP
+#ifndef ASDF_NDARRAY_HXX
+#define ASDF_NDARRAY_HXX
 
-#include "asdf_datatype.hpp"
-#include "asdf_io.hpp"
-#include "asdf_memoized.hpp"
+#include "asdf/datatype.hxx"
+#include "asdf/io.hxx"
+#include "asdf/memoized.hxx"
 
 #include <yaml-cpp/yaml.h>
 
@@ -259,8 +259,8 @@ public:
 
 } // namespace ASDF
 
-#define ASDF_NDARRAY_HPP_DONE
-#endif // #ifndef ASDF_NDARRAY_HPP
-#ifndef ASDF_NDARRAY_HPP_DONE
+#define ASDF_NDARRAY_HXX_DONE
+#endif // #ifndef ASDF_NDARRAY_HXX
+#ifndef ASDF_NDARRAY_HXX_DONE
 #error "Cyclic include depencency"
 #endif

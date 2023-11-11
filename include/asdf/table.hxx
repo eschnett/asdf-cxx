@@ -1,7 +1,7 @@
-#ifndef ASDF_TABLE_HPP
-#define ASDF_TABLE_HPP
+#ifndef ASDF_TABLE_HXX
+#define ASDF_TABLE_HXX
 
-#include "asdf_ndarray.hpp"
+#include "asdf/ndarray.hxx"
 
 #include <yaml-cpp/yaml.h>
 
@@ -62,8 +62,8 @@ public:
 
 } // namespace ASDF
 
-#define ASDF_TABLE_HPP_DONE
-#endif // #ifndef ASDF_TABLE_HPP
-#ifndef ASDF_TABLE_HPP_DONE
+#define ASDF_TABLE_HXX_DONE
+#endif // #ifndef ASDF_TABLE_HXX
+#ifndef ASDF_TABLE_HXX_DONE
 #error "Cyclic include depencency"
 #endif

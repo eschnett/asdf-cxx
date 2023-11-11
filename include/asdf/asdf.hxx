@@ -1,10 +1,15 @@
-#ifndef ASDF_ASDF_HPP
-#define ASDF_ASDF_HPP
+#ifndef ASDF_ASDF_HXX
+#define ASDF_ASDF_HXX
 
-#include "asdf_config.hpp"
-#include "asdf_entry.hpp"
-#include "asdf_ndarray.hpp"
-#include "asdf_reference.hpp"
+#include <asdf/byteorder.hxx>
+#include <asdf/config.hxx>
+#include <asdf/datatype.hxx>
+#include <asdf/entry.hxx>
+#include <asdf/io.hxx>
+#include <asdf/ndarray.hxx>
+#include <asdf/reference.hxx>
+#include <asdf/stl.hxx>
+#include <asdf/table.hxx>
 
 #include <yaml-cpp/yaml.h>
 
@@ -77,8 +82,8 @@ public:
 
 } // namespace ASDF
 
-#define ASDF_ASDF_HPP_DONE
-#endif // #ifndef ASDF_ASDF_HPP
-#ifndef ASDF_ASDF_HPP_DONE
+#define ASDF_ASDF_HXX_DONE
+#endif // #ifndef ASDF_ASDF_HXX
+#ifndef ASDF_ASDF_HXX_DONE
 #error "Cyclic include depencency"
 #endif

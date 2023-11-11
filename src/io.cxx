@@ -1,7 +1,7 @@
-#include "asdf_io.hpp"
+#include <asdf/io.hxx>
 
-#include "asdf_asdf.hpp"
-#include "asdf_ndarray.hpp"
+#include <asdf/asdf.hxx>
+#include <asdf/ndarray.hxx>
 
 #include <yaml-cpp/yaml.h>
 

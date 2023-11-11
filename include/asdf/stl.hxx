@@ -1,7 +1,7 @@
-#ifndef ASDF_STL_HPP
-#define ASDF_STL_HPP
+#ifndef ASDF_STL_HXX
+#define ASDF_STL_HXX
 
-#include "asdf_datatype.hpp"
+#include "asdf/datatype.hxx"
 
 #include <yaml-cpp/yaml.h>
 
@@ -50,8 +50,8 @@ YAML::Node yaml_encode(const map<K, T> &data) {
 
 } // namespace ASDF
 
-#define ASDF_STL_HPP_DONE
-#endif // #ifndef ASDF_STL_HPP
-#ifndef ASDF_STL_HPP_DONE
+#define ASDF_STL_HXX_DONE
+#endif // #ifndef ASDF_STL_HXX
+#ifndef ASDF_STL_HXX_DONE
 #error "Cyclic include depencency"
 #endif

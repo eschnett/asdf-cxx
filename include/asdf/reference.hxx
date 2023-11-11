@@ -1,7 +1,7 @@
-#ifndef ASDF_REFERENCE_HPP
-#define ASDF_REFERENCE_HPP
+#ifndef ASDF_REFERENCE_HXX
+#define ASDF_REFERENCE_HXX
 
-#include "asdf_io.hpp"
+#include "asdf/io.hxx"
 
 #include <yaml-cpp/yaml.h>
 
@@ -40,8 +40,8 @@ public:
 
 } // namespace ASDF
 
-#define ASDF_REFERENCE_HPP_DONE
-#endif // #ifndef ASDF_REFERENCE_HPP
-#ifndef ASDF_REFERENCE_HPP_DONE
+#define ASDF_REFERENCE_HXX_DONE
+#endif // #ifndef ASDF_REFERENCE_HXX
+#ifndef ASDF_REFERENCE_HXX_DONE
 #error "Cyclic include depencency"
 #endif

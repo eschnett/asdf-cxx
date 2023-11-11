@@ -1,5 +1,5 @@
-#ifndef ASDF_BYTEORDER_HPP
-#define ASDF_BYTEORDER_HPP
+#ifndef ASDF_BYTEORDER_HXX
+#define ASDF_BYTEORDER_HXX
 
 #include <yaml-cpp/yaml.h>
 
@@ -64,8 +64,8 @@ inline void htox(unsigned char *val, byteorder_t byteorder) {
 
 } // namespace ASDF
 
-#define ASDF_BYTEORDER_HPP_DONE
-#endif // #ifndef ASDF_BYTEORDER_HPP
-#ifndef ASDF_BYTEORDER_HPP_DONE
+#define ASDF_BYTEORDER_HXX_DONE
+#endif // #ifndef ASDF_BYTEORDER_HXX
+#ifndef ASDF_BYTEORDER_HXX_DONE
 #error "Cyclic include depencency"
 #endif

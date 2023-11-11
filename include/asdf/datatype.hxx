@@ -1,8 +1,8 @@
-#ifndef ASDF_DATATYPE_HPP
-#define ASDF_DATATYPE_HPP
+#ifndef ASDF_DATATYPE_HXX
+#define ASDF_DATATYPE_HXX
 
-#include "asdf_byteorder.hpp"
-#include "asdf_io.hpp"
+#include "asdf/byteorder.hxx"
+#include "asdf/io.hxx"
 
 #include <yaml-cpp/yaml.h>
 
@@ -247,8 +247,8 @@ YAML::Node emit_scalar(const unsigned char *data,
 
 } // namespace ASDF
 
-#define ASDF_DATATYPE_HPP_DONE
-#endif // #ifndef ASDF_DATATYPE_HPP
-#ifndef ASDF_DATATYPE_HPP_DONE
+#define ASDF_DATATYPE_HXX_DONE
+#endif // #ifndef ASDF_DATATYPE_HXX
+#ifndef ASDF_DATATYPE_HXX_DONE
 #error "Cyclic include depencency"
 #endif

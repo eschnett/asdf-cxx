@@ -1,4 +1,4 @@
-#include "asdf_config.hpp"
+#include <asdf/config.hxx>
 
 #include <cstdlib>
 #include <iostream>

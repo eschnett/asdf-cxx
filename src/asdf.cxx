@@ -1,4 +1,4 @@
-#include "asdf_asdf.hpp"
+#include <asdf/asdf.hxx>
 
 #include <array>
 #include <cassert>
@@ -39,7 +39,7 @@ asdf::asdf(const copy_state &cs, const asdf &project) {
 writer &asdf::to_yaml(writer &w) const {
   w << YAML::LocalTag("core/asdf-1.1.0");
   w << YAML::BeginMap;
-  w << YAML::Key << "asdf_library" << YAML::Value
+  w << YAML::Key << "asdf/library" << YAML::Value
     << software(ASDF_NAME, ASDF_AUTHOR, ASDF_HOMEPAGE, ASDF_VERSION);
   // for (const auto &kv : data)
   //   w << YAML::Key << kv.first << YAML::Value << *kv.second;
@@ -49,7 +49,7 @@ writer &asdf::to_yaml(writer &w) const {
   //   w << YAML::Key << "group" << YAML::Value << *grp;
   if (grp)
     for (const auto &[key, value] : *grp->get_group())
-      if (key != "asdf_library")
+      if (key != "asdf/library")
         w << YAML::Key << key << YAML::Value << *value;
   for (const auto &kv : nodes)
     w << YAML::Key << kv.first << YAML::Value << kv.second;
