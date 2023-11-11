@@ -28,6 +28,10 @@ void check_version(const char *header_version);
 
 #define ASDF_CHECK_VERSION (::ASDF::checkVersion(ASDF_VERSION))
 
+// Suport for some types
+//TODO #cmakedefine ASDF_HAVE_FLOAT16
+//TODO #cmakedefine ASDF_HAVE_INT128
+
 // blosc support
 
 #if @HAVE_BLOSC@
