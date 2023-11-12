@@ -11,15 +11,14 @@ jobs:
     strategy:
       matrix:
         include:
-          - {arch: x64, os: ubuntu-22.04}
-          - {arch: x86, os: ubuntu-22.04}
-          - {arch: x64, os: macos-12}
+          - {os: ubuntu-22.04}
+          - {os: macos-12}
     runs-on: ${{matrix.os}}
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
       if: startsWith(matrix.os, 'macos')
-      run: brew install -y lcov libblosc-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
+      run: brew install lcov libblosc-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
     - name: Install dependencies
       if: startsWith(matrix.os, 'ubuntu')
       run: sudo apt install -y lcov libblosc-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
