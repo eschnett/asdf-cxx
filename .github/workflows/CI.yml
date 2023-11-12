@@ -2,16 +2,23 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, macos-12]
+    runs-on: ${{matrix.os}}
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
+      if: ${{startsWith$({{matrix.os}}, "macos.04"}}
+      run: brew install -y lcov libblosc-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
+    - name: Install dependencies
+      if: ${{startsWith$({{matrix.os}}, "ubuntu-22.04"}}
       run: sudo apt install -y lcov libblosc-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
     - name: Configure
       run: cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="$HOME/install" -DCODE_COVERAGE=ON
@@ -28,4 +35,4 @@ jobs:
         lcov --list coverage.info # debug info
     - uses: codecov/codecov-action@v3
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
+        token: ${{secrets.CODECOV_TOKEN}}
