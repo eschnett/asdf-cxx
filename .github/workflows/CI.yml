@@ -31,6 +31,8 @@ jobs:
     - name: Install
       run: cmake --install build
     - name: Collect code coverage
+      # `lcov` reports errors on macos
+      if: startsWith(matrix.os, 'ubuntu')
       run: |
         lcov --capture --directory . --output-file coverage.info
         lcov --remove coverage.info '/usr/*' --output-file coverage.info # filter system-files
