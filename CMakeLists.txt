@@ -126,10 +126,10 @@ include(CheckCXXSourceCompiles)
 
 configure_file(
   "${PROJECT_SOURCE_DIR}/include/asdf/config.hxx.in"
-  "${PROJECT_BINARY_DIR}/asdf/config.hxx"
+  "${PROJECT_BINARY_DIR}/include/asdf/config.hxx"
   )
 
-include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
+include_directories("${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/include")
 
 set(ASDF_HEADERS
   include/asdf/asdf.hxx
@@ -157,7 +157,7 @@ set(ASDF_SOURCES
 
 add_library(asdf-cxx ${ASDF_HEADERS} ${ASDF_SOURCES})
 set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
-target_include_directories(asdf-cxx PUBLIC include)
+target_include_directories(asdf-cxx PUBLIC include/asdf)
 target_link_libraries(asdf-cxx ${LIBS})
 
 add_executable(asdf-copy utils/copy.cxx)
@@ -235,8 +235,8 @@ endif()
 
 # Install
 
-install(FILES ${ASDF_HEADERS} DESTINATION include)
-install(FILES "${PROJECT_BINARY_DIR}/asdf/config.hxx" DESTINATION include)
+install(FILES ${ASDF_HEADERS} DESTINATION include/asdf)
+install(FILES "${PROJECT_BINARY_DIR}/include/asdf/config.hxx" DESTINATION include/asdf)
 install(TARGETS asdf-cxx DESTINATION lib)
 install(TARGETS asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-demo-compression asdf-ls
   DESTINATION bin)

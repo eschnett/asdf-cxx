@@ -107,6 +107,7 @@ int main(int argc, char **argv) {
           {"int", make_shared<int_entry>(42)},
           {"float", make_shared<float_entry>(12.3)},
           {"complex", make_shared<complex_entry>(complex64_t(-4.4, -5.5))},
+          {"string", make_shared<string_entry>("hello")},
           {"array4d", make_shared<ndarray_entry>(std::move(arr4d))}}));
 
   auto project = make_shared<asdf>(map<string, string>(), grp);
