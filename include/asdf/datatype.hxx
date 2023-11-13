@@ -1,8 +1,8 @@
 #ifndef ASDF_DATATYPE_HXX
 #define ASDF_DATATYPE_HXX
 
-#include "asdf/byteorder.hxx"
-#include "asdf/io.hxx"
+#include <asdf/byteorder.hxx>
+#include <asdf/io.hxx>
 
 #include <yaml-cpp/yaml.h>
 

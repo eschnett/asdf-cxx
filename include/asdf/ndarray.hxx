@@ -1,9 +1,9 @@
 #ifndef ASDF_NDARRAY_HXX
 #define ASDF_NDARRAY_HXX
 
-#include "asdf/datatype.hxx"
-#include "asdf/io.hxx"
-#include "asdf/memoized.hxx"
+#include <asdf/datatype.hxx>
+#include <asdf/io.hxx>
+#include <asdf/memoized.hxx>
 
 #include <yaml-cpp/yaml.h>
 

@@ -14,7 +14,8 @@ namespace ASDF {
 asdf::asdf(const shared_ptr<reader_state> &rs, const YAML::Node &node,
            const map<string, reader_t> &readers) {
   assert(node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.0.0" ||
-         node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.1.0");
+         node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.1.0" ||
+         node.Tag() == "tag:stsci.edu:asdf/core/asdf-1.2.0");
 
   assert(readers.empty());
   // if (readers.count(tag))
@@ -40,7 +41,8 @@ writer &asdf::to_yaml(writer &w) const {
   w << YAML::LocalTag("core/asdf-1.1.0");
   w << YAML::BeginMap;
   w << YAML::Key << "asdf/library" << YAML::Value
-    << software(ASDF_NAME, ASDF_AUTHOR, ASDF_HOMEPAGE, ASDF_VERSION);
+    << software(ASDF_CXX_NAME, ASDF_CXX_AUTHOR, ASDF_CXX_HOMEPAGE,
+                ASDF_CXX_VERSION);
   // for (const auto &kv : data)
   //   w << YAML::Key << kv.first << YAML::Value << *kv.second;
   // // if (tab)

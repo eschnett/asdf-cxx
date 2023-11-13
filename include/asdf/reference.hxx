@@ -1,7 +1,7 @@
 #ifndef ASDF_REFERENCE_HXX
 #define ASDF_REFERENCE_HXX
 
-#include "asdf/io.hxx"
+#include <asdf/io.hxx>
 
 #include <yaml-cpp/yaml.h>
 

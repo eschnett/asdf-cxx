@@ -18,10 +18,10 @@ int main(int argc, char **argv) {
 
   auto grp = make_shared<group>();
 
-  // auto array0d = make_shared<ndarray>(
-  //     vector<int64_t>{42}, block_format_t::inline_array, compression_t::none, 0,
-  //     vector<bool>(), vector<int64_t>{});
-  // grp->emplace("alpha", array0d);
+  auto array0d = make_shared<ndarray>(
+      vector<int64_t>{42}, block_format_t::inline_array, compression_t::none, 0,
+      vector<bool>(), vector<int64_t>{});
+  grp->emplace("alpha", array0d);
 
   auto array1d = make_shared<ndarray>(
       vector<int64_t>{1, 2, 3}, block_format_t::block, compression_t::none, 0,
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
   grp->emplace("epsilon", array8d);
 
   auto seq = make_shared<sequence>();
-  // seq->emplace_back(array0d);
+  seq->emplace_back(array0d);
   seq->emplace_back(array1d);
   seq->emplace_back(array2d);
   grp->emplace("zeta", seq);

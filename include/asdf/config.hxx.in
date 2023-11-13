@@ -5,32 +5,53 @@
 
 namespace ASDF {
 
+#define ASDF_STRINGIFY(X) #X
+
+// Standard version
+
+#define ASDF_STANDARD_VERSION_MAJOR 1
+#define ASDF_STANDARD_VERSION_MINOR 2
+#define ASDF_STANDARD_VERSION_PATCH 0
+
+#define ASDF_STANDARD_VERSION                                                  \
+  ASDF_STRINGIFY(ASDF_STANDARD_VERSION_MAJOR)                                  \
+  "." ASDF_STRINGIFY(ASDF_STANDARD_VERSION_MINOR) "." ASDF_STRINGIFY(          \
+      ASDF_STANDARD_VERSION_PATCH)
+
+int asdf_standard_version_major();
+int asdf_standard_version_minor();
+int asdf_standard_version_patch();
+
+std::string asdf_standard_version();
+
 // Software version
 
-#define ASDF_NAME "asdf-cxx"
-#define ASDF_AUTHOR "Erik Schnetter"
-#define ASDF_HOMEPAGE "https://github.com/eschnett/asdf-cxx"
+#define ASDF_CXX_NAME "asdf-cxx"
+#define ASDF_CXX_AUTHOR "Erik Schnetter"
+#define ASDF_CXX_HOMEPAGE "https://github.com/eschnett/asdf-cxx"
 
-#define ASDF_VERSION_MAJOR @asdf-cxx_VERSION_MAJOR@
-#define ASDF_VERSION_MINOR @asdf-cxx_VERSION_MINOR@
-#define ASDF_VERSION_PATCH @asdf-cxx_VERSION_PATCH@
+#define ASDF_CXX_VERSION_MAJOR @asdf-cxx_VERSION_MAJOR@
+#define ASDF_CXX_VERSION_MINOR @asdf-cxx_VERSION_MINOR@
+#define ASDF_CXX_VERSION_PATCH @asdf-cxx_VERSION_PATCH@
 
-#define ASDF_VERSION                                                           \
-  "@asdf-cxx_VERSION_MAJOR@.@asdf-cxx_VERSION_MINOR@.@asdf-cxx_VERSION_PATCH@"
+#define ASDF_CXX_VERSION                                                       \
+  ASDF_STRINGIFY(ASDF_CXX_VERSION_MAJOR)                                       \
+  "." ASDF_STRINGIFY(ASDF_CXX_VERSION_MINOR) "." ASDF_STRINGIFY(               \
+      ASDF_CXX_VERSION_PATCH)
 
-int version_major();
-int version_minor();
-int version_patch();
+int asdf_cxx_version_major();
+int asdf_cxx_version_minor();
+int asdf_cxx_version_patch();
 
-std::string version();
+std::string asdf_cxx_version();
 
 void check_version(const char *header_version);
 
-#define ASDF_CHECK_VERSION (::ASDF::checkVersion(ASDF_VERSION))
+#define ASDF_CHECK_VERSION (::ASDF::checkVersion(ASDF_CXX_VERSION))
 
 // Suport for some types
-//TODO #cmakedefine ASDF_HAVE_FLOAT16
-//TODO #cmakedefine ASDF_HAVE_INT128
+#cmakedefine ASDF_HAVE_FLOAT16
+#cmakedefine ASDF_HAVE_INT128
 
 // blosc support
 
