@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
   auto array2d128 = make_shared<ndarray>(
       vector<int128_t>{1, 2, 3, 4, 5, 6}, block_format_t::inline_array,
       compression_t::none, 0, vector<bool>(), vector<int64_t>{2, 3});
-  grp->emplace("gamma128", array2d16);
+  grp->emplace("gamma128", array2d128);
 #endif
 
   auto array3d = make_shared<ndarray>(
