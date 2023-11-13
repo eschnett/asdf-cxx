@@ -3,7 +3,7 @@
 %module asdf
 
 %{
-  #include "asdf.hpp"
+  #include <asdf/asdf.hpp>
   using namespace ASDF;
 %}
 

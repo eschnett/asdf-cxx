@@ -1,7 +1,7 @@
 #ifndef ASDF_TABLE_HXX
 #define ASDF_TABLE_HXX
 
-#include "asdf/ndarray.hxx"
+#include <asdf/ndarray.hxx>
 
 #include <yaml-cpp/yaml.h>
 

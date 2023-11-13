@@ -1,3 +1,4 @@
+#include <asdf/config.hxx>
 #include <asdf/datatype.hxx>
 
 #include <limits>

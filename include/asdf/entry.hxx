@@ -1,9 +1,9 @@
 #ifndef ASDF_ENTRY_HXX
 #define ASDF_ENTRY_HXX
 
-#include "asdf/datatype.hxx"
-#include "asdf/ndarray.hxx"
-#include "asdf/reference.hxx"
+#include <asdf/datatype.hxx>
+#include <asdf/ndarray.hxx>
+#include <asdf/reference.hxx>
 
 #include <yaml-cpp/yaml.h>
 
@@ -624,7 +624,7 @@ inline std::shared_ptr<group> make_entry(
   return std::make_shared<group>(std::move(entries));
 }
 inline std::shared_ptr<entry> make_entry(std::shared_ptr<entry> value) {
-  return std::move(value);
+  return value;
 }
 
 std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,

@@ -1,7 +1,7 @@
 #ifndef ASDF_STL_HXX
 #define ASDF_STL_HXX
 
-#include "asdf/datatype.hxx"
+#include <asdf/datatype.hxx>
 
 #include <yaml-cpp/yaml.h>
 

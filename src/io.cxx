@@ -10,7 +10,21 @@
 namespace ASDF {
 
 const string asdf_format_version = "1.0.0";
-const string asdf_standard_version = "1.1.0";
+
+bool have_int128() {
+#ifdef ASDF_HAVE_INT128
+  return true;
+#else
+  return false;
+#endif
+}
+bool have_float16() {
+#ifdef ASDF_HAVE_FLOAT16
+  return true;
+#else
+  return false;
+#endif
+}
 
 bool have_checksum() {
 #ifdef ASDF_HAVE_OPENSSL
@@ -182,7 +196,7 @@ writer::writer(ostream &os, const map<string, string> &tags)
     : os(os), emitter(os) {
   // yaml-cpp does not support comments without leading space
   os << "#ASDF " << asdf_format_version << "\n"
-     << "#ASDF_STANDARD " << asdf_standard_version << "\n"
+     << "#ASDF_STANDARD " << asdf_standard_version() << "\n"
      << "# This is an ASDF file <https://asdf-standard.readthedocs.io/>\n"
      // yaml-cpp does not support writing a YAML tag
      << "%YAML 1.1\n"

@@ -1,7 +1,7 @@
 #ifndef ASDF_IO_HXX
 #define ASDF_IO_HXX
 
-#include "asdf/memoized.hxx"
+#include <asdf/memoized.hxx>
 
 #include <yaml-cpp/yaml.h>
 
@@ -30,6 +30,9 @@ enum class compression_t {
   libzstd,
   zlib
 };
+
+bool have_float16();
+bool have_int128();
 
 bool have_checksum();
 bool have_compression_blosc();
