@@ -246,11 +246,11 @@ if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND AND SWIG_FOUND)
 endif()
 
 # `bz2` is also required
-set(PKG_CONFIG_REQUIRES "")
+set(PKG_CONFIG_REQUIRES "yaml-cpp")
 set(PKG_CONFIG_INCLUDEDIR "\${prefix}/include")
 set(PKG_CONFIG_LIBDIR "\${prefix}/lib")
 set(PKG_CONFIG_CFLAGS "-I\${includedir}")
-set(PKG_CONFIG_LIBS "-L\${libdir} -lasdf-cxx")
+set(PKG_CONFIG_LIBS "-L\${libdir} -lasdf-cxx -lyaml-cpp")
 if(BLOSC_FOUND)
   set(PKG_CONFIG_REQUIRES "${PKG_CONFIG_REQUIRES} blosc")
   set(PKG_CONFIG_LIBS "${PKG_CONFIG_LIBS} -lblosc")

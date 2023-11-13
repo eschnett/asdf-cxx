@@ -28,6 +28,7 @@ using namespace std;
 enum class entry_type_t {
   unknown,
   null,
+  bool8, // TrueFalseBool
   int64,
   float64,
   complex128,
@@ -43,8 +44,9 @@ enum class entry_type_t {
 std::ostream &operator<<(std::ostream &os, entry_type_t entry_type);
 
 class null_entry;
-class int64_entry;
-class float64_entry;
+class bool_entry;
+class int_entry;
+class float_entry;
 class complex128_entry;
 class string_entry;
 class software;
@@ -71,6 +73,7 @@ public:
   }
 
   virtual std::optional<std::tuple<>> get_maybe_null() const { return {}; }
+  virtual std::optional<bool> get_maybe_bool() const { return {}; }
   virtual std::optional<std::int64_t> get_maybe_int() const { return {}; }
   virtual std::optional<float64_t> get_maybe_float() const { return {}; }
   virtual std::optional<std::complex<float64_t>> get_maybe_complex() const {
@@ -127,6 +130,40 @@ public:
   }
 
   std::tuple<> get_null() const { return value; }
+};
+
+class bool_entry : public entry {
+  bool value;
+
+public:
+  using value_type = bool;
+
+  bool_entry() = delete;
+  bool_entry(const bool_entry &) = default;
+  bool_entry(bool_entry &&) = default;
+  bool_entry &operator=(const bool_entry &) = default;
+  bool_entry &operator=(bool_entry &&) = default;
+
+  virtual ~bool_entry() {}
+
+  bool_entry(bool value) : value(std::move(value)) {}
+
+  virtual entry_type_t get_entry_type() const override {
+    return entry_type_t::bool8;
+  }
+
+  virtual std::shared_ptr<entry> copy(const copy_state &cs) const override {
+    return std::make_shared<bool_entry>(value);
+  }
+
+  virtual writer &to_yaml(writer &w) const override;
+  friend writer &operator<<(writer &w, const bool_entry &ent) {
+    return ent.to_yaml(w);
+  }
+
+  virtual std::optional<bool> get_maybe_bool() const override { return value; }
+
+  bool get_bool() const { return value; }
 };
 
 class int_entry : public entry {
@@ -550,6 +587,9 @@ public:
 inline std::shared_ptr<null_entry> make_entry(std::tuple<> value) {
   return std::make_shared<null_entry>(std::move(value));
 }
+inline std::shared_ptr<bool_entry> make_entry(bool value) {
+  return std::make_shared<bool_entry>(value);
+}
 template <typename T>
 std::enable_if_t<std::is_integral_v<T>, std::shared_ptr<int_entry>>
 make_entry(T value) {
@@ -587,6 +627,10 @@ make_entry(std::map<std::string, std::shared_ptr<entry>> entries) {
 inline std::shared_ptr<null_entry>
 make_entry(const std::shared_ptr<std::tuple<>> &value) {
   return std::make_shared<null_entry>(*value);
+}
+inline std::shared_ptr<bool_entry>
+make_entry(const std::shared_ptr<bool> &value) {
+  return std::make_shared<bool_entry>(*value);
 }
 template <typename T>
 std::enable_if_t<std::is_integral_v<T>, std::shared_ptr<int_entry>>

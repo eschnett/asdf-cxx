@@ -104,6 +104,8 @@ int main(int argc, char **argv) {
       "attributed",
       make_shared<group>(std::map<string, shared_ptr<entry>>{
           {"null", make_shared<null_entry>()},
+          {"fbool", make_shared<bool_entry>(false)},
+          {"tbool", make_shared<bool_entry>(true)},
           {"int", make_shared<int_entry>(42)},
           {"float", make_shared<float_entry>(12.3)},
           {"complex", make_shared<complex_entry>(complex64_t(-4.4, -5.5))},
