@@ -24,6 +24,8 @@ std::ostream &operator<<(std::ostream &os, entry_type_t entry_type) {
   switch (entry_type) {
   case entry_type_t::null:
     return os << "null";
+  case entry_type_t::bool8:
+    return os << "bool8";
   case entry_type_t::int64:
     return os << "int64";
   case entry_type_t::float64:
@@ -51,6 +53,8 @@ std::ostream &operator<<(std::ostream &os, entry_type_t entry_type) {
 
 writer &null_entry::to_yaml(writer &w) const { return w << YAML::Null; }
 
+writer &bool_entry::to_yaml(writer &w) const { return w << yaml_encode(value); }
+
 writer &int_entry::to_yaml(writer &w) const { return w << yaml_encode(value); }
 
 writer &float_entry::to_yaml(writer &w) const {
@@ -61,7 +65,9 @@ writer &complex_entry::to_yaml(writer &w) const {
   return w << yaml_encode(value);
 }
 
-writer &string_entry::to_yaml(writer &w) const { return w << value; }
+writer &string_entry::to_yaml(writer &w) const {
+  return w << YAML::DoubleQuoted << value;
+}
 
 software::software(const std::shared_ptr<reader_state> &rs,
                    const YAML::Node node) {
@@ -174,7 +180,12 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
   if (node.IsNull())
     return std::make_shared<null_entry>(std::tuple<>());
 
-  // Scalar nodes can be either ints, floats, or strings. Try in this order.
+  // Scalar nodes can be either boo, int, float, or string. Try in this order.
+  if (node.IsScalar()) {
+    const auto bool8 = try_parse_yaml<bool>(node);
+    if (bool8)
+      return std::make_shared<bool_entry>(*bool8);
+  }
   if (node.IsScalar()) {
     const auto int64 = try_parse_yaml<int64_t>(node);
     if (int64)
