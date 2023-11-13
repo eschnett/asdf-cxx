@@ -13,7 +13,7 @@ using namespace ASDF;
 int main(int argc, char **argv) {
   cout << "asdf-demo-large: Create a large ASDF file\n";
 
-  int64_t ni = 1000, nj = 1000, nk = 500;
+  int64_t ni = 1000, nj = 1000, nk = 250;
   auto getidx = [&](int64_t i, int64_t j, int64_t k) {
     return (i * nj + j) * nk + k;
   };
@@ -33,8 +33,9 @@ int main(int argc, char **argv) {
   cout << "\n";
 
   cout << "  creating project..." << flush;
-  const auto compression = compression_t::blosc2;
-  // const auto compression = compression_t::zlib;
+  const auto
+      compression = // have_compression_blosc2()  ? compression_t::blosc2 :
+      have_compression_blosc() ? compression_t::blosc : compression_t::zlib;
   const int level = 9;
   auto array3d = make_shared<ndarray>(std::move(rho), block_format_t::block,
                                       compression, level, std::vector<bool>(),

@@ -186,9 +186,7 @@ writer::writer(ostream &os, const map<string, string> &tags)
      << "# This is an ASDF file <https://asdf-standard.readthedocs.io/>\n"
      // yaml-cpp does not support writing a YAML tag
      << "%YAML 1.1\n"
-     << "%TAG ! tag:stsci.edu:asdf/\n"
-      // << "%TAG !asdf-cxx! tag:github.com/eschnett/asdf-cxx/\n"
-      ;
+     << "%TAG ! tag:stsci.edu:asdf/\n";
   for (const auto &kv : tags)
     os << "%TAG !" << kv.first << "! " << kv.second << "\n";
   emitter << YAML::BeginDoc;
