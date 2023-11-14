@@ -169,14 +169,17 @@ target_link_libraries(asdf-ls asdf-cxx ${LIBS})
 add_executable(asdf-demo demo/demo.cxx)
 target_link_libraries(asdf-demo asdf-cxx ${LIBS})
 
+add_executable(asdf-demo-compression demo/demo-compression.cxx)
+target_link_libraries(asdf-demo-compression asdf-cxx ${LIBS})
+
 add_executable(asdf-demo-external demo/demo-external.cxx)
 target_link_libraries(asdf-demo-external asdf-cxx ${LIBS})
 
 add_executable(asdf-demo-large demo/demo-large.cxx)
 target_link_libraries(asdf-demo-large asdf-cxx ${LIBS})
 
-add_executable(asdf-demo-compression demo/demo-compression.cxx)
-target_link_libraries(asdf-demo-compression asdf-cxx ${LIBS})
+add_executable(asdf-demo-nonstandard demo/demo-nonstandard.cxx)
+target_link_libraries(asdf-demo-nonstandard asdf-cxx ${LIBS})
 
 # SWIG bindings
 
@@ -191,8 +194,10 @@ endif()
 enable_testing()
 add_test(NAME demo COMMAND ./asdf-demo)
 add_test(NAME ls COMMAND ./asdf-ls demo.asdf)
+add_test(NAME demo-nonstandard COMMAND ./asdf-demo-nonstandard)
+add_test(NAME ls2 COMMAND ./asdf-ls nonstandard.asdf)
 add_test(NAME copy COMMAND ./asdf-copy demo.asdf demo2.asdf)
-add_test(NAME ls2 COMMAND ./asdf-ls demo2.asdf)
+add_test(NAME ls3 COMMAND ./asdf-ls demo2.asdf)
 add_test(NAME compare-demo
   COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
   "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
@@ -222,7 +227,7 @@ add_test(NAME external COMMAND ./asdf-demo-external)
 # See <https://github.com/codecov/example-cpp11-cmake>
 option(CODE_COVERAGE "Enable coverage reporting" OFF)
 if(CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  foreach(target asdf-cxx asdf-copy asdf-demo asdf-demo-external asdf-demo-large asdf-demo-compression asdf-ls)
+  foreach(target asdf-cxx asdf-copy asdf-ls asdf-demo asdf-demo-compression asdf-demo-external asdf-demo-large asdf-demo-nonstandard)
     # Add required flags (GCC & LLVM/Clang)
     target_compile_options(${target} INTERFACE
       -O0        # no optimization

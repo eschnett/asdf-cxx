@@ -5,18 +5,13 @@
 
 namespace ASDF {
 
-#define ASDF_STRINGIFY(X) #X
-
 // Standard version
 
 #define ASDF_STANDARD_VERSION_MAJOR 1
 #define ASDF_STANDARD_VERSION_MINOR 2
 #define ASDF_STANDARD_VERSION_PATCH 0
 
-#define ASDF_STANDARD_VERSION                                                  \
-  ASDF_STRINGIFY(ASDF_STANDARD_VERSION_MAJOR)                                  \
-  "." ASDF_STRINGIFY(ASDF_STANDARD_VERSION_MINOR) "." ASDF_STRINGIFY(          \
-      ASDF_STANDARD_VERSION_PATCH)
+#define ASDF_STANDARD_VERSION "1.2.0"
 
 int asdf_standard_version_major();
 int asdf_standard_version_minor();
@@ -34,10 +29,8 @@ std::string asdf_standard_version();
 #define ASDF_CXX_VERSION_MINOR @asdf-cxx_VERSION_MINOR@
 #define ASDF_CXX_VERSION_PATCH @asdf-cxx_VERSION_PATCH@
 
-#define ASDF_CXX_VERSION                                                       \
-  ASDF_STRINGIFY(ASDF_CXX_VERSION_MAJOR)                                       \
-  "." ASDF_STRINGIFY(ASDF_CXX_VERSION_MINOR) "." ASDF_STRINGIFY(               \
-      ASDF_CXX_VERSION_PATCH)
+#define ASDF_CXX_VERSION \
+  "@asdf-cxx_VERSION_MAJOR@.@asdf-cxx_VERSION_MINOR@.@asdf-cxx_VERSION_PATCH@"
 
 int asdf_cxx_version_major();
 int asdf_cxx_version_minor();
