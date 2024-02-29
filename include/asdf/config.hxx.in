@@ -29,7 +29,7 @@ std::string asdf_standard_version();
 #define ASDF_CXX_VERSION_MINOR @asdf-cxx_VERSION_MINOR@
 #define ASDF_CXX_VERSION_PATCH @asdf-cxx_VERSION_PATCH@
 
-#define ASDF_CXX_VERSION \
+#define ASDF_CXX_VERSION                                                       \
   "@asdf-cxx_VERSION_MAJOR@.@asdf-cxx_VERSION_MINOR@.@asdf-cxx_VERSION_PATCH@"
 
 int asdf_cxx_version_major();
@@ -37,10 +37,6 @@ int asdf_cxx_version_minor();
 int asdf_cxx_version_patch();
 
 std::string asdf_cxx_version();
-
-void check_version(const char *header_version);
-
-#define ASDF_CHECK_VERSION (::ASDF::checkVersion(ASDF_CXX_VERSION))
 
 // Suport for some types
 #cmakedefine ASDF_HAVE_FLOAT16
@@ -101,6 +97,27 @@ void check_version(const char *header_version);
 #else
 #undef ASDF_HAVE_ZLIB
 #endif
+
+// Consistency check
+
+void check_version(const char *header_version, bool have_float16,
+                   bool have_int128);
+
+#ifdef ASDF_HAVE_FLOAT16
+#define ASDF_FLOAT16_SUPPORTED 1
+#else
+#define ASDF_FLOAT16_SUPPORTED 0
+#endif
+
+#ifdef ASDF_HAVE_INT128
+#define ASDF_INT128_SUPPORTED 1
+#else
+#define ASDF_INT128_SUPPORTED 0
+#endif
+
+#define ASDF_CHECK_VERSION()						\
+  (::ASDF::check_version(ASDF_CXX_VERSION, ASDF_FLOAT16_SUPPORTED,	\
+			 ASDF_INT128_SUPPORTED))
 
 } // namespace ASDF
 

@@ -86,7 +86,8 @@ static_assert(get_scalar_type_id<ucs4_t>() == id_ucs4, "");
 size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
   switch (scalar_type_id) {
   case id_error:
-    throw std::invalid_argument("Scalar type `scalar_type_id_t::id_error` does not have a size");
+    throw std::invalid_argument(
+        "Scalar type `scalar_type_id_t::id_error` does not have a size\n");
   case id_bool8:
     return sizeof(bool8_t);
   case id_int8:
@@ -132,7 +133,8 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
     // case id_ascii
     // case id_ucs4
   default:
-    throw std::invalid_argument("Invalid `scalar_type_id_t` value " + std::to_string(int(scalar_type_id)));
+    throw std::invalid_argument("Invalid `scalar_type_id_t` value " +
+                                std::to_string(int(scalar_type_id)) + "\n");
   }
 }
 
