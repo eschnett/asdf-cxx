@@ -162,6 +162,7 @@ void read_file(const std::vector<int64_t> &shape,
 
 int main(int argc, char **argv) {
   cout << "asdf-demo: Create a compressed ASDF file\n";
+  ASDF_CHECK_VERSION();
 
   const std::vector<int64_t> shape{101, 101, 101};
   const auto data = make_data<float64_t>(shape);

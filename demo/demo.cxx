@@ -15,6 +15,7 @@ using namespace ASDF;
 
 int main(int argc, char **argv) {
   cout << "asdf-demo: Create a simple ASDF file\n";
+  ASDF_CHECK_VERSION();
 
   auto grp = make_shared<group>();
 

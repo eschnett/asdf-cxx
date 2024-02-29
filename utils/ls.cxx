@@ -94,6 +94,8 @@ void output(std::ostream &os, const int indent,
 
 int main(int argc, char **argv) {
   cout << "asdf-ls: List content of ASDF files\n";
+  ASDF_CHECK_VERSION();
+
   // cout << "Syntax: " << argv[0] << " <filename>+\n";
 
 #if 0

@@ -12,6 +12,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   cout << "asdf-copy: Copy the content of an ASDF file\n";
+  ASDF_CHECK_VERSION();
 
   // Parse command line arguments
   auto check = [=](bool cond, const string &msg) {

@@ -107,6 +107,7 @@ void read_metadata() {
 
 int main(int argc, char **argv) {
   cout << "asdf-demo-external: Create an ASDF file with external references\n";
+  ASDF_CHECK_VERSION();
 
   write_external();
   write_metadata();

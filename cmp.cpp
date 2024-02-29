@@ -12,6 +12,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   cout << "asdf-cmp: Compare the content of two ASDF files\n";
+  ASDF_CHECK_VERSION();
+
   cout << "Syntax: " << argv[0] << " <file 1> <file 2>\n";
   if (argc != 3) {
     cerr << "Wrong number of arguments\n";

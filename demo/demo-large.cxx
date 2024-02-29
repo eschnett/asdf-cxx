@@ -12,6 +12,7 @@ using namespace ASDF;
 
 int main(int argc, char **argv) {
   cout << "asdf-demo-large: Create a large ASDF file\n";
+  ASDF_CHECK_VERSION();
 
   const int64_t ni = 1000, nj = 1000, nk = 250;
   const auto getidx = [&](int64_t i, int64_t j, int64_t k) {
