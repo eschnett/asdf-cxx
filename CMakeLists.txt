@@ -102,9 +102,6 @@ endif()
 
 # Main project
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 string(REPLACE "-DNDEBUG" ""
   CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 
@@ -157,6 +154,7 @@ set(ASDF_SOURCES
 
 add_library(asdf-cxx ${ASDF_HEADERS} ${ASDF_SOURCES})
 set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
+target_compile_features(asdf-cxx PUBLIC cxx_std_17)
 target_include_directories(asdf-cxx PUBLIC include/asdf)
 target_link_libraries(asdf-cxx ${LIBS})
 
