@@ -23,7 +23,7 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       run: sudo apt install -y lcov libblosc-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
     - name: Configure
-      run: cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="$HOME/install" -DCODE_COVERAGE=ON
+      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="{$HOME}/install" -DCODE_COVERAGE=ON
     - name: Build
       run: cmake --build build --parallel $(nproc)
     - name: Test
@@ -37,6 +37,6 @@ jobs:
         lcov --capture --directory . --output-file coverage.info
         lcov --remove coverage.info '/usr/*' --output-file coverage.info # filter system-files
         lcov --list coverage.info # debug info
-    - uses: codecov/codecov-action@v3
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{secrets.CODECOV_TOKEN}}
