@@ -18,7 +18,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install dependencies
       if: startsWith(matrix.os, 'macos')
-      run: brew install bzip2 c-blosc lcov lz4 ninja numpy openssl yaml-cpp zlib zstd
+      run: brew install bzip2 c-blosc lcov ninja numpy yaml-cpp
     - name: Install dependencies
       if: startsWith(matrix.os, 'ubuntu')
       run: sudo apt install -y lcov libblosc-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
