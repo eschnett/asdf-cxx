@@ -141,6 +141,7 @@ YAML::Node reader_state::resolve_reference(const vector<string> &path) const {
           return stoi(elem);
         } catch (exception &) {
           assert(0);
+          return -1; // suppress compiler warning
         }
       }();
       node = unique_ptr<YAML::Node>(new YAML::Node((*node)[idx]));

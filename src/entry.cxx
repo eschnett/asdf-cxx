@@ -212,6 +212,7 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
   }
 
   assert(0);
+  return NULL; // suppress compiler warning
 }
 
 } // namespace ASDF
