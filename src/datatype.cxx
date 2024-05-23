@@ -442,7 +442,7 @@ template <typename T> YAML::Node yaml_encode_complex(const complex<T> &val) {
 #ifdef ASDF_HAVE_FLOAT16
 YAML::Node yaml_encode(complex32_t val) {
   // yaml-cpp does not support `float16_t`
-  return yaml_encode(complex32_t(float32_t(val.real()), float32_t(val.imag())));
+  return yaml_encode(complex32_t(float16_t(val.real()), float16_t(val.imag())));
 }
 #endif
 YAML::Node yaml_encode(complex64_t val) { return yaml_encode_complex(val); }

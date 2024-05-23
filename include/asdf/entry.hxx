@@ -19,6 +19,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <cstdint>
 
 namespace ASDF {
 using namespace std;
