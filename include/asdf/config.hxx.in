@@ -115,11 +115,9 @@ void check_version(const char *header_version, bool have_float16,
 #define ASDF_INT128_SUPPORTED 0
 #endif
 
-#define ASDF_CHECK_VERSION()						\
-  do {									\
-    ::ASDF::check_version(ASDF_CXX_VERSION, ASDF_FLOAT16_SUPPORTED,	\
-			  ASDF_INT128_SUPPORTED);			\
-  } while (0)
+#define ASDF_CHECK_VERSION()                                                   \
+  (::ASDF::check_version(ASDF_CXX_VERSION, ASDF_FLOAT16_SUPPORTED,             \
+                         ASDF_INT128_SUPPORTED))
 
 } // namespace ASDF
 

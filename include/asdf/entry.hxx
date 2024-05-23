@@ -9,6 +9,7 @@
 
 #include <array>
 #include <complex>
+#include <cstdint>
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -19,7 +20,6 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
-#include <cstdint>
 
 namespace ASDF {
 using namespace std;
