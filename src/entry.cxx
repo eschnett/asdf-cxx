@@ -3,6 +3,7 @@
 #include <asdf/datatype.hxx>
 
 #include <cctype>
+#include <cstdlib>
 #include <optional>
 #include <sstream>
 
@@ -212,6 +213,7 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
   }
 
   assert(0);
+  std::abort();
 }
 
 } // namespace ASDF
