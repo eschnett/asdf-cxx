@@ -1,4 +1,4 @@
-#include "asdf.hpp"
+#include <asdf/asdf.hpp>
 
 #include <yaml-cpp/yaml.h>
 
@@ -12,6 +12,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   cout << "asdf-cmp: Compare the content of two ASDF files\n";
+  ASDF_CHECK_VERSION();
+
   cout << "Syntax: " << argv[0] << " <file 1> <file 2>\n";
   if (argc != 3) {
     cerr << "Wrong number of arguments\n";
@@ -34,10 +36,10 @@ int main(int argc, char **argv) {
   }
   YAML::Node node = YAML::Load(doc.str());
   ASDF::reader_state rs(is);
-  auto project = ASDF::asdf(rs, node);
+  auto project = make_shared<ASDF::asdf>(rs, node);
   is.close();
   // Write output
-  project.write(outputfilename);
+  project->write(outputfilename);
   //
   cout << "Done.\n";
   return 0;

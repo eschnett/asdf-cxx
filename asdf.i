@@ -3,7 +3,7 @@
 %module asdf
 
 %{
-  #include "asdf.hpp"
+  #include <asdf/asdf.hpp>
   using namespace ASDF;
 %}
 
@@ -16,20 +16,34 @@
 using std::string;
 
 %shared_ptr(asdf);
+%shared_ptr(complex_entry);
 %shared_ptr(datatype_t);
 %shared_ptr(entry);
 %shared_ptr(field_t);
+%shared_ptr(float_entry);
 %shared_ptr(group);
+%shared_ptr(int_entry);
 %shared_ptr(ndarray);
+%shared_ptr(ndarray_entry);
+%shared_ptr(null_entry);
 %shared_ptr(reference);
+%shared_ptr(reference_entry);
 %shared_ptr(sequence);
+%shared_ptr(string_entry);
 
 %template(map_string_string)
   std::map<string, string>;
-%template(map_string_shared_ptr_entry)
-  std::map<string, std::shared_ptr<entry>>;
 %template(map_string_shared_ptr_ndarray)
   std::map<string, std::shared_ptr<ndarray>>;
+
+%template(vector_shared_ptr_entry)
+  std::vector<std::shared_ptr<entry>>;
+%template(map_string_shared_ptr_entry)
+  std::map<string, std::shared_ptr<entry>>;
+%template(shared_ptr_vector_shared_ptr_entry)
+  std::shared_ptr<std::vector<std::shared_ptr<entry>>>;
+%template(shared_ptr_map_string_shared_ptr_entry)
+  std::shared_ptr<std::map<string, std::shared_ptr<entry>>>;
 
 %template(vector_bool) std::vector<bool>;
 %template(vector_complex_double) std::vector<std::complex<double>>;
@@ -53,7 +67,7 @@ using std::string;
 
 
 enum class block_format_t { undefined, block, inline_array };
-enum class compression_t { undefined, none, bzip2, zlib };
+enum class compression_t { undefined, none, blosc, blosc2, bzip2, libzstd, zlib };
 
 
 
@@ -78,8 +92,10 @@ enum scalar_type_id_t {
   id_uint16,
   id_uint32,
   id_uint64,
+  id_float16,
   id_float32,
   id_float64,
+  id_complex32,
   id_complex64,
   id_complex128,
   id_ascii,
@@ -87,17 +103,25 @@ enum scalar_type_id_t {
 };
 
 %{
+  constexpr scalar_type_id_t get_scalar_type_id_int8() { return get_scalar_type_id<int8_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_int16() { return get_scalar_type_id<int16_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_int32() { return get_scalar_type_id<int32_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_int64() { return get_scalar_type_id<int64_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_float16() { return get_scalar_type_id<float16_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_float32() { return get_scalar_type_id<float32_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_float64() { return get_scalar_type_id<float64_t>(); }
+  constexpr scalar_type_id_t get_scalar_type_id_complex32() { return get_scalar_type_id<complex32_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_complex64() { return get_scalar_type_id<complex64_t>(); }
   constexpr scalar_type_id_t get_scalar_type_id_complex128() { return get_scalar_type_id<complex128_t>(); }
 %}
+constexpr scalar_type_id_t get_scalar_type_id_int8();
+constexpr scalar_type_id_t get_scalar_type_id_int16();
 constexpr scalar_type_id_t get_scalar_type_id_int32();
 constexpr scalar_type_id_t get_scalar_type_id_int64();
+constexpr scalar_type_id_t get_scalar_type_id_float16();
 constexpr scalar_type_id_t get_scalar_type_id_float32();
 constexpr scalar_type_id_t get_scalar_type_id_float64();
+constexpr scalar_type_id_t get_scalar_type_id_complex32();
 constexpr scalar_type_id_t get_scalar_type_id_complex64();
 constexpr scalar_type_id_t get_scalar_type_id_complex128();
 
@@ -142,14 +166,13 @@ class ndarray {
     }
 
     static std::shared_ptr<ndarray>
-      create_int32(std::vector<int> data,
-                   block_format_t block_format,
-                   compression_t compression,
-                   int compression_level,
-                   std::vector<bool> mask,
-                   const std::vector<long>& shape1)
+      create_int8(std::vector<int8_t> data,
+                  block_format_t block_format,
+                  compression_t compression,
+                  int compression_level,
+                  std::vector<bool> mask,
+                  const std::vector<long>& shape1)
     {
-      static_assert(sizeof *data.data() == sizeof(int32_t), "");
       std::vector<int64_t> shape(shape1.size());
       for (size_t d=0; d<shape.size(); ++d)
         shape[d] = shape1[d];
@@ -159,30 +182,13 @@ class ndarray {
     }
 
     static std::shared_ptr<ndarray>
-      create_int64(std::vector<long> data,
+      create_int16(std::vector<int16_t> data,
                    block_format_t block_format,
                    compression_t compression,
                    int compression_level,
                    std::vector<bool> mask,
                    const std::vector<long>& shape1)
     {
-      static_assert(sizeof *data.data() == sizeof(int64_t), "");
-      std::vector<int64_t> shape(shape1.size());
-      for (size_t d=0; d<shape.size(); ++d)
-        shape[d] = shape1[d];
-      return std::make_shared<ndarray>
-        (std::move(data), block_format, compression, compression_level,
-         std::move(mask), std::move(shape));
-    }
-    static std::shared_ptr<ndarray>
-      create_int64(std::vector<long long> data,
-                   block_format_t block_format,
-                   compression_t compression,
-                   int compression_level,
-                   std::vector<bool> mask,
-                   const std::vector<long>& shape1)
-    {
-      static_assert(sizeof *data.data() == sizeof(int64_t), "");
       std::vector<int64_t> shape(shape1.size());
       for (size_t d=0; d<shape.size(); ++d)
         shape[d] = shape1[d];
@@ -192,14 +198,45 @@ class ndarray {
     }
 
     static std::shared_ptr<ndarray>
-      create_float64(std::vector<double> data,
+      create_int32(std::vector<int32_t> data,
+                   block_format_t block_format,
+                   compression_t compression,
+                   int compression_level,
+                   std::vector<bool> mask,
+                   const std::vector<long>& shape1)
+    {
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
+      create_int64(std::vector<int64_t> data,
+                   block_format_t block_format,
+                   compression_t compression,
+                   int compression_level,
+                   std::vector<bool> mask,
+                   const std::vector<long>& shape1)
+    {
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
+      create_float16(std::vector<float16_t> data,
                      block_format_t block_format,
                      compression_t compression,
                      int compression_level,
                      std::vector<bool> mask,
                      const std::vector<long>& shape1)
     {
-      static_assert(sizeof *data.data() == sizeof(float64_t), "");
       std::vector<int64_t> shape(shape1.size());
       for (size_t d=0; d<shape.size(); ++d)
         shape[d] = shape1[d];
@@ -209,14 +246,77 @@ class ndarray {
     }
 
     static std::shared_ptr<ndarray>
-      create_complex128(std::vector<std::complex<double>> data,
+      create_float32(std::vector<float32_t> data,
+                     block_format_t block_format,
+                     compression_t compression,
+                     int compression_level,
+                     std::vector<bool> mask,
+                     const std::vector<long>& shape1)
+    {
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
+      create_float64(std::vector<float64_t> data,
+                     block_format_t block_format,
+                     compression_t compression,
+                     int compression_level,
+                     std::vector<bool> mask,
+                     const std::vector<long>& shape1)
+    {
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
+      create_complex32(std::vector<std::complex<float16_t>> data,
+                       block_format_t block_format,
+                       compression_t compression,
+                       int compression_level,
+                       std::vector<bool> mask,
+                       const std::vector<long>& shape1)
+    {
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
+      create_complex64(std::vector<std::complex<float32_t>> data,
+                       block_format_t block_format,
+                       compression_t compression,
+                       int compression_level,
+                       std::vector<bool> mask,
+                       const std::vector<long>& shape1)
+    {
+      std::vector<int64_t> shape(shape1.size());
+      for (size_t d=0; d<shape.size(); ++d)
+        shape[d] = shape1[d];
+      return std::make_shared<ndarray>
+        (std::move(data), block_format, compression, compression_level,
+         std::move(mask), std::move(shape));
+    }
+
+    static std::shared_ptr<ndarray>
+      create_complex128(std::vector<std::complex<float64_t>> data,
                         block_format_t block_format,
                         compression_t compression,
                         int compression_level,
                         std::vector<bool> mask,
                         const std::vector<long>& shape1)
     {
-      static_assert(sizeof *data.data() == sizeof(complex128_t), "");
       std::vector<int64_t> shape(shape1.size());
       for (size_t d=0; d<shape.size(); ++d)
         shape[d] = shape1[d];
@@ -233,65 +333,61 @@ class ndarray {
   }
 
   %extend {
-    std::vector<signed char> get_data_vector_int8() const
+    std::vector<int8_t> get_data_vector_int8() const
     {
-      static_assert(sizeof(signed char) == sizeof(int8_t), "");
-      return self->get_data_vector<signed char>();
+      return self->get_data_vector<int8_t>();
     }
-    std::vector<short> get_data_vector_int16() const
+    std::vector<int16_t> get_data_vector_int16() const
     {
-      static_assert(sizeof(short) == sizeof(int16_t), "");
-      return self->get_data_vector<short>();
+      return self->get_data_vector<int16_t>();
     }
-    std::vector<int> get_data_vector_int32() const
+    std::vector<int32_t> get_data_vector_int32() const
     {
-      static_assert(sizeof(int) == sizeof(int32_t), "");
-      return self->get_data_vector<int>();
+      return self->get_data_vector<int32_t>();
     }
-    std::vector<long long> get_data_vector_int64() const
+    std::vector<int64_t> get_data_vector_int64() const
     {
-      static_assert(sizeof(long long) == sizeof(int64_t), "");
-      return self->get_data_vector<long long>();
+      return self->get_data_vector<int64_t>();
     }
-    std::vector<unsigned char> get_data_vector_uint8() const
+    std::vector<uint8_t> get_data_vector_uint8() const
     {
-      static_assert(sizeof(unsigned char) == sizeof(uint8_t), "");
-      return self->get_data_vector<unsigned char>();
+      return self->get_data_vector<uint8_t>();
     }
-    std::vector<unsigned short> get_data_vector_uint16() const
+    std::vector<uint16_t> get_data_vector_uint16() const
     {
-      static_assert(sizeof(unsigned short) == sizeof(uint16_t), "");
-      return self->get_data_vector<unsigned short>();
+      return self->get_data_vector<uint16_t>();
     }
-    std::vector<unsigned int> get_data_vector_uint32() const
+    std::vector<uint32_t> get_data_vector_uint32() const
     {
-      static_assert(sizeof(unsigned int) == sizeof(uint32_t), "");
-      return self->get_data_vector<unsigned int>();
+      return self->get_data_vector<uint32_t>();
     }
-    std::vector<unsigned long long> get_data_vector_uint64() const
+    std::vector<uint64_t> get_data_vector_uint64() const
     {
-      static_assert(sizeof(unsigned long long) == sizeof(uint64_t), "");
-      return self->get_data_vector<unsigned long long>();
+      return self->get_data_vector<uint64_t>();
     }
-    std::vector<float> get_data_vector_float32() const
+    std::vector<float16_t> get_data_vector_float32() const
     {
-      static_assert(sizeof(float) == sizeof(float32_t), "");
-      return self->get_data_vector<float>();
+      return self->get_data_vector<float16_t>();
     }
-    std::vector<double> get_data_vector_float64() const
+    std::vector<float32_t> get_data_vector_float32() const
     {
-      static_assert(sizeof(double) == sizeof(float64_t), "");
-      return self->get_data_vector<double>();
+      return self->get_data_vector<float32_t>();
     }
-    std::vector<std::complex<float>> get_data_vector_complex64() const
+    std::vector<float64_t> get_data_vector_float64() const
     {
-      static_assert(sizeof(std::complex<float>) == sizeof(complex64_t), "");
-      return self->get_data_vector<std::complex<float>>();
+      return self->get_data_vector<float64_t>();
     }
-    std::vector<std::complex<double>> get_data_vector_complex128() const
+    std::vector<std::complex<float16_t>> get_data_vector_complex32() const
     {
-      static_assert(sizeof(std::complex<double>) == sizeof(complex128_t), "");
-      return self->get_data_vector<std::complex<double>>();
+      return self->get_data_vector<std::complex<float16_t>>();
+    }
+    std::vector<std::complex<float32_t>> get_data_vector_complex64() const
+    {
+      return self->get_data_vector<std::complex<float32_t>>();
+    }
+    std::vector<std::complex<float64_t>> get_data_vector_complex128() const
+    {
+      return self->get_data_vector<std::complex<float64_t>>();
     }
   }
 
@@ -439,12 +535,12 @@ class asdf {
  public:
 
   %extend {
-    static std::shared_ptr<asdf>
-      create_from_ndarrays(std::map<string, string> tags,
-                           std::map<string, std::shared_ptr<ndarray>> data)
-    {
-      return std::make_shared<asdf>(std::move(tags), std::move(data));
-    }
+    // static std::shared_ptr<asdf>
+    //   create_from_ndarrays(std::map<string, string> tags,
+    //                        std::map<string, std::shared_ptr<ndarray>> data)
+    // {
+    //   return std::make_shared<asdf>(std::move(tags), std::move(data));
+    // }
     static std::shared_ptr<asdf>
       create_from_group(std::map<string, string> tags,
                         std::shared_ptr<group> grp)

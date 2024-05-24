@@ -8,8 +8,8 @@ fi
 # dir=`mktemp -d`
 dir="/tmp/$USER-$$-`date -u +%Y%m%dT%H%M%S`"
 mkdir "$dir"
-$1 >"$dir/output1"
-$2 >"$dir/output2"
+$1 | grep -v compress | grep -v checksum >"$dir/output1"
+$2 | grep -v compress | grep -v checksum >"$dir/output2"
 diff -u "$dir/output1" "$dir/output2"
 retval=$?
 rm -rf "$dir"

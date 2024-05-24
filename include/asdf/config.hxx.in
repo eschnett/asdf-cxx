@@ -1,0 +1,128 @@
+#ifndef ASDF_CONFIG_HPP
+#define ASDF_CONFIG_HPP
+
+#include <string>
+
+namespace ASDF {
+
+// Standard version
+
+#define ASDF_STANDARD_VERSION_MAJOR 1
+#define ASDF_STANDARD_VERSION_MINOR 2
+#define ASDF_STANDARD_VERSION_PATCH 0
+
+#define ASDF_STANDARD_VERSION "1.2.0"
+
+int asdf_standard_version_major();
+int asdf_standard_version_minor();
+int asdf_standard_version_patch();
+
+std::string asdf_standard_version();
+
+// Software version
+
+#define ASDF_CXX_NAME "asdf-cxx"
+#define ASDF_CXX_AUTHOR "Erik Schnetter"
+#define ASDF_CXX_HOMEPAGE "https://github.com/eschnett/asdf-cxx"
+
+#define ASDF_CXX_VERSION_MAJOR @asdf-cxx_VERSION_MAJOR@
+#define ASDF_CXX_VERSION_MINOR @asdf-cxx_VERSION_MINOR@
+#define ASDF_CXX_VERSION_PATCH @asdf-cxx_VERSION_PATCH@
+
+#define ASDF_CXX_VERSION                                                       \
+  "@asdf-cxx_VERSION_MAJOR@.@asdf-cxx_VERSION_MINOR@.@asdf-cxx_VERSION_PATCH@"
+
+int asdf_cxx_version_major();
+int asdf_cxx_version_minor();
+int asdf_cxx_version_patch();
+
+std::string asdf_cxx_version();
+
+// Suport for some types
+#cmakedefine ASDF_HAVE_FLOAT16
+#cmakedefine ASDF_HAVE_INT128
+
+// blosc support
+
+#if @HAVE_BLOSC@
+#define ASDF_HAVE_BLOSC 1
+#else
+#undef ASDF_HAVE_BLOSC
+#endif
+
+// blosc2 support
+
+#if @HAVE_BLOSC2@
+#define ASDF_HAVE_BLOSC2 1
+#else
+#undef ASDF_HAVE_BLOSC2
+#endif
+
+// bzip2 support
+
+#if @HAVE_BZIP2@
+#define ASDF_HAVE_BZIP2 1
+#else
+#undef ASDF_HAVE_BZIP2
+#endif
+
+// liblz4 support
+
+#if @HAVE_LIBLZ4@
+#define ASDF_HAVE_LIBLZ4 1
+#else
+#undef ASDF_HAVE_LIBLZ4
+#endif
+
+// libzstd support
+
+#if @HAVE_LIBZSTD@
+#define ASDF_HAVE_LIBZSTD 1
+#else
+#undef ASDF_HAVE_LIBZSTD
+#endif
+
+// OpenSSL support
+
+#if @HAVE_OPENSSL@
+#define ASDF_HAVE_OPENSSL 1
+#else
+#undef ASDF_HAVE_OPENSSL
+#endif
+
+// zlib support
+
+#if @HAVE_ZLIB@
+#define ASDF_HAVE_ZLIB 1
+#else
+#undef ASDF_HAVE_ZLIB
+#endif
+
+// Consistency check
+
+void check_version(const char *header_version, bool have_float16,
+                   bool have_int128);
+
+#ifdef ASDF_HAVE_FLOAT16
+#define ASDF_FLOAT16_SUPPORTED 1
+#else
+#define ASDF_FLOAT16_SUPPORTED 0
+#endif
+
+#ifdef ASDF_HAVE_INT128
+#define ASDF_INT128_SUPPORTED 1
+#else
+#define ASDF_INT128_SUPPORTED 0
+#endif
+
+#define ASDF_CHECK_VERSION()                                                   \
+  (::ASDF::check_version(ASDF_CXX_VERSION, ASDF_FLOAT16_SUPPORTED,             \
+                         ASDF_INT128_SUPPORTED))
+
+} // namespace ASDF
+
+#define ASDF_CONFIG_HPP_DONE
+#endif // #ifndef ASDF_CONFIG_HPP
+#ifndef ASDF_CONFIG_HPP_DONE
+#error "Cyclic include depencency"
+#endif

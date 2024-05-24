@@ -1,1 +1,5 @@
+Testing
 build
+coverage.info
+*.asdf
+BUILD.md

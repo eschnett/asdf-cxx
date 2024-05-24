@@ -2,22 +2,41 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - {os: ubuntu-22.04}
+          - {os: macos-12}
+    runs-on: ${{matrix.os}}
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
-      run: sudo apt install -y libblosc-dev libbz2-dev libssl-dev libyaml-cpp-dev libzstd-dev zlib1g-dev
+      if: startsWith(matrix.os, 'macos')
+      run: brew install bzip2 c-blosc lcov ninja numpy yaml-cpp
+    - name: Install dependencies
+      if: startsWith(matrix.os, 'ubuntu')
+      run: sudo apt install -y lcov libblosc-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
     - name: Configure
-      run: cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$HOME/install"
+      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="{$HOME}/install" -DCODE_COVERAGE=ON
     - name: Build
-      run: cmake --build build --jobs $(nproc)
-    - name: Install
-      run: cmake --install build
+      run: cmake --build build --parallel $(nproc)
     - name: Test
       run: ctest --test-dir build --output-on-failure
+    - name: Install
+      run: cmake --install build
+    - name: Collect code coverage
+      # `lcov` reports errors on macos
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        lcov --capture --directory . --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' --output-file coverage.info # filter system-files
+        lcov --list coverage.info # debug info
+    - uses: codecov/codecov-action@v4
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
