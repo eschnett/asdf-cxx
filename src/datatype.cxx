@@ -312,15 +312,8 @@ void yaml_decode_complex(const YAML::Node &node, complex<T> &val) {
   smatch m;
   bool didmatch = regex_match(str, m, cmplx);
   assert(didmatch);
-  T re, im;
-  if (m[1].matched)
-    re = stod(m[1].str());
-  else
-    re = 0;
-  if (m[6].matched)
-    im = stod(m[6].str());
-  else
-    im = 0;
+  const T re = m[1].matched ? static_cast<T>(stold(m[1].str())) : 0;
+  const T im = m[6].matched ? static_cast<T>(stold(m[1].str())) : 0;
   val = {re, im};
 }
 } // namespace
