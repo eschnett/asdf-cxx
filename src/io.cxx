@@ -5,6 +5,7 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <cstdlib>
 #include <fstream>
 
 namespace ASDF {
@@ -113,7 +114,7 @@ std::ostream &operator<<(std::ostream &os, compression_t compression) {
 reader_state::reader_state(const YAML::Node &tree,
                            const shared_ptr<istream> &pis,
                            const string &filename)
-    : filename(filename), tree(tree) {
+    : tree(tree), filename(filename) {
   for (;;) {
     const auto [block, block_info] = ndarray::read_block(pis);
     if (!block.valid())
@@ -141,7 +142,7 @@ YAML::Node reader_state::resolve_reference(const vector<string> &path) const {
           return stoi(elem);
         } catch (exception &) {
           assert(0);
-          return -1; // suppress compiler warning
+          std::abort();
         }
       }();
       node = unique_ptr<YAML::Node>(new YAML::Node((*node)[idx]));
