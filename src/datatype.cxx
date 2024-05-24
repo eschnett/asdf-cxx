@@ -314,11 +314,11 @@ void yaml_decode_complex(const YAML::Node &node, complex<T> &val) {
   assert(didmatch);
   T re, im;
   if (m[1].matched)
-    re = stod(m[1].str());
+    re = static_cast<T>(stod(m[1].str()));
   else
     re = 0;
   if (m[6].matched)
-    im = stod(m[6].str());
+    im = static_cast<T>(stod(m[6].str()));
   else
     im = 0;
   val = {re, im};

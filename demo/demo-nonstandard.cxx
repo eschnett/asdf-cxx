@@ -36,8 +36,12 @@ int main(int argc, char **argv) {
   grp->emplace("gamma", array2d);
 
 #ifdef ASDF_HAVE_FLOAT16
+  std::vector<_Float16> vec;
+  for (float val : {1.0, 2.0, 3.0, 4.0, 5.0, 6.0}) {
+      vec.push_back(static_cast<_Float16>(val));
+  }
   auto array2d16 =
-      make_shared<ndarray>(vector<float16_t>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0},
+      make_shared<ndarray>(vec,
                            block_format_t::inline_array, compression_t::none, 0,
                            vector<bool>(), vector<int64_t>{2, 3});
   grp->emplace("gamma16", array2d16);
