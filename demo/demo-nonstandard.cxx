@@ -29,17 +29,15 @@ int main(int argc, char **argv) {
       vector<bool>(), vector<int64_t>{3});
   grp->emplace("beta", array1d);
 
-  auto array2d =
-      make_shared<ndarray>(vector<float64_t>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0},
-                           block_format_t::inline_array, compression_t::none, 0,
-                           vector<bool>(), vector<int64_t>{2, 3});
+  auto array2d = make_shared<ndarray>(
+      vector<float64_t>{1, 2, 3, 4, 5, 6}, block_format_t::inline_array,
+      compression_t::none, 0, vector<bool>(), vector<int64_t>{2, 3});
   grp->emplace("gamma", array2d);
 
 #ifdef ASDF_HAVE_FLOAT16
-  auto array2d16 =
-      make_shared<ndarray>(vector<float16_t>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0},
-                           block_format_t::inline_array, compression_t::none, 0,
-                           vector<bool>(), vector<int64_t>{2, 3});
+  auto array2d16 = make_shared<ndarray>(
+      vector<float16_t>{1, 2, 3, 4, 5, 6}, block_format_t::inline_array,
+      compression_t::none, 0, vector<bool>(), vector<int64_t>{2, 3});
   grp->emplace("gamma16", array2d16);
 #endif
 
