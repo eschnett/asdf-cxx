@@ -52,7 +52,7 @@ void parse_inline_array_nd(const YAML::Node &node,
                            const vector<int64_t> &shape, int rank,
                            vector<unsigned char> &data) {
   assert(rank >= 0);
-  assert(shape.size() >= rank);
+  assert(shape.size() >= static_cast<size_t>(rank));
   if (rank == 0) {
     assert(node.IsScalar());
     size_t oldsize = data.size();
@@ -62,7 +62,7 @@ void parse_inline_array_nd(const YAML::Node &node,
   }
   int64_t size = shape.at(shape.size() - rank);
   assert(node.IsSequence());
-  assert(node.size() == size);
+  assert(node.size() == static_cast<size_t>(size));
   for (YAML::const_iterator ni = node.begin(), ne = node.end(); ni != ne; ++ni)
     parse_inline_array_nd(*ni, datatype, shape, rank - 1, data);
 }
@@ -94,17 +94,17 @@ void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
       datatype = make_shared<datatype_t>(id_int64);
       data1.reserve(npoints * datatype->type_size());
       parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
-    } catch (YAML::RepresentationException) {
+    } catch (const YAML::RepresentationException &) {
       try {
         datatype = make_shared<datatype_t>(id_float64);
         data1.reserve(npoints * datatype->type_size());
         parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
-      } catch (YAML::RepresentationException) {
+      } catch (const YAML::RepresentationException &) {
         try {
           datatype = make_shared<datatype_t>(id_complex128);
           data1.reserve(npoints * datatype->type_size());
           parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
-        } catch (YAML::RepresentationException) {
+        } catch (const YAML::RepresentationException &) {
           // bool8_t
           // ucs4_t
           assert(0);
@@ -138,7 +138,7 @@ YAML::Node emit_inline_array(const unsigned char *data,
     // 1-dimensional array
     YAML::Node node;
     // node.SetStyle(YAML::EmitterStyle::Flow);
-    for (size_t i = 0; i < shape.at(0); ++i)
+    for (size_t i = 0; i < static_cast<size_t>(shape.at(0)); ++i)
       node[i] = emit_scalar(data + i * strides.at(0), datatype, byteorder);
     return node;
   }
@@ -151,7 +151,7 @@ YAML::Node emit_inline_array(const unsigned char *data,
   vector<int64_t> strides1(rank - 1);
   for (size_t d = 0; d < rank - 1; ++d)
     strides1.at(d) = strides.at(d + 1);
-  for (size_t i = 0; i < shape.at(0); ++i)
+  for (size_t i = 0; i < static_cast<size_t>(shape.at(0)); ++i)
     node[i] = emit_inline_array(data + i * strides.at(0), datatype, byteorder,
                                 shape1, strides1);
   return node;
@@ -197,7 +197,7 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     assert(ires == 1);
     ires = EVP_DigestUpdate(mdctx, indata.data(), indata.size());
     assert(ires == 1);
-    assert(EVP_MD_size(EVP_md5()) == checksum.size());
+    assert(static_cast<size_t>(EVP_MD_size(EVP_md5())) == checksum.size());
     unsigned int digest_size;
     ires = EVP_DigestFinal_ex(mdctx, checksum.data(), &digest_size);
     assert(digest_size == checksum.size());
