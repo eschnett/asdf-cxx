@@ -42,7 +42,10 @@ inline T xtoh(const unsigned char *data, byteorder_t byteorder) {
 template <typename T>
 inline array<unsigned char, sizeof(T)> htox(const T &val,
                                             byteorder_t byteorder) {
-  auto data = reinterpret_cast<const array<unsigned char, sizeof(T)>>(val);
+  array<unsigned char, sizeof(T)> data;
+  const unsigned char *ptr = reinterpret_cast<const unsigned char *>(&val);
+  for (size_t i = 0; i < sizeof(T); ++i)
+    data[i] = ptr[i];
   if (byteorder == host_byteorder())
     return data;
   array<unsigned char, sizeof(T)> res;
