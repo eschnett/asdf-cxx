@@ -545,7 +545,7 @@ void ndarray::write_block(ostream &os) const {
     bool needs_free;
     const int64_t size = blosc2_schunk_to_buffer(schunk, &cframe, &needs_free);
 
-    // TODO: Reuse `cframe`, at least of `needs_free== true`
+    // TODO: Reuse `cframe`, at least if `needs_free== true`
     outdata =
         make_shared<typed_block_t<unsigned char>>(vector<unsigned char>(size));
     std::memcpy(outdata->ptr(), cframe, outdata->nbytes());
