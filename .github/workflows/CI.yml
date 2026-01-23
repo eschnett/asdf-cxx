@@ -11,11 +11,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - {os: ubuntu-22.04}
-          - {os: macos-12}
+          - {os: macOS-15-arm64}
+          - {os: macOS-15}
+          - {os: ubuntu-24.04}
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Install dependencies
       if: startsWith(matrix.os, 'macos')
       run: brew install bzip2 c-blosc coreutils lcov ninja numpy yaml-cpp
@@ -37,6 +38,6 @@ jobs:
         lcov --capture --directory . --output-file coverage.info
         lcov --remove coverage.info '/usr/*' --output-file coverage.info # filter system-files
         lcov --list coverage.info # debug info
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{secrets.CODECOV_TOKEN}}
