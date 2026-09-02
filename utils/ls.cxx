@@ -44,7 +44,12 @@ void output(std::ostream &os, const int indent,
 
 void output(std::ostream &os, const int indent,
             const std::shared_ptr<ndarray> &arr) {
-  const auto block_info = *arr->get_block_info();
+  const auto maybe_block_info = arr->get_block_info();
+  if (!maybe_block_info) {
+    os << std::string(indent, ' ') << "inline array\n";
+    return;
+  }
+  const auto block_info = *maybe_block_info;
   os << std::string(indent, ' ') << "block_info:\n";
   os << std::string(indent + indent_step, ' ')
      << "compressor:        " << block_info.compression << "\n";

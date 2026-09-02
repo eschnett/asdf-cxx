@@ -82,14 +82,6 @@ int main(int argc, char **argv) {
       vector<int64_t>{nrecords});
   grp->emplace("theta", record_array);
 
-  auto record_arrayb = make_shared<ndarray>(
-      make_constant_memoized(shared_ptr<block_t>(
-          make_shared<typed_block_t<unsigned char>>(record_data))),
-      optional<block_info_t>(), block_format_t::inline_array,
-      compression_t::none, 0, vector<bool>(), record_datatype, host_byteorder(),
-      vector<int64_t>{nrecords});
-  grp->emplace("thetab", record_arrayb);
-
   auto seq = make_shared<sequence>();
   seq->emplace_back(array1d);
   seq->emplace_back(array2d);
