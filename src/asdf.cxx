@@ -49,7 +49,7 @@ asdf::asdf(const copy_state &cs, const asdf &project) {
 writer &asdf::to_yaml(writer &w) const {
   w << YAML::LocalTag("core/asdf-1.1.0");
   w << YAML::BeginMap;
-  w << YAML::Key << "asdf/library" << YAML::Value
+  w << YAML::Key << "asdf_library" << YAML::Value
     << software(ASDF_CXX_NAME, ASDF_CXX_AUTHOR, ASDF_CXX_HOMEPAGE,
                 ASDF_CXX_VERSION);
   // for (const auto &kv : data)
@@ -60,7 +60,7 @@ writer &asdf::to_yaml(writer &w) const {
   //   w << YAML::Key << "group" << YAML::Value << *grp;
   if (grp)
     for (const auto &[key, value] : *grp->get_group())
-      if (key != "asdf/library")
+      if (key != "asdf_library")
         w << YAML::Key << key << YAML::Value << *value;
   for (const auto &kv : nodes)
     w << YAML::Key << kv.first << YAML::Value << kv.second;
