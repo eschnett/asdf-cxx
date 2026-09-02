@@ -2,4 +2,5 @@ Testing
 build
 coverage.info
 *.asdf
+!tests/*.asdf
 BUILD.md

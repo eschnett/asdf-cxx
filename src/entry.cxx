@@ -172,7 +172,8 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
   // if (tag == "tag:stsci.edu:asdf/core/history_entry-1.0.0")
   //   return std::make_shared<history_entry>(rs, node);
 
-  if (tag == "tag:stsci.edu:asdf/core/ndarray-1.0.0")
+  if (tag == "tag:stsci.edu:asdf/core/ndarray-1.0.0" ||
+      tag == "tag:stsci.edu:asdf/core/ndarray-1.1.0")
     return std::make_shared<ndarray_entry>(std::make_shared<ndarray>(rs, node));
 
   assert(tag.empty() || tag == "?" || tag == "!");

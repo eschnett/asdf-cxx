@@ -23,7 +23,16 @@ asdf::asdf(const shared_ptr<reader_state> &rs, const YAML::Node &node,
 
   // TODO: data, table
 
-  grp = std::make_shared<group>(rs, node);
+  // History entries are not supported and are ignored when reading. (Their
+  // tagged extension metadata would otherwise be rejected as unknown tags.)
+  assert(node.IsMap());
+  grp = std::make_shared<group>();
+  for (const auto &key_value : node) {
+    const auto key = key_value.first.Scalar();
+    if (key == "history")
+      continue;
+    grp->insert(key, make_entry(rs, key_value.second));
+  }
 }
 
 asdf::asdf(const copy_state &cs, const asdf &project) {
@@ -40,7 +49,7 @@ asdf::asdf(const copy_state &cs, const asdf &project) {
 writer &asdf::to_yaml(writer &w) const {
   w << YAML::LocalTag("core/asdf-1.1.0");
   w << YAML::BeginMap;
-  w << YAML::Key << "asdf/library" << YAML::Value
+  w << YAML::Key << "asdf_library" << YAML::Value
     << software(ASDF_CXX_NAME, ASDF_CXX_AUTHOR, ASDF_CXX_HOMEPAGE,
                 ASDF_CXX_VERSION);
   // for (const auto &kv : data)
@@ -51,7 +60,7 @@ writer &asdf::to_yaml(writer &w) const {
   //   w << YAML::Key << "group" << YAML::Value << *grp;
   if (grp)
     for (const auto &[key, value] : *grp->get_group())
-      if (key != "asdf/library")
+      if (key != "asdf_library")
         w << YAML::Key << key << YAML::Value << *value;
   for (const auto &kv : nodes)
     w << YAML::Key << kv.first << YAML::Value << kv.second;

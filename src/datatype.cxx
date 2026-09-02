@@ -1,5 +1,6 @@
 #include <asdf/config.hxx>
 #include <asdf/datatype.hxx>
+#include <asdf/stl.hxx>
 
 #include <limits>
 #include <regex>
@@ -10,14 +11,14 @@
 namespace ASDF {
 
 bool have_datatype_int128() {
-#ifdef HAVE_INT128
+#ifdef ASDF_HAVE_INT128
   return true;
 #else
   return false;
 #endif
 }
 bool have_datatype_float16() {
-#ifdef HAVE_FLOAT16
+#ifdef ASDF_HAVE_FLOAT16
   return true;
 #else
   return false;
@@ -609,14 +610,44 @@ field_t::field_t(string name, shared_ptr<datatype_t> datatype,
     : name(std::move(name)), datatype(std::move(datatype)),
       have_byteorder(have_byteorder), byteorder(byteorder),
       shape(std::move(shape)) {
-  assert(datatype);
+  // (The constructor argument has been moved from)
+  assert(this->datatype);
 }
 
-field_t::field_t(const shared_ptr<reader_state> &rs, const YAML::Node &node) {
-  assert(0);
+field_t::field_t(const shared_ptr<reader_state> &rs, const YAML::Node &node)
+    : have_byteorder(false), byteorder(byteorder_t::undefined) {
+  if (node.IsScalar()) {
+    // An anonymous field, described by its datatype alone
+    datatype = make_shared<datatype_t>(rs, node);
+    return;
+  }
+  assert(node.IsMap());
+  if (node["name"].IsDefined())
+    name = node["name"].Scalar();
+  // The datatype is the only required entry. It can itself be structured.
+  assert(node["datatype"].IsDefined());
+  datatype = make_shared<datatype_t>(rs, node["datatype"]);
+  if (node["byteorder"].IsDefined()) {
+    have_byteorder = true;
+    yaml_decode(node["byteorder"], byteorder);
+  }
+  if (node["shape"].IsDefined())
+    yaml_decode(node["shape"], shape);
 }
 
-field_t::field_t(const copy_state &cs, const field_t &field) { assert(0); }
+field_t::field_t(const copy_state &cs, const field_t &field)
+    : name(field.name), datatype(make_shared<datatype_t>(cs, *field.datatype)),
+      have_byteorder(field.have_byteorder), byteorder(field.byteorder),
+      shape(field.shape) {}
+
+size_t field_t::type_size() const {
+  size_t size = datatype->type_size();
+  for (const auto &s : shape) {
+    assert(s >= 0);
+    size *= s;
+  }
+  return size;
+}
 
 YAML::Node field_t::to_yaml() const {
   YAML::Node node;
@@ -626,7 +657,7 @@ YAML::Node field_t::to_yaml() const {
   if (have_byteorder)
     node["byteorder"] = yaml_encode(byteorder);
   if (!shape.empty())
-    node["shape"] = shape;
+    node["shape"] = yaml_encode(shape);
   return node;
 }
 
@@ -634,14 +665,15 @@ datatype_t::datatype_t(scalar_type_id_t scalar_type_id)
     : is_scalar(true), scalar_type_id(scalar_type_id) {}
 
 datatype_t::datatype_t(vector<shared_ptr<field_t>> fields)
-    : is_scalar(false), fields(std::move(fields)) {}
+    : is_scalar(false), scalar_type_id(id_error), fields(std::move(fields)) {}
 
 size_t datatype_t::type_size() const {
   if (is_scalar)
     return get_scalar_type_size(scalar_type_id);
+  // Structured types are packed, without any alignment padding
   size_t size = 0;
   for (const auto &field : fields)
-    size += field->datatype->type_size();
+    size += field->type_size();
   return size;
 }
 
@@ -654,13 +686,19 @@ datatype_t::datatype_t(const shared_ptr<reader_state> &rs,
   }
   assert(node.IsSequence());
   is_scalar = false;
+  scalar_type_id = id_error;
   fields.reserve(node.size());
   for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni)
     fields.push_back(make_shared<field_t>(rs, *ni));
 }
 
-datatype_t::datatype_t(const copy_state &cs, const datatype_t &datatype) {
-  assert(0);
+datatype_t::datatype_t(const copy_state &cs, const datatype_t &datatype)
+    : is_scalar(datatype.is_scalar), scalar_type_id(datatype.scalar_type_id) {
+  if (is_scalar)
+    return;
+  fields.reserve(datatype.fields.size());
+  for (const auto &field : datatype.fields)
+    fields.push_back(make_shared<field_t>(cs, *field));
 }
 
 YAML::Node datatype_t::to_yaml() const {
@@ -672,32 +710,73 @@ YAML::Node datatype_t::to_yaml() const {
   return node;
 }
 
+namespace {
+
+// Parse a field that may be a sub-array, i.e. that may have a `shape`. The
+// elements are stored contiguously in C order, and `ptr` is advanced past
+// them.
+void parse_field(const YAML::Node &node, unsigned char *&ptr,
+                 const shared_ptr<datatype_t> &datatype,
+                 const vector<int64_t> &shape, size_t dim,
+                 byteorder_t byteorder) {
+  if (dim == shape.size()) {
+    parse_scalar(node, ptr, datatype, byteorder);
+    ptr += datatype->type_size();
+    return;
+  }
+  assert(node.IsSequence());
+  assert(node.size() == static_cast<size_t>(shape.at(dim)));
+  for (YAML::const_iterator ni = node.begin(), ne = node.end(); ni != ne; ++ni)
+    parse_field(*ni, ptr, datatype, shape, dim + 1, byteorder);
+}
+
+YAML::Node emit_field(const unsigned char *&ptr,
+                      const shared_ptr<datatype_t> &datatype,
+                      const vector<int64_t> &shape, size_t dim,
+                      byteorder_t byteorder) {
+  if (dim == shape.size()) {
+    YAML::Node node = emit_scalar(ptr, datatype, byteorder);
+    ptr += datatype->type_size();
+    return node;
+  }
+  YAML::Node node(YAML::NodeType::Sequence);
+  node.SetStyle(YAML::EmitterStyle::Flow);
+  for (int64_t i = 0; i < shape.at(dim); ++i)
+    node.push_back(emit_field(ptr, datatype, shape, dim + 1, byteorder));
+  return node;
+}
+
+} // namespace
+
 void parse_scalar(const YAML::Node &node, unsigned char *data,
                   const shared_ptr<datatype_t> &datatype,
                   byteorder_t byteorder) {
   if (datatype->is_scalar)
     return parse_scalar(node, data, datatype->scalar_type_id, byteorder);
+  // A structured element is a sequence with one entry per field
+  assert(node.IsSequence());
+  assert(node.size() == datatype->fields.size());
   unsigned char *ptr = data;
-  for (const auto &field : datatype->fields) {
-    parse_scalar(node, ptr, field->datatype,
-                 field->have_byteorder ? field->byteorder : byteorder);
-    ptr += field->datatype->type_size();
+  for (size_t i = 0; i < datatype->fields.size(); ++i) {
+    const auto &field = datatype->fields.at(i);
+    parse_field(node[i], ptr, field->datatype, field->shape, 0,
+                field->have_byteorder ? field->byteorder : byteorder);
   }
+  assert(ptr == data + datatype->type_size());
 }
 YAML::Node emit_scalar(const unsigned char *data,
                        const shared_ptr<datatype_t> &datatype,
                        byteorder_t byteorder) {
   if (datatype->is_scalar)
     return emit_scalar(data, datatype->scalar_type_id, byteorder);
-  YAML::Node node;
+  YAML::Node node(YAML::NodeType::Sequence);
   node.SetStyle(YAML::EmitterStyle::Flow);
   const unsigned char *ptr = data;
-  for (const auto &field : datatype->fields) {
+  for (const auto &field : datatype->fields)
     node.push_back(
-        emit_scalar(ptr, field->datatype,
-                    field->have_byteorder ? field->byteorder : byteorder));
-    ptr += field->datatype->type_size();
-  }
+        emit_field(ptr, field->datatype, field->shape, 0,
+                   field->have_byteorder ? field->byteorder : byteorder));
+  assert(ptr == data + datatype->type_size());
   return node;
 }
 

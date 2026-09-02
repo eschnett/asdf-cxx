@@ -287,6 +287,9 @@ public:
   field_t(const copy_state &cs, const field_t &field);
   YAML::Node to_yaml() const;
   YAML::Node to_yaml(writer &w) const { return to_yaml(); }
+
+  // Number of bytes occupied by this field, including its `shape`
+  size_t type_size() const;
 };
 
 inline YAML::Node yaml_encode(const field_t &field) { return field.to_yaml(); }

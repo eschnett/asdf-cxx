@@ -84,6 +84,19 @@ else()
   set(HAVE_ZLIB 0)
 endif()
 
+# Optionally insist on every optional dependency. CI turns this on so that
+# all compression and checksum code paths are built and tested.
+option(ASDF_REQUIRE_ALL_DEPENDENCIES
+  "Fail configuration if any optional dependency is missing" OFF)
+if(ASDF_REQUIRE_ALL_DEPENDENCIES)
+  foreach(dep BLOSC BLOSC2 BZIP2 LIBLZ4 LIBZSTD OPENSSL ZLIB)
+    if(NOT HAVE_${dep})
+      message(FATAL_ERROR "Optional dependency ${dep} was not found, "
+        "but ASDF_REQUIRE_ALL_DEPENDENCIES is ON")
+    endif()
+  endforeach()
+endif()
+
 #TODO set(Python_ADDITIONAL_VERSIONS 3.0)
 #TODO # This sets PYTHONINTERP_FOUND
 #TODO find_package(PythonInterp)
@@ -202,6 +215,29 @@ add_test(NAME compare-demo
   COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
   "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
 add_test(NAME external COMMAND ./asdf-demo-external)
+add_test(NAME compression COMMAND ./asdf-demo-compression)
+# Read files written by the Python reference implementation; see
+# tests/README.md
+add_test(NAME padded-ls
+  COMMAND ./asdf-ls ${CMAKE_SOURCE_DIR}/tests/padded.asdf)
+add_test(NAME padded-copy
+  COMMAND ./asdf-copy ${CMAKE_SOURCE_DIR}/tests/padded.asdf padded2.asdf)
+add_test(NAME padded-ls2 COMMAND ./asdf-ls padded2.asdf)
+set_tests_properties(padded-ls2 PROPERTIES DEPENDS padded-copy)
+add_test(NAME python-default-ls
+  COMMAND ./asdf-ls ${CMAKE_SOURCE_DIR}/tests/python-default.asdf)
+add_test(NAME python-default-copy
+  COMMAND ./asdf-copy ${CMAKE_SOURCE_DIR}/tests/python-default.asdf
+  python-default2.asdf)
+add_test(NAME python-default-ls2 COMMAND ./asdf-ls python-default2.asdf)
+set_tests_properties(python-default-ls2 PROPERTIES DEPENDS python-default-copy)
+if(LIBLZ4_FOUND)
+  add_test(NAME lz4-ls COMMAND ./asdf-ls ${CMAKE_SOURCE_DIR}/tests/lz4.asdf)
+  add_test(NAME lz4-copy
+    COMMAND ./asdf-copy ${CMAKE_SOURCE_DIR}/tests/lz4.asdf lz4-2.asdf)
+  add_test(NAME lz4-ls2 COMMAND ./asdf-ls lz4-2.asdf)
+  set_tests_properties(lz4-ls2 PROPERTIES DEPENDS lz4-copy)
+endif()
 
 # These tests are broken in Python 3:
 # SWIG does not translate between numpy integer arrays and C++ std::vector

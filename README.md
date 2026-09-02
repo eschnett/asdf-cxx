@@ -53,9 +53,15 @@ Other minor limitations are:
   must not rely on this. asdf-cxx does probably not yet honour all
   these "optional requirements".
 - JSON URI references are not percent encoded
+- Two lz4 encodings are supported. `lz4` is the standard's encoding and
+  interoperates with the Python `asdf` library. `lz4f`, the LZ4 frame
+  format, is an asdf-cxx extension that other implementations do not
+  read; it is kept so that files written by earlier versions of asdf-cxx,
+  which used it exclusively, stay readable.
 
 Things that should be improved:
-- Tests should compare to the Python reference `asdf` library
+- More tests should compare to the Python reference `asdf` library
+  (the fixtures in `tests/` are a start)
 
 Also, the `yaml-cpp` library outputs the YAML 1.2 format, whereas ASDF
 requires the YAML 1.1 format. The differences between these two
@@ -108,3 +114,7 @@ cmake --build build
 ctest --test-dir build
 cmake --install build
 ```
+
+All compression and checksum libraries are optional. Configure with
+`-DASDF_REQUIRE_ALL_DEPENDENCIES=ON` to make CMake fail instead of
+silently leaving a feature out; CI does this.

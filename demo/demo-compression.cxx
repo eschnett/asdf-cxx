@@ -71,10 +71,21 @@ void write_file(const std::vector<int64_t> &shape,
   }
 
   if (have_compression_liblz4()) {
-    auto array3d_liblz4 = make_shared<ndarray>(data3d, block_format_t::block,
-                                               compression_t::liblz4, 9,
-                                               std::vector<bool>(), shape);
-    grp->emplace("array3d_liblz4", array3d_liblz4);
+    auto array3d_lz4 =
+        make_shared<ndarray>(data3d, block_format_t::block, compression_t::lz4,
+                             9, std::vector<bool>(), shape);
+    grp->emplace("array3d_lz4", array3d_lz4);
+    auto array3d_lz4f =
+        make_shared<ndarray>(data3d, block_format_t::block, compression_t::lz4f,
+                             9, std::vector<bool>(), shape);
+    grp->emplace("array3d_lz4f", array3d_lz4f);
+  }
+
+  if (have_compression_libzstd()) {
+    auto array3d_libzstd = make_shared<ndarray>(data3d, block_format_t::block,
+                                                compression_t::libzstd, 9,
+                                                std::vector<bool>(), shape);
+    grp->emplace("array3d_libzstd", array3d_libzstd);
   }
 
   if (have_compression_zlib()) {
@@ -140,11 +151,28 @@ void read_file(const std::vector<int64_t> &shape,
   }
 
   if (have_compression_liblz4()) {
-    const std::shared_ptr<ndarray> array3d_liblz4 =
-        grp->at("array3d_liblz4")->get_maybe_ndarray();
-    const std::vector<T> data3d_liblz4 = array3d_liblz4->get_data_vector<T>();
-    if (!data_equal(shape, data3d, data3d_liblz4)) {
-      std::cerr << "Dataset \"array3d_liblz4\" is incorrect\n";
+    const std::shared_ptr<ndarray> array3d_lz4 =
+        grp->at("array3d_lz4")->get_maybe_ndarray();
+    const std::vector<T> data3d_lz4 = array3d_lz4->get_data_vector<T>();
+    if (!data_equal(shape, data3d, data3d_lz4)) {
+      std::cerr << "Dataset \"array3d_lz4\" is incorrect\n";
+      std::exit(1);
+    }
+    const std::shared_ptr<ndarray> array3d_lz4f =
+        grp->at("array3d_lz4f")->get_maybe_ndarray();
+    const std::vector<T> data3d_lz4f = array3d_lz4f->get_data_vector<T>();
+    if (!data_equal(shape, data3d, data3d_lz4f)) {
+      std::cerr << "Dataset \"array3d_lz4f\" is incorrect\n";
+      std::exit(1);
+    }
+  }
+
+  if (have_compression_libzstd()) {
+    const std::shared_ptr<ndarray> array3d_libzstd =
+        grp->at("array3d_libzstd")->get_maybe_ndarray();
+    const std::vector<T> data3d_libzstd = array3d_libzstd->get_data_vector<T>();
+    if (!data_equal(shape, data3d, data3d_libzstd)) {
+      std::cerr << "Dataset \"array3d_libzstd\" is incorrect\n";
       std::exit(1);
     }
   }

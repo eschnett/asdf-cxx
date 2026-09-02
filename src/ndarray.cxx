@@ -18,6 +18,7 @@
 #ifdef ASDF_HAVE_LIBLZ4
 #include <lz4.h>
 #include <lz4frame.h>
+#include <lz4hc.h>
 #endif
 
 #ifdef ASDF_HAVE_LIBZSTD
@@ -39,6 +40,19 @@
 
 namespace ASDF {
 
+#ifdef ASDF_HAVE_BLOSC2
+namespace {
+// blosc2 must be initialised once per process before its schunk API is used
+void ensure_blosc2_initialized() {
+  static const bool initialized = [] {
+    blosc2_init();
+    return true;
+  }();
+  (void)initialized;
+}
+} // namespace
+#endif
+
 // Multi-dimensional array
 
 typed_block_t<bool>::typed_block_t(const vector<bool> &data) {
@@ -54,7 +68,9 @@ void parse_inline_array_nd(const YAML::Node &node,
   assert(rank >= 0);
   assert(shape.size() >= static_cast<size_t>(rank));
   if (rank == 0) {
-    assert(node.IsScalar());
+    // A scalar element is a YAML scalar, a structured element is a YAML
+    // sequence with one entry per field
+    assert(datatype->is_scalar ? node.IsScalar() : node.IsSequence());
     size_t oldsize = data.size();
     data.resize(oldsize + datatype->type_size());
     parse_scalar(node, &data[oldsize], datatype);
@@ -67,6 +83,19 @@ void parse_inline_array_nd(const YAML::Node &node,
     parse_inline_array_nd(*ni, datatype, shape, rank - 1, data);
 }
 
+namespace {
+// The nesting depth of a single element in the inline representation: a
+// scalar element is not nested, a structured element is a sequence with one
+// entry per field, and sub-array fields add further nesting.
+size_t element_nesting(const shared_ptr<datatype_t> &datatype) {
+  if (datatype->is_scalar)
+    return 0;
+  assert(!datatype->fields.empty());
+  const auto &field = datatype->fields.front();
+  return 1 + field->shape.size() + element_nesting(field->datatype);
+}
+} // namespace
+
 void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
                         const bool have_datatype,
                         shared_ptr<datatype_t> &datatype, const bool have_shape,
@@ -76,13 +105,18 @@ void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
     shape.clear();
     YAML::Node n = node;
     while (n.IsSequence()) {
-      shape.insert(shape.begin(), n.size());
+      shape.push_back(n.size());
       // This method does not work if the array size is zero in one dimension
-      if (shape[0] == 0)
+      if (shape.back() == 0)
         break;
-      n = n[0];
+      // Note: `n = n[0]` would modify the tree instead of rebinding `n`
+      n.reset(n[0]);
     }
     assert(n.IsScalar());
+    // The nesting of a structured element is not part of the array shape
+    const size_t nesting = have_datatype ? element_nesting(datatype) : 0;
+    assert(shape.size() >= nesting);
+    shape.erase(shape.end() - nesting, shape.end());
   }
   int64_t npoints = 1;
   for (size_t d = 0; d < shape.size(); ++d)
@@ -92,16 +126,19 @@ void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
     // determine datatype while parsing
     try {
       datatype = make_shared<datatype_t>(id_int64);
+      data1.clear();
       data1.reserve(npoints * datatype->type_size());
       parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
     } catch (const YAML::RepresentationException &) {
       try {
         datatype = make_shared<datatype_t>(id_float64);
+        data1.clear();
         data1.reserve(npoints * datatype->type_size());
         parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
       } catch (const YAML::RepresentationException &) {
         try {
           datatype = make_shared<datatype_t>(id_complex128);
+          data1.clear();
           data1.reserve(npoints * datatype->type_size());
           parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
         } catch (const YAML::RepresentationException &) {
@@ -175,14 +212,16 @@ template <typename T> void input(istream &is, T &data) {
 
 shared_ptr<block_t>
 read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
-                uint64_t allocated_space, uint64_t data_space,
+                uint64_t used_space, uint64_t data_space,
                 compression_t compression,
                 const array<unsigned char, 16> &want_checksum) {
   istream &is = *pis;
   assert(is);
   is.seekg(block_begin);
   assert(is);
-  vector<unsigned char> indata(allocated_space);
+  // The payload occupies the first `used_space` bytes of the block; the
+  // remaining `allocated_space - used_space` bytes are padding
+  vector<unsigned char> indata(used_space);
   is.read(reinterpret_cast<char *>(indata.data()), indata.size());
   assert(is);
 
@@ -212,7 +251,7 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   switch (compression) {
 
   case compression_t::none:
-    assert(data_space == allocated_space);
+    assert(data_space == used_space);
     data = std::move(indata);
     break;
 
@@ -231,7 +270,7 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
 
 #ifdef ASDF_HAVE_BLOSC2
   case compression_t::blosc2: {
-    blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
+    ensure_blosc2_initialized();
     // TODO: Don't copy the data
     blosc2_schunk *const schunk =
         blosc2_schunk_from_buffer(indata.data(), indata.size(), false);
@@ -289,7 +328,40 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
 #endif
 
 #ifdef ASDF_HAVE_LIBLZ4
-  case compression_t::liblz4: {
+  case compression_t::lz4: {
+    // ASDF standard lz4 encoding, as written by the Python reference
+    // implementation: a sequence of chunks, each a 4-byte big-endian length
+    // followed by that many bytes of LZ4 block-format data, which in turn
+    // begin with the 4-byte little-endian uncompressed chunk size
+    data.resize(data_space);
+    size_t inpos = 0;
+    size_t outpos = 0;
+    while (inpos < indata.size()) {
+      assert(inpos + 4 <= indata.size());
+      uint32_t chunk_size = 0;
+      for (int i = 0; i < 4; ++i)
+        chunk_size = (chunk_size << 8) | indata[inpos + i];
+      inpos += 4;
+      assert(chunk_size >= 4);
+      assert(inpos + chunk_size <= indata.size());
+      uint32_t uncompressed_size = 0;
+      for (int i = 3; i >= 0; --i)
+        uncompressed_size = (uncompressed_size << 8) | indata[inpos + i];
+      assert(outpos + uncompressed_size <= data.size());
+      const int nbytes = LZ4_decompress_safe(
+          reinterpret_cast<const char *>(indata.data() + inpos + 4),
+          reinterpret_cast<char *>(data.data() + outpos), int(chunk_size - 4),
+          int(uncompressed_size));
+      assert(nbytes >= 0);
+      assert(uint32_t(nbytes) == uncompressed_size);
+      inpos += chunk_size;
+      outpos += uncompressed_size;
+    }
+    assert(outpos == data.size());
+    break;
+  }
+
+  case compression_t::lz4f: {
     data.resize(data_space);
 
     LZ4F_decompressOptions_t dOpt;
@@ -315,6 +387,18 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
 
     ierr = LZ4F_freeDecompressionContext(dctx);
     assert(!LZ4F_isError(ierr));
+    break;
+  }
+#endif
+
+#ifdef ASDF_HAVE_LIBZSTD
+  case compression_t::libzstd: {
+    data.resize(data_space);
+    // The uncompressed size is known, so a single-shot decompression suffices
+    const size_t ret =
+        ZSTD_decompress(data.data(), data.size(), indata.data(), indata.size());
+    assert(!ZSTD_isError(ret));
+    assert(ret == data_space);
     break;
   }
 #endif
@@ -363,12 +447,29 @@ std::tuple<memoized<block_t>, block_info_t>
 ndarray::read_block(const shared_ptr<istream> &pis) {
   istream &is = *pis;
   // block_magic_token
+  // Other writers may pad between the YAML tree and the first block, so scan
+  // forward until the magic token is found. Stop at the end of the file or at
+  // the block index ("#ASDF BLOCK INDEX"), leaving the stream in a good state
+  // and positioned at whatever was found.
   array<unsigned char, 4> token;
-  for (auto &ch : token)
-    input(is, ch);
-  if (token != block_magic_token) {
-    is.seekg(-int64_t(token.size()), ios_base::cur);
-    return {};
+  for (;;) {
+    const auto pos = is.tellg();
+    is.read(reinterpret_cast<char *>(token.data()), token.size());
+    if (!is) {
+      // End of file: no more blocks
+      is.clear();
+      is.seekg(pos);
+      return {};
+    }
+    if (token == block_magic_token)
+      break;
+    if (token[0] == '#') {
+      // Block index
+      is.seekg(pos);
+      return {};
+    }
+    // Padding: skip one byte and try again
+    is.seekg(pos + streamoff(1));
   }
   // header_size
   uint16_t header_size;
@@ -392,8 +493,10 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
     compression = compression_t::blosc2;
   else if ((comp == array<unsigned char, 4>{'b', 'z', 'p', '2'}))
     compression = compression_t::bzip2;
+  else if ((comp == array<unsigned char, 4>{'l', 'z', '4', 0}))
+    compression = compression_t::lz4;
   else if ((comp == array<unsigned char, 4>{'l', 'z', '4', 'f'}))
-    compression = compression_t::liblz4;
+    compression = compression_t::lz4f;
   else if ((comp == array<unsigned char, 4>{'z', 's', 't', 'd'}))
     compression = compression_t::libzstd;
   else if ((comp == array<unsigned char, 4>{'z', 'l', 'i', 'b'}))
@@ -406,7 +509,7 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
   // used_space
   uint64_t used_space;
   input(is, used_space);
-  assert(used_space >= allocated_space);
+  assert(used_space <= allocated_space);
   // data_space
   uint64_t data_space;
   input(is, data_space);
@@ -423,15 +526,15 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
   // read data
   auto block_begin = is.tellg();
   auto fdata = memoized<block_t>([=]() {
-    return read_block_data(pis, block_begin, allocated_space, data_space,
+    return read_block_data(pis, block_begin, used_space, data_space,
                            compression, checksum);
   });
   // This would ensure synchronous reading, which might be useful for
   // debugging
   // fdata.fill_cache();
 
-  // skip padding
-  is.seekg(block_begin + streamoff(used_space));
+  // skip the block, including its padding
+  is.seekg(block_begin + streamoff(allocated_space));
 
   block_info_t block_info{
       token,       header_size,     header_read, flags,      comp,
@@ -512,6 +615,7 @@ void ndarray::write_block(ostream &os) const {
 #ifdef ASDF_HAVE_BLOSC2
   case compression_t::blosc2: {
     comp = {'b', 'l', 's', '2'};
+    ensure_blosc2_initialized();
 
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.compcode = BLOSC_BLOSCLZ;
@@ -602,7 +706,43 @@ void ndarray::write_block(ostream &os) const {
 #endif
 
 #ifdef ASDF_HAVE_LIBLZ4
-  case compression_t::liblz4: {
+  case compression_t::lz4: {
+    comp = {'l', 'z', '4', 0};
+    // ASDF standard lz4 encoding (see the decoder for the layout). Use the
+    // same chunk size as the Python reference implementation.
+    const size_t chunk_size = size_t(1) << 22;
+    // LZ4HC treats levels below 1 as its default level
+    const int level = compression_level < 1
+                          ? LZ4HC_CLEVEL_DEFAULT
+                          : min(LZ4HC_CLEVEL_MAX, compression_level);
+    const char *const src = static_cast<const char *>(get_data()->ptr());
+    const size_t src_size = get_data()->nbytes();
+    vector<unsigned char> out;
+    vector<char> buf(LZ4_compressBound(int(min(chunk_size, src_size))));
+    for (size_t pos = 0; pos < src_size; pos += chunk_size) {
+      const size_t n = min(chunk_size, src_size - pos);
+      const int nbytes = LZ4_compress_HC(src + pos, buf.data(), int(n),
+                                         int(buf.size()), level);
+      assert(nbytes > 0);
+      // big-endian length of the chunk, including the size prefix below
+      const uint32_t chunk_len = uint32_t(nbytes) + 4;
+      for (int i = 3; i >= 0; --i)
+        out.push_back((chunk_len >> (8 * i)) & 0xff);
+      // little-endian uncompressed size
+      for (int i = 0; i < 4; ++i)
+        out.push_back((uint32_t(n) >> (8 * i)) & 0xff);
+      out.insert(out.end(), buf.data(), buf.data() + nbytes);
+    }
+    outdata = make_shared<typed_block_t<unsigned char>>(std::move(out));
+    if (outdata->nbytes() >= get_data()->nbytes()) {
+      // Skip compression if it does not reduce the size
+      comp = {0, 0, 0, 0};
+      outdata = get_data().get();
+    }
+    break;
+  }
+
+  case compression_t::lz4f: {
     comp = {'l', 'z', '4', 'f'};
 
     LZ4F_preferences_t preferences = LZ4F_INIT_PREFERENCES;
@@ -617,6 +757,33 @@ void ndarray::write_block(ostream &os) const {
         LZ4F_compressFrame(outdata->ptr(), outdata->nbytes(), get_data()->ptr(),
                            get_data()->nbytes(), &preferences);
     outdata->resize(nbytes);
+    break;
+  }
+#endif
+
+#ifdef ASDF_HAVE_LIBZSTD
+  case compression_t::libzstd: {
+    comp = {'z', 's', 't', 'd'};
+
+    // A level of zero means "use the default level"
+    int level =
+        compression_level == 0 ? ZSTD_CLEVEL_DEFAULT : compression_level;
+    level = max(ZSTD_minCLevel(), min(ZSTD_maxCLevel(), level));
+
+    const size_t max_nbytes = ZSTD_compressBound(get_data()->nbytes());
+    outdata = make_shared<typed_block_t<unsigned char>>(
+        vector<unsigned char>(max_nbytes));
+
+    const size_t nbytes =
+        ZSTD_compress(outdata->ptr(), outdata->nbytes(), get_data()->ptr(),
+                      get_data()->nbytes(), level);
+    assert(!ZSTD_isError(nbytes));
+    outdata->resize(nbytes);
+    if (outdata->nbytes() >= get_data()->nbytes()) {
+      // Skip compression if it does not reduce the size
+      comp = {0, 0, 0, 0};
+      outdata = get_data().get();
+    }
     break;
   }
 #endif
@@ -728,7 +895,8 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : block_format(block_format_t::undefined),
       compression(compression_t::undefined), compression_level(-1),
       byteorder(byteorder_t::undefined), offset(-1) {
-  assert(node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.0.0");
+  assert(node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.0.0" ||
+         node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.1.0");
   if (node["source"].IsDefined())
     block_format = block_format_t::block;
   else if (node["data"].IsDefined())
@@ -741,9 +909,6 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
   case block_format_t::block: {
     int64_t source;
     yaml_decode(node["source"], source);
-    // TODO: This is just a default choice
-    compression = compression_t::zlib;
-    compression_level = 9;
     datatype = make_shared<datatype_t>(rs, node["datatype"]);
     yaml_decode(node["byteorder"], byteorder);
     yaml_decode(node["shape"], shape);
@@ -764,11 +929,18 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     }
     mdata = rs->get_block(source);
     block_info = std::make_optional<block_info_t>(rs->get_block_info(source));
+    // Remember the block's compressor so that a copy preserves it. The
+    // original compression level is not recorded in the file.
+    compression = block_info->compression;
+    compression_level = compression == compression_t::none ? 0 : 9;
     break;
   }
 
   case block_format_t::inline_array: {
-    // compression remains uninitialized
+    // Inline arrays are not compressed. Use "none" so that converting to
+    // block format produces a valid (uncompressed) block.
+    compression = compression_t::none;
+    compression_level = 0;
     bool have_datatype = node["datatype"].IsDefined();
     if (have_datatype)
       datatype = make_shared<datatype_t>(rs, node["datatype"]);
