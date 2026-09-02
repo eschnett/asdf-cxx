@@ -92,6 +92,8 @@ Every header ends with a `#define <GUARD>_DONE` and a trailing
   `asdf-ls`, `asdf-demo`, `asdf-demo-compression`, `asdf-demo-external`,
   `asdf-demo-large`, `asdf-demo-nonstandard`.
 - `CODE_COVERAGE=ON` adds `--coverage` (used by CI).
+- `ASDF_REQUIRE_ALL_DEPENDENCIES=ON` turns a missing optional dependency
+  into a configure error (CI uses it so every code path is tested).
 - Install: headers to `include/asdf/`, library to `lib/`, executables
   to `bin/`, `asdf-cxx.pc` to `lib/pkgconfig/`.
 - SWIG/Python: the `find_package(PythonInterp/PythonLibs)` calls are
@@ -609,8 +611,11 @@ Debug, `CODE_COVERAGE=ON`, build → ctest → install → lcov + Codecov
 10. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).
 11. Blosc and blosc2 code paths compile only where those libraries are
-    found and are therefore easy to leave unexercised; guard demo usage
-    with `have_compression_blosc()`.
+    found. CI requires them (`ASDF_REQUIRE_ALL_DEPENDENCIES`), but a
+    development machine without them silently skips those paths, so guard
+    demo usage with `have_compression_blosc()` and test with both. blosc2
+    needs `blosc2_init()` before its schunk API; `ndarray.cxx` does this
+    once per process.
 12. **External:** Python asdf 5.3 with numpy 2 cannot read inline
     structured arrays, its own included. Block-format structured arrays
     round-trip fine. Keep `demo.asdf` free of inline structured arrays.

@@ -114,3 +114,7 @@ cmake --build build
 ctest --test-dir build
 cmake --install build
 ```
+
+All compression and checksum libraries are optional. Configure with
+`-DASDF_REQUIRE_ALL_DEPENDENCIES=ON` to make CMake fail instead of
+silently leaving a feature out; CI does this.

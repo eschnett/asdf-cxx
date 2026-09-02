@@ -84,6 +84,19 @@ else()
   set(HAVE_ZLIB 0)
 endif()
 
+# Optionally insist on every optional dependency. CI turns this on so that
+# all compression and checksum code paths are built and tested.
+option(ASDF_REQUIRE_ALL_DEPENDENCIES
+  "Fail configuration if any optional dependency is missing" OFF)
+if(ASDF_REQUIRE_ALL_DEPENDENCIES)
+  foreach(dep BLOSC BLOSC2 BZIP2 LIBLZ4 LIBZSTD OPENSSL ZLIB)
+    if(NOT HAVE_${dep})
+      message(FATAL_ERROR "Optional dependency ${dep} was not found, "
+        "but ASDF_REQUIRE_ALL_DEPENDENCIES is ON")
+    endif()
+  endforeach()
+endif()
+
 #TODO set(Python_ADDITIONAL_VERSIONS 3.0)
 #TODO # This sets PYTHONINTERP_FOUND
 #TODO find_package(PythonInterp)

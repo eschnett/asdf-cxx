@@ -20,12 +20,21 @@ jobs:
     - uses: actions/checkout@v6
     - name: Install dependencies
       if: startsWith(matrix.os, 'macos')
-      run: brew install bzip2 c-blosc coreutils lcov ninja numpy yaml-cpp
+      run: brew install bzip2 c-blosc c-blosc2 coreutils lcov lz4 ninja openssl@3 yaml-cpp zstd
+    - name: Locate OpenSSL
+      # Homebrew's OpenSSL is keg-only; tell CMake's FindOpenSSL where it is
+      if: startsWith(matrix.os, 'macos')
+      run: echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
     - name: Install dependencies
       if: startsWith(matrix.os, 'ubuntu')
-      run: sudo apt install -y lcov libblosc-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build python3-numpy zlib1g-dev
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -y lcov libblosc-dev libblosc2-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build zlib1g-dev
     - name: Configure
-      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="{$HOME}/install" -DCODE_COVERAGE=ON
+      # ASDF_REQUIRE_ALL_DEPENDENCIES makes the configuration fail if any
+      # optional compression or checksum library is missing, so that every
+      # code path is built and tested
+      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="${HOME}/install" -DCODE_COVERAGE=ON -DASDF_REQUIRE_ALL_DEPENDENCIES=ON
     - name: Build
       run: cmake --build build --parallel $(nproc)
     - name: Test
