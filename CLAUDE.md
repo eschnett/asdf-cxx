@@ -27,6 +27,12 @@ no unit-test framework. `compare-demo` diffs `asdf-ls` output of
 `demo.asdf` and its copy via `diff-commands.sh`, ignoring lines that
 mention compression or checksums.
 
+The fixtures in `tests/` were written by the Python reference
+implementation; `tests/make_fixtures.py` regenerates them (needs `asdf`
+and `numpy`; use an isolated environment). Python asdf is also the best
+way to check files this library writes: `asdf.open` validates against
+the schemas.
+
 Format with `clang-format -i <file>` (config in `.clang-format`, 80
 columns, 2 spaces).
 
@@ -51,3 +57,8 @@ columns, 2 spaces).
   `ASDF_HAVE_*` flags there and in `CMakeLists.txt`, not by hand.
 - `asdf.i` (SWIG) and `cmp.cpp` are stale and not built; ignore them
   unless asked to revive the Python binding.
+- `demo.asdf` must stay readable by stock Python asdf, which is used for
+  cross-checks. Standard-conformant cases that Python cannot read (such
+  as inline structured arrays) belong in `demo-nonstandard.cxx`.
+- `TODO.md` in the repo root is the maintainer's private notes; do not
+  edit it.

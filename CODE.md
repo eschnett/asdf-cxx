@@ -1,4 +1,4 @@
-# asdf-cxx — Code Reference
+  | Same plus 0-d arrays and, if available, float16/complex32/int128 arrays with blosc, or zlib when blosc is absent; an inline structured array (standard conformant, but Python asdf 5.3 with numpy 2 cannot read it) |# asdf-cxx — Code Reference
 
 A developer-oriented map of this repository: what lives where, how the
 pieces fit together, how reading and writing actually work, and the
@@ -17,7 +17,9 @@ including demos and the SWIG file.
 ```
 asdf-cxx/
 ├── CMakeLists.txt            Build, tests, install, pkg-config generation
-├── cmake/Modules/            Find modules (pkg-config based) for blosc, blosc2,
+├── cmake/Modules/            Find modules (pkg-config based) for - **asdf-copy** `[--array=block|inline] [--compression=none|blosc|blosc2|bzip2|liblz4|libzstd|zlib] [--compression-level=0..9] <in> <out>`
+  — read, `copy(copy_state)`, write. Without `--compression`, each block
+  keeps the compressor it had in the input (§5.4)., blosc2,
 │                             liblz4, libzstd, yaml-cpp
 ├── include/asdf/             Public headers (.hxx) — installed to include/asdf/
 │   ├── asdf.hxx              Top-level `asdf` class; includes every other header
@@ -43,6 +45,8 @@ asdf-cxx/
 │   ├── demo-compression.cxx  asdf-demo-compression: round-trips every available compressor
 │   ├── demo-large.cxx        asdf-demo-large: 1000×1000×250 float64 (2 GB) — not a test
 │   └── *.py                  Python demos for the (stale) SWIG binding
+├── tests/                    Fixtures written by Python asdf (padded blocks, default
+│                             Python output) + make_fixtures.py to regenerate them
 ├── asdf.i                    SWIG interface (stale, not built — see §10)
 ├── cmp.cpp                   Unfinished compare tool (stale, not built — see §10)
 ├── diff-commands.sh          Test helper: diff two commands' output, ignoring
@@ -146,7 +150,7 @@ ndarray                               (ndarray.hxx)
 
 datatype_t                            (datatype.hxx)
  ├── is_scalar + scalar_type_id_t     e.g. id_float64
- └── fields: vector<shared_ptr<field_t>>   structured types (write-only, §11)
+ └── fields: vector<shared_ptr<field_t>>   structured (record) types, packed
 ```
 
 ---
@@ -227,7 +231,7 @@ Constructors:
 - `ndarray(rs, node)` — read; `ndarray(cs, arr)` — copy.
 
 Accessors: `get_datatype()`, `get_shape()`, `get_offset()`,
-`get_strides()`, `get_block_info()` (only meaningful after reading),
+`get_strides()`, `get_block_info()` (empty unless read from a binary block),
 `get_data_vector<T>()` (copies out, asserts type match),
 `linear_index(idx)`.
 
@@ -252,9 +256,12 @@ and returns `{memoized<block_t>, block_info_t}` (§5.2).
 - `parse_scalar(node, unsigned char *dst, type_or_datatype, byteorder)`
   and `emit_scalar(const unsigned char *src, ...)` convert between a
   YAML scalar and raw bytes, byte-swapping via `htox<N>` / `xtoh<T>`.
-- `datatype_t` is either scalar or a list of `field_t` (name, datatype,
-  optional byteorder, shape). `type_size()` sums fields for structured
-  types.
+- `datatype_t` is either scalar or a list of `field_t` (optional name, a
+  datatype that may itself be structured, optional byteorder, optional
+  sub-array shape). Structured types are packed with no alignment
+  padding; `type_size()` sums `field_t::type_size()`, which multiplies by
+  the sub-array shape. In inline data a structured element is a YAML
+  sequence with one entry per field.
 
 ### 4.5 `reader_state`, `writer`, `copy_state` (`io.hxx`, `src/io.cxx`)
 
@@ -343,15 +350,18 @@ always big-endian and handled separately by `input`/`output` helpers in
    text. The tree is therefore fully buffered in memory as text.
 3. `reader_state`'s constructor then loops `ndarray::read_block(pis)`
    from the current stream position:
-   - read 4 bytes; if not the block magic, seek back 4 bytes and stop
-     (this is how the block index or EOF terminates the scan);
+   - scan forward byte by byte until the 4-byte block magic is found,
+     skipping any padding another writer left after the tree; stop, with
+     the stream left in a good state, at the block index (a `#`) or at
+     EOF;
    - parse the fixed header fields (§7), assert `flags == 0`, map the
      4-byte compression code to `compression_t`;
    - skip any extra header bytes beyond those understood;
    - create a `memoized<block_t>` whose closure captures the stream,
      the data offset, sizes, compression and checksum and calls
      `read_block_data` on first use;
-   - seek to `block_begin + used_space` and continue.
+   - seek to `block_begin + allocated_space` (payload plus padding) and
+     continue.
 
    The `#ASDF BLOCK INDEX` trailer is never read; blocks are always
    located by this sequential scan.
@@ -359,12 +369,14 @@ always big-endian and handled separately by `input`/`output` helpers in
 ### 5.3 Tree construction: `make_entry(rs, node)`
 
 `asdf(rs, node)` asserts the root tag is `core/asdf-1.0.0`, `1.1.0` or
-`1.2.0` and builds `group(rs, node)`, which calls `make_entry` for each
-value. Dispatch order in `src/entry.cxx`:
+`1.2.0` and builds the root `group` from every key except `history`,
+which is skipped (history entries are unsupported, and their tagged
+extension metadata would otherwise be rejected as unknown tags). Each
+value goes through `make_entry`. Dispatch order in `src/entry.cxx`:
 
 1. **By tag**: `core/complex-1.0.0` → `complex_entry`;
-   `core/software-1.0.0` → `software`; `core/ndarray-1.0.0` →
-   `ndarray_entry`. Any other non-empty tag hits `assert`.
+   `core/software-1.0.0` → `software`; `core/ndarray-1.0.0` or
+   `core/ndarray-1.1.0` → `ndarray_entry`. Any other non-empty tag hits `assert`.
 2. **Null** node → `null_entry`.
 3. **Scalar**: try `as<bool>`, then `as<int64_t>`, then `as<double>`,
    else `string_entry`.
@@ -376,18 +388,20 @@ value. Dispatch order in `src/entry.cxx`:
 - `source:` present → block format. Reads `datatype`, `byteorder`,
   `shape`, optional `offset` (default 0) and `strides` (default
   C-order). `mdata = rs->get_block(source)`; `block_info` recorded.
-  **`compression` is set to `zlib` level 9 as a placeholder** (the
-  original compressor is only in `block_info`), which is what a later
-  copy/write will use unless overridden.
-- `data:` present → inline format. `shape` is inferred from nesting if
-  absent; `datatype` is inferred by attempting to parse as int64, then
-  float64, then complex128. Data is parsed into a
-  `typed_block_t<unsigned char>` in host byte order.
+  `compression` is taken from the block header so that a later copy or
+  write preserves it unless `copy_state` overrides it; the level is set
+  to 9 because the file does not record the original level.
+- `data:` present → inline format. `shape` is inferred from the nesting
+  if absent (for structured datatypes the element's own nesting is
+  discounted); `datatype`, if absent, is inferred by attempting to parse
+  as int64, then float64, then complex128. Data is parsed into a
+  `typed_block_t<unsigned char>` in host byte order. `compression` is
+  `none`, so converting to block format yields an uncompressed block.
 - `mask:` is ignored on read.
 
 ### 5.5 `read_block_data` (lazy block load)
 
-Seeks to the data offset, reads `allocated_space` bytes, verifies the
+Seeks to the data offset, reads `used_space` bytes, verifies the
 MD5 checksum if OpenSSL is available and the stored checksum is
 non-zero, then decompresses according to the compression code into a
 buffer of `data_space` bytes. Returns a `typed_block_t<unsigned char>`.
@@ -402,8 +416,8 @@ buffer of `data_space` bytes. Returns a `typed_block_t<unsigned char>`.
 1. Construct `writer w(os, tags)` — writes the textual header lines and
    `BeginDoc`.
 2. `w << *this` → `asdf::to_yaml`:
-   - `!core/asdf-1.1.0` map (note: header says standard 1.2.0, tag says
-     1.1.0);
+   - `!core/asdf-1.1.0` map (this is the schema version that ASDF
+     standard 1.2.0 maps to, so the header and tag agree);
    - `asdf/library:` → `software(ASDF_CXX_NAME, AUTHOR, HOMEPAGE, VERSION)`;
    - every entry of `grp` except a key literally named `asdf/library`;
    - then `nodes`, then `writers` (the alternative root contents).
@@ -451,16 +465,14 @@ All multi-byte integers big-endian. Written `header_size` is 48.
 | 4 | 2 | header_size | bytes following this field |
 | 6 | 4 | flags | must be 0 |
 | 10 | 4 | compression | `\0\0\0\0` none, `blsc`, `bls2`, `bzp2`, `lz4f`, `zstd`, `zlib` |
-| 14 | 8 | allocated_space | bytes read as compressed payload |
-| 22 | 8 | used_space | on write equals allocated_space; on read the reader seeks `block_begin + used_space` |
+| 14 | 8 | allocated_space | payload plus padding; the reader skips this many bytes to reach the next block |
+| 22 | 8 | used_space | compressed payload length, at most allocated_space; the writer always sets it equal to allocated_space |
 | 30 | 8 | data_space | uncompressed size |
 | 38 | 16 | checksum | MD5 of compressed payload; all zeros = none |
 
-Read-side asserts `used_space >= allocated_space`, which is the
-opposite of the standard's `used_size <= allocated_size`. Since asdf-cxx
-always writes them equal this round-trips its own files, but a padded
-file produced by another writer (allocated > used) will fail that
-assert. See §11.
+The reader tolerates padded blocks (`used_space < allocated_space`),
+padding between the tree and the first block, and a missing block index;
+`tests/padded.asdf` covers all three.
 
 ---
 
@@ -502,7 +514,7 @@ assert. See §11.
 - **asdf-ls** `<file>...` — prints the YAML tree (via `from_yaml`), then
   re-reads the file as an `asdf` and walks the tree printing, for every
   ndarray, its block's compressor, compressed/uncompressed sizes, ratio
-  and checksum. Scalars are not printed in the second pass (TODO in code).
+  and checksum, or `inline array` for inline data. Scalars are not printed in the second pass (TODO in code).
 - **asdf-copy** `[--array=block|inline] [--compression=none|blosc|blosc2|bzip2|libzstd|zlib] [--compression-level=0..9] <in> <out>`
   — read, `copy(copy_state)`, write. Without `--compression`, every
   block read from a file is re-written with zlib level 9 (§5.4). lz4 is
@@ -512,7 +524,7 @@ assert. See §11.
 
 | Executable | Output | Purpose |
 |---|---|---|
-| asdf-demo | demo.asdf | Mix of block/inline arrays, scalars, nested group, sequence, reference; bzip2 and zlib blocks |
+| asdf-demo | demo.asdf | Mix of block/inline arrays, a structured (record) array, scalars, nested group, sequence, reference; bzip2 and zlib blocks. Must stay readable by stock Python asdf |
 | asdf-demo-nonstandard | nonstandard.asdf | Same plus 0-d arrays and, if available, float16/complex32/int128 arrays with blosc |
 | asdf-demo-external | external.asdf, metadata.asdf | Writes a file and a second file referencing it, then resolves local, remote, and remote-to-local references and prints the data |
 | asdf-demo-compression | compression.asdf | Writes a 101³ float64 array with every available compressor, reads back, verifies equality |
@@ -523,13 +535,19 @@ assert. See §11.
 `demo` → `ls demo.asdf` → `demo-nonstandard` → `ls2 nonstandard.asdf` →
 `copy demo.asdf demo2.asdf` → `ls3 demo2.asdf` → `compare-demo`
 (`diff-commands.sh` diffs `asdf-ls` output of original and copy,
-filtering lines mentioning compress/checksum because the copy
-re-compresses with zlib) → `external`. asdf-demo-compression and
-asdf-demo-large are built but not registered as tests.
+filtering lines mentioning compress/checksum because compressed sizes
+and checksums are not guaranteed to match between writers) → `external`
+→ `compression` → `padded-*` and `python-default-*` (read, copy and
+re-list the Python-written fixtures in `tests/`; see `tests/README.md`).
+asdf-demo-large is built but not registered as a test.
 
-There is no unit-test framework and no comparison against the Python
-reference implementation (`test-std.sh` is a manual helper that expects
-the asdf-standard reference files checked out under `~/src/asdf/`).
+There is no unit-test framework. The fixtures in `tests/` are the only
+automated check against the Python reference implementation;
+`tests/make_fixtures.py` regenerates them. For ad-hoc cross-checks,
+Python asdf reads the files this library writes and validates them
+against the schemas on `asdf.open`. `test-std.sh` is an older manual
+helper that expects the asdf-standard reference files under
+`~/src/asdf/`.
 
 ### CI (`.github/workflows/CI.yml`)
 
@@ -558,49 +576,45 @@ Debug, `CODE_COVERAGE=ON`, build → ctest → install → lcov + Codecov
 
 ## 11. Known gaps and gotchas (from reading the code)
 
-1. **zstd is wired everywhere except where it matters.** `compression_t::libzstd`
-   exists, CMake detects libzstd, `config.hxx` gets `ASDF_HAVE_LIBZSTD`,
-   `<zstd.h>` is included, the `zstd` block token is recognised on read,
-   and `asdf-copy` accepts `--compression=libzstd` — but neither
-   `read_block_data` nor `write_block` has a `case compression_t::libzstd`,
-   so both fall into `default: assert(0)`.
-2. **`have_datatype_int128()` / `have_datatype_float16()`** in
-   `src/datatype.cxx` test `HAVE_INT128` / `HAVE_FLOAT16` (no `ASDF_`
-   prefix) and therefore always return false. Use `have_int128()` /
-   `have_float16()` from `io.hxx`, which test the right macros.
-3. **Structured datatypes cannot be read.** `field_t(rs, node)` and
-   `field_t(cs, field)` / `datatype_t(cs, datatype)` are `assert(0)`.
-   Writing structured types works (`field_t::to_yaml`).
-4. **Masks are not supported.** Read ignores `mask:`; write asserts
+1. **Masks are not supported.** Read ignores `mask:`; write asserts
    the mask is empty.
-5. **Read-side default compression is zlib 9** for every block, so
-   `asdf-copy` without `--compression` changes the compressor of
-   anything that was not zlib.
-6. **Block header size semantics inverted** on read
-   (`assert(used_space >= allocated_space)`; payload length taken from
-   `allocated_space`). Padded blocks from other writers will abort.
-7. **Root tag mismatch**: header advertises `#ASDF_STANDARD 1.2.0`, tree
-   is tagged `!core/asdf-1.1.0`. The reader accepts 1.0.0–1.2.0.
-8. **Block index** is written but never read; files are always scanned
+2. **lz4 blocks are not interoperable.** asdf-cxx writes the LZ4 frame
+   format under the nonstandard token `lz4f`. Python asdf's `lz4` is a
+   different framing (LZ4 block format with 4-byte big-endian compressed
+   lengths), so neither side reads the other's lz4 blocks.
+3. **Library entry key.** The writer emits the software entry under
+   `asdf/library`; the standard's key is `asdf_library`. A copy of a
+   Python-written file therefore ends up with both keys.
+4. **Only `core/ndarray-1.0.0` and `-1.1.0` tags are recognised**, by
+   exact string comparison; any other unknown tag aborts. `history` is
+   dropped on read.
+5. **Compression level is not stored** in the file. Every compressed
+   block read back gets level 9 for re-writing.
+6. **Block index** is written but never read; files are always scanned
    sequentially. Streamed blocks and exploded (`source:` as a URI
    string) files are unsupported.
-9. **YAML head is read line-by-line until `...`** and buffered as text.
+7. **YAML head is read line-by-line until `...`** and buffered as text.
    A file whose YAML lacks the `...` terminator fails with "Stream input
    error".
-10. `ascii`/`ucs4` scalar types are declared but unimplemented.
-11. `asdf-copy` accepts `--compression-level` only as ten literal
-    strings (`--compression-level=0` … `=9`); anything else asserts.
-12. Reading compares the YAML tag strings exactly; e.g. an ndarray
-    tagged `core/ndarray-1.1.0` would not be recognised.
-13. The `asdf(readers=...)` hook for custom tags asserts if non-empty.
-14. yaml-cpp emits YAML 1.2 syntax while the header declares
+8. `ascii`/`ucs4` scalar types are declared but unimplemented, including
+   the standard's two-element `[ascii, N]` form.
+9. `asdf-copy` accepts `--compression-level` only as ten literal
+   strings (`--compression-level=0` … `=9`); anything else asserts.
+10. The `asdf(readers=...)` hook for custom tags asserts if non-empty.
+11. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).
+12. Blosc and blosc2 code paths compile only where those libraries are
+    found and are therefore easy to leave unexercised; guard demo usage
+    with `have_compression_blosc()`.
+13. **External:** Python asdf 5.3 with numpy 2 cannot read inline
+    structured arrays, its own included. Block-format structured arrays
+    round-trip fine. Keep `demo.asdf` free of inline structured arrays.
 
 ---
 
 ## 12. Where to start for common changes
 
-**Add a compressor** (zstd is 80% done and a good template):
+**Add a compressor** (the zstd cases are the most compact template):
 1. `io.hxx`: enum value; `io.cxx`: `operator<<` name and `have_compression_*()`.
 2. `ndarray.cxx`: 4-byte token in `read_block`; `case` in
    `read_block_data` (decompress into `data_space` bytes); `case` in
@@ -623,6 +637,10 @@ Debug, `CODE_COVERAGE=ON`, build → ctest → install → lcov + Codecov
 `datatype.cxx` (static_asserts, `get_scalar_type_size`, name
 string ↔ id, `yaml_decode`/`yaml_encode`, `parse_scalar`,
 `emit_scalar`).
+
+**Add a Python-written fixture**: extend `tests/make_fixtures.py`, run it
+with an environment that has `asdf` and `numpy`, and register ctest
+entries next to the `padded-*` ones in `CMakeLists.txt`.
 
 **Inspect a file during debugging**: `./build/asdf-ls file.asdf`, or
 `head -c 4096 file.asdf | strings` to see the YAML head, and
