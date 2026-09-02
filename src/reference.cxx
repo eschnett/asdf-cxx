@@ -21,7 +21,9 @@ string tilde_decode(const string &cooked) {
     unsigned char ch = cooked[pos++];
     switch (ch) {
     case '~': {
-      assert(pos < len);
+      ASDF_CHECK(pos < len,
+                 "Invalid JSON pointer escape: trailing \"~\" in \"" + cooked +
+                     "\"");
       unsigned char ch2 = cooked[pos++];
       switch (ch2) {
       case '0':
@@ -31,12 +33,13 @@ string tilde_decode(const string &cooked) {
         buf << '~';
         break;
       default:
-        assert(0);
+        ASDF_ERROR("Invalid JSON pointer escape \"~" +
+                   std::string(1, char(ch2)) + "\" in \"" + cooked + "\"");
       }
       break;
     }
     case '/':
-      assert(0);
+      ASDF_ERROR("Unexpected \"/\" in JSON pointer element \"" + cooked + "\"");
     default:
       buf << ch;
       break;
@@ -73,7 +76,8 @@ string fragment_percent_decode(const string &cooked) {
     unsigned char ch = cooked[pos++];
     switch (ch) {
     case '%': {
-      assert(pos + 2 <= len);
+      ASDF_CHECK(pos + 2 <= len,
+                 "Invalid percent encoding in \"" + cooked + "\"");
       istringstream digs(cooked.substr(pos, 2));
       pos += 2;
       unsigned int ch2;
@@ -161,16 +165,17 @@ pair<string, vector<string>> reference::get_split_target() const {
   }
   // The fragment should either be empty, or should begin with a slash. In both
   // cases, the first element of doc_path should have length zero.
-  assert(doc_path.size() > 0);
-  assert(doc_path.at(0).size() == 0);
+  ASDF_CHECK(!doc_path.empty() && doc_path.at(0).empty(),
+             "Invalid reference \"" + target +
+                 "\": the fragment must be empty or start with \"/\"");
   doc_path.erase(doc_path.begin());
   return {std::move(base_target), std::move(doc_path)};
 }
 
 reference::reference(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : rs(rs) {
-  assert(node.IsMap());
-  assert(node.size() == 1);
+  ASDF_CHECK(node.IsMap() && node.size() == 1 && node["$ref"],
+             "A reference must be a mapping with the single key \"$ref\"");
   target = node["$ref"].Scalar();
 }
 

@@ -39,6 +39,13 @@ jobs:
       run: cmake --build build --parallel $(nproc)
     - name: Test
       run: ctest --test-dir build --output-on-failure
+    - name: Configure (Release)
+      # Release builds define NDEBUG; make sure nothing depends on `assert`
+      run: cmake -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DASDF_REQUIRE_ALL_DEPENDENCIES=ON
+    - name: Build (Release)
+      run: cmake --build build-release --parallel $(nproc)
+    - name: Test (Release)
+      run: ctest --test-dir build-release --output-on-failure
     - name: Install
       run: cmake --install build
     - name: Collect code coverage

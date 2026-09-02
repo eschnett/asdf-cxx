@@ -115,11 +115,6 @@ endif()
 
 # Main project
 
-string(REPLACE "-DNDEBUG" ""
-  CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-string(REPLACE "-DNDEBUG" ""
-  CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-
 include(CheckCXXSourceCompiles)
   check_cxx_source_compiles(
     "
@@ -148,6 +143,7 @@ set(ASDF_HEADERS
   include/asdf/byteorder.hxx
   include/asdf/datatype.hxx
   include/asdf/entry.hxx
+  include/asdf/error.hxx
   include/asdf/io.hxx
   include/asdf/memoized.hxx
   include/asdf/ndarray.hxx
@@ -161,6 +157,7 @@ set(ASDF_SOURCES
   src/config.cxx
   src/datatype.cxx
   src/entry.cxx
+  src/error.cxx
   src/io.cxx
   src/ndarray.cxx
   src/reference.cxx
@@ -237,6 +234,24 @@ if(LIBLZ4_FOUND)
     COMMAND ./asdf-copy ${CMAKE_SOURCE_DIR}/tests/lz4.asdf lz4-2.asdf)
   add_test(NAME lz4-ls2 COMMAND ./asdf-ls lz4-2.asdf)
   set_tests_properties(lz4-ls2 PROPERTIES DEPENDS lz4-copy)
+endif()
+# Deliberately broken files must produce an error message and exit status 1
+# rather than a crash; see tests/README.md
+add_test(NAME error-not-asdf
+  COMMAND ${CMAKE_SOURCE_DIR}/tests/expect-error.sh
+  ./asdf-ls ${CMAKE_SOURCE_DIR}/tests/not-asdf.asdf)
+add_test(NAME error-unknown-tag
+  COMMAND ${CMAKE_SOURCE_DIR}/tests/expect-error.sh
+  ./asdf-ls ${CMAKE_SOURCE_DIR}/tests/corrupt-tag.asdf)
+add_test(NAME error-truncated
+  COMMAND ${CMAKE_SOURCE_DIR}/tests/expect-error.sh
+  ./asdf-copy ${CMAKE_SOURCE_DIR}/tests/corrupt-truncated.asdf
+  corrupt-truncated2.asdf)
+if(OPENSSL_FOUND)
+  add_test(NAME error-checksum
+    COMMAND ${CMAKE_SOURCE_DIR}/tests/expect-error.sh
+    ./asdf-copy ${CMAKE_SOURCE_DIR}/tests/corrupt-checksum.asdf
+    corrupt-checksum2.asdf)
 endif()
 
 # These tests are broken in Python 3:

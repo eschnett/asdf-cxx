@@ -72,8 +72,9 @@ writer &string_entry::to_yaml(writer &w) const {
 
 software::software(const std::shared_ptr<reader_state> &rs,
                    const YAML::Node node) {
-  assert(node.IsMap());
-  assert(node.Tag() == "tag:stsci.edu:asdf/core/software-1.0.0");
+  ASDF_CHECK(node.IsMap(), "A core/software entry must be a mapping");
+  ASDF_CHECK(node.Tag() == "tag:stsci.edu:asdf/core/software-1.0.0",
+             "Expected tag core/software-1.0.0, found \"" + node.Tag() + "\"");
   name = node["name"].Scalar();
   author = node["author"] ? node["author"].Scalar() : "";
   homepage = node["homepage"] ? node["homepage"].Scalar() : "";
@@ -115,7 +116,7 @@ writer &reference_entry::to_yaml(writer &w) const { return w << *value; }
 
 sequence::sequence(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : sequence() {
-  assert(node.IsSequence());
+  ASDF_CHECK(node.IsSequence(), "Expected a YAML sequence");
   for (const auto &value : node)
     push_back(make_entry(rs, value));
 }
@@ -135,7 +136,7 @@ writer &sequence::to_yaml(writer &w) const {
 
 group::group(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : group() {
-  assert(node.IsMap());
+  ASDF_CHECK(node.IsMap(), "Expected a YAML mapping");
   for (const auto &key_value : node)
     insert({key_value.first.Scalar(), make_entry(rs, key_value.second)});
 }
@@ -155,7 +156,7 @@ writer &group::to_yaml(writer &w) const {
 
 std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
                                   const YAML::Node &node) {
-  assert(node.IsDefined());
+  ASDF_CHECK(node.IsDefined(), "Undefined YAML node");
 
   // First look at the tag. If there is a tag we know what to do.
   const auto tag = node.Tag();
@@ -176,7 +177,8 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
       tag == "tag:stsci.edu:asdf/core/ndarray-1.1.0")
     return std::make_shared<ndarray_entry>(std::make_shared<ndarray>(rs, node));
 
-  assert(tag.empty() || tag == "?" || tag == "!");
+  ASDF_CHECK(tag.empty() || tag == "?" || tag == "!",
+             "Unknown YAML tag \"" + tag + "\"");
 
   // Next look at the node type.
   if (node.IsNull())
@@ -213,8 +215,7 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
       return std::make_shared<group>(rs, node);
   }
 
-  assert(0);
-  std::abort();
+  ASDF_ERROR("Unhandled YAML node type");
 }
 
 } // namespace ASDF

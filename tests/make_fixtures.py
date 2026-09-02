@@ -63,6 +63,38 @@ af.set_array_compression(af["b"], "lz4")
 af.set_array_compression(af["c"], "lz4")
 af.write_to(os.path.join(here, "lz4.asdf"))
 
+# Deliberately broken files, derived from python-default.asdf, to check that
+# the tools report an error instead of crashing.
+default = open(os.path.join(here, "python-default.asdf"), "rb").read()
+
+
+def write(name, data):
+    path = os.path.join(here, name)
+    open(path, "wb").write(data)
+    print("wrote", path)
+
+
+# An unknown tag (same length, so the block offsets stay valid)
+write(
+    "corrupt-tag.asdf",
+    default.replace(b"!core/ndarray-1.1.0", b"!core/ndarray-9.9.9", 1),
+)
+
+# A flipped byte inside the first block's payload; detected through the MD5
+# checksum when asdf-cxx was built with OpenSSL
+first = default.index(b"\xd3BLK")
+payload = first + 4 + 2 + 48  # magic, header_size, header
+corrupt = bytearray(default)
+corrupt[payload + 8] ^= 0xFF
+write("corrupt-checksum.asdf", bytes(corrupt))
+
+# The file ends in the middle of the last block and has no block index
+index = default.index(b"#ASDF BLOCK INDEX")
+write("corrupt-truncated.asdf", default[: index - 100])
+
+# Not an ASDF file at all
+write("not-asdf.asdf", b"This is not an ASDF file.\n")
+
 print("wrote", os.path.join(here, "padded.asdf"))
 print("wrote", os.path.join(here, "python-default.asdf"))
 print("wrote", os.path.join(here, "lz4.asdf"))

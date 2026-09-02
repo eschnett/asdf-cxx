@@ -97,7 +97,7 @@ void output(std::ostream &os, const int indent,
   output(os, indent + indent_step, project->get_group());
 }
 
-int main(int argc, char **argv) {
+int run(int argc, char **argv) {
   cout << "asdf-ls: List content of ASDF files\n";
   ASDF_CHECK_VERSION();
 
@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
 #if 0
   for (int arg = 1; arg < argc; ++arg) {
     string filename = argv[arg];
-    assert(!filename.empty());
+    ASDF_CHECK(!filename.empty(), "Empty file name");
     fstream is(filename, ios::binary | ios::in);
     // TODO: stream the file instead
     ostringstream doc;
@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
 
   for (int arg = 1; arg < argc; ++arg) {
     string filename = argv[arg];
-    assert(!filename.empty());
+    ASDF_CHECK(!filename.empty(), "Empty file name");
 
     // Read project
     ifstream is(filename, ios::binary | ios::in);
@@ -141,4 +141,13 @@ int main(int argc, char **argv) {
 
   cout << "Done.\n";
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return run(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << argv[0] << ": error: " << e.what() << "\n";
+    return 1;
+  }
 }

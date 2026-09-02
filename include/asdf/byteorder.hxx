@@ -1,6 +1,8 @@
 #ifndef ASDF_BYTEORDER_HXX
 #define ASDF_BYTEORDER_HXX
 
+#include <asdf/error.hxx>
+
 #include <yaml-cpp/yaml.h>
 
 #include <array>
@@ -57,7 +59,7 @@ inline array<unsigned char, sizeof(T)> htox(const T &val,
 template <size_t N>
 inline void htox(unsigned char *val, byteorder_t byteorder) {
   if (byteorder != host_byteorder()) {
-    assert(byteorder != byteorder_t::undefined);
+    ASDF_CHECK(byteorder != byteorder_t::undefined, "Byte order is undefined");
     array<unsigned char, N> tmp;
     for (size_t i = 0; i < N; ++i)
       tmp[i] = val[N - 1 - i];
