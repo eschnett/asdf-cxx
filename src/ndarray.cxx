@@ -175,14 +175,16 @@ template <typename T> void input(istream &is, T &data) {
 
 shared_ptr<block_t>
 read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
-                uint64_t allocated_space, uint64_t data_space,
+                uint64_t used_space, uint64_t data_space,
                 compression_t compression,
                 const array<unsigned char, 16> &want_checksum) {
   istream &is = *pis;
   assert(is);
   is.seekg(block_begin);
   assert(is);
-  vector<unsigned char> indata(allocated_space);
+  // The payload occupies the first `used_space` bytes of the block; the
+  // remaining `allocated_space - used_space` bytes are padding
+  vector<unsigned char> indata(used_space);
   is.read(reinterpret_cast<char *>(indata.data()), indata.size());
   assert(is);
 
@@ -212,7 +214,7 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   switch (compression) {
 
   case compression_t::none:
-    assert(data_space == allocated_space);
+    assert(data_space == used_space);
     data = std::move(indata);
     break;
 
@@ -406,7 +408,7 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
   // used_space
   uint64_t used_space;
   input(is, used_space);
-  assert(used_space >= allocated_space);
+  assert(used_space <= allocated_space);
   // data_space
   uint64_t data_space;
   input(is, data_space);
@@ -423,15 +425,15 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
   // read data
   auto block_begin = is.tellg();
   auto fdata = memoized<block_t>([=]() {
-    return read_block_data(pis, block_begin, allocated_space, data_space,
+    return read_block_data(pis, block_begin, used_space, data_space,
                            compression, checksum);
   });
   // This would ensure synchronous reading, which might be useful for
   // debugging
   // fdata.fill_cache();
 
-  // skip padding
-  is.seekg(block_begin + streamoff(used_space));
+  // skip the block, including its padding
+  is.seekg(block_begin + streamoff(allocated_space));
 
   block_info_t block_info{
       token,       header_size,     header_read, flags,      comp,
