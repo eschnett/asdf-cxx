@@ -54,7 +54,9 @@ void parse_inline_array_nd(const YAML::Node &node,
   assert(rank >= 0);
   assert(shape.size() >= static_cast<size_t>(rank));
   if (rank == 0) {
-    assert(node.IsScalar());
+    // A scalar element is a YAML scalar, a structured element is a YAML
+    // sequence with one entry per field
+    assert(datatype->is_scalar ? node.IsScalar() : node.IsSequence());
     size_t oldsize = data.size();
     data.resize(oldsize + datatype->type_size());
     parse_scalar(node, &data[oldsize], datatype);
@@ -67,6 +69,19 @@ void parse_inline_array_nd(const YAML::Node &node,
     parse_inline_array_nd(*ni, datatype, shape, rank - 1, data);
 }
 
+namespace {
+// The nesting depth of a single element in the inline representation: a
+// scalar element is not nested, a structured element is a sequence with one
+// entry per field, and sub-array fields add further nesting.
+size_t element_nesting(const shared_ptr<datatype_t> &datatype) {
+  if (datatype->is_scalar)
+    return 0;
+  assert(!datatype->fields.empty());
+  const auto &field = datatype->fields.front();
+  return 1 + field->shape.size() + element_nesting(field->datatype);
+}
+} // namespace
+
 void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
                         const bool have_datatype,
                         shared_ptr<datatype_t> &datatype, const bool have_shape,
@@ -76,13 +91,18 @@ void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
     shape.clear();
     YAML::Node n = node;
     while (n.IsSequence()) {
-      shape.insert(shape.begin(), n.size());
+      shape.push_back(n.size());
       // This method does not work if the array size is zero in one dimension
-      if (shape[0] == 0)
+      if (shape.back() == 0)
         break;
-      n = n[0];
+      // Note: `n = n[0]` would modify the tree instead of rebinding `n`
+      n.reset(n[0]);
     }
     assert(n.IsScalar());
+    // The nesting of a structured element is not part of the array shape
+    const size_t nesting = have_datatype ? element_nesting(datatype) : 0;
+    assert(shape.size() >= nesting);
+    shape.erase(shape.end() - nesting, shape.end());
   }
   int64_t npoints = 1;
   for (size_t d = 0; d < shape.size(); ++d)
@@ -92,16 +112,19 @@ void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
     // determine datatype while parsing
     try {
       datatype = make_shared<datatype_t>(id_int64);
+      data1.clear();
       data1.reserve(npoints * datatype->type_size());
       parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
     } catch (const YAML::RepresentationException &) {
       try {
         datatype = make_shared<datatype_t>(id_float64);
+        data1.clear();
         data1.reserve(npoints * datatype->type_size());
         parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
       } catch (const YAML::RepresentationException &) {
         try {
           datatype = make_shared<datatype_t>(id_complex128);
+          data1.clear();
           data1.reserve(npoints * datatype->type_size());
           parse_inline_array_nd(node, datatype, shape, shape.size(), data1);
         } catch (const YAML::RepresentationException &) {
