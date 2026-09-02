@@ -218,6 +218,13 @@ add_test(NAME python-default-copy
   python-default2.asdf)
 add_test(NAME python-default-ls2 COMMAND ./asdf-ls python-default2.asdf)
 set_tests_properties(python-default-ls2 PROPERTIES DEPENDS python-default-copy)
+if(LIBLZ4_FOUND)
+  add_test(NAME lz4-ls COMMAND ./asdf-ls ${CMAKE_SOURCE_DIR}/tests/lz4.asdf)
+  add_test(NAME lz4-copy
+    COMMAND ./asdf-copy ${CMAKE_SOURCE_DIR}/tests/lz4.asdf lz4-2.asdf)
+  add_test(NAME lz4-ls2 COMMAND ./asdf-ls lz4-2.asdf)
+  set_tests_properties(lz4-ls2 PROPERTIES DEPENDS lz4-copy)
+endif()
 
 # These tests are broken in Python 3:
 # SWIG does not translate between numpy integer arrays and C++ std::vector

@@ -18,6 +18,7 @@
 #ifdef ASDF_HAVE_LIBLZ4
 #include <lz4.h>
 #include <lz4frame.h>
+#include <lz4hc.h>
 #endif
 
 #ifdef ASDF_HAVE_LIBZSTD
@@ -314,7 +315,40 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
 #endif
 
 #ifdef ASDF_HAVE_LIBLZ4
-  case compression_t::liblz4: {
+  case compression_t::lz4: {
+    // ASDF standard lz4 encoding, as written by the Python reference
+    // implementation: a sequence of chunks, each a 4-byte big-endian length
+    // followed by that many bytes of LZ4 block-format data, which in turn
+    // begin with the 4-byte little-endian uncompressed chunk size
+    data.resize(data_space);
+    size_t inpos = 0;
+    size_t outpos = 0;
+    while (inpos < indata.size()) {
+      assert(inpos + 4 <= indata.size());
+      uint32_t chunk_size = 0;
+      for (int i = 0; i < 4; ++i)
+        chunk_size = (chunk_size << 8) | indata[inpos + i];
+      inpos += 4;
+      assert(chunk_size >= 4);
+      assert(inpos + chunk_size <= indata.size());
+      uint32_t uncompressed_size = 0;
+      for (int i = 3; i >= 0; --i)
+        uncompressed_size = (uncompressed_size << 8) | indata[inpos + i];
+      assert(outpos + uncompressed_size <= data.size());
+      const int nbytes = LZ4_decompress_safe(
+          reinterpret_cast<const char *>(indata.data() + inpos + 4),
+          reinterpret_cast<char *>(data.data() + outpos), int(chunk_size - 4),
+          int(uncompressed_size));
+      assert(nbytes >= 0);
+      assert(uint32_t(nbytes) == uncompressed_size);
+      inpos += chunk_size;
+      outpos += uncompressed_size;
+    }
+    assert(outpos == data.size());
+    break;
+  }
+
+  case compression_t::lz4f: {
     data.resize(data_space);
 
     LZ4F_decompressOptions_t dOpt;
@@ -446,8 +480,10 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
     compression = compression_t::blosc2;
   else if ((comp == array<unsigned char, 4>{'b', 'z', 'p', '2'}))
     compression = compression_t::bzip2;
+  else if ((comp == array<unsigned char, 4>{'l', 'z', '4', 0}))
+    compression = compression_t::lz4;
   else if ((comp == array<unsigned char, 4>{'l', 'z', '4', 'f'}))
-    compression = compression_t::liblz4;
+    compression = compression_t::lz4f;
   else if ((comp == array<unsigned char, 4>{'z', 's', 't', 'd'}))
     compression = compression_t::libzstd;
   else if ((comp == array<unsigned char, 4>{'z', 'l', 'i', 'b'}))
@@ -656,7 +692,43 @@ void ndarray::write_block(ostream &os) const {
 #endif
 
 #ifdef ASDF_HAVE_LIBLZ4
-  case compression_t::liblz4: {
+  case compression_t::lz4: {
+    comp = {'l', 'z', '4', 0};
+    // ASDF standard lz4 encoding (see the decoder for the layout). Use the
+    // same chunk size as the Python reference implementation.
+    const size_t chunk_size = size_t(1) << 22;
+    // LZ4HC treats levels below 1 as its default level
+    const int level = compression_level < 1
+                          ? LZ4HC_CLEVEL_DEFAULT
+                          : min(LZ4HC_CLEVEL_MAX, compression_level);
+    const char *const src = static_cast<const char *>(get_data()->ptr());
+    const size_t src_size = get_data()->nbytes();
+    vector<unsigned char> out;
+    vector<char> buf(LZ4_compressBound(int(min(chunk_size, src_size))));
+    for (size_t pos = 0; pos < src_size; pos += chunk_size) {
+      const size_t n = min(chunk_size, src_size - pos);
+      const int nbytes = LZ4_compress_HC(src + pos, buf.data(), int(n),
+                                         int(buf.size()), level);
+      assert(nbytes > 0);
+      // big-endian length of the chunk, including the size prefix below
+      const uint32_t chunk_len = uint32_t(nbytes) + 4;
+      for (int i = 3; i >= 0; --i)
+        out.push_back((chunk_len >> (8 * i)) & 0xff);
+      // little-endian uncompressed size
+      for (int i = 0; i < 4; ++i)
+        out.push_back((uint32_t(n) >> (8 * i)) & 0xff);
+      out.insert(out.end(), buf.data(), buf.data() + nbytes);
+    }
+    outdata = make_shared<typed_block_t<unsigned char>>(std::move(out));
+    if (outdata->nbytes() >= get_data()->nbytes()) {
+      // Skip compression if it does not reduce the size
+      comp = {0, 0, 0, 0};
+      outdata = get_data().get();
+    }
+    break;
+  }
+
+  case compression_t::lz4f: {
     comp = {'l', 'z', '4', 'f'};
 
     LZ4F_preferences_t preferences = LZ4F_INIT_PREFERENCES;

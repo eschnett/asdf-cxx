@@ -100,8 +100,10 @@ std::ostream &operator<<(std::ostream &os, compression_t compression) {
     return os << "blosc2";
   case compression_t::bzip2:
     return os << "bzip2";
-  case compression_t::liblz4:
-    return os << "liblz4";
+  case compression_t::lz4:
+    return os << "lz4";
+  case compression_t::lz4f:
+    return os << "lz4f";
   case compression_t::libzstd:
     return os << "libzstd";
   case compression_t::zlib:

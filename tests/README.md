@@ -25,3 +25,10 @@ standard version, `core/ndarray-1.1.0` tags, a `history` map with tagged
 `core/extension_metadata-1.0.0` entries, and a block index. asdf-cxx
 ignores `history` when reading and writes `core/ndarray-1.0.0` tags, so
 the copy the tests produce is not byte-identical, but its arrays are.
+
+## `lz4.asdf`
+
+Arrays `b` and `c` use the standard `lz4` block encoding, which needs the
+Python `lz4` package to write. Its tests run only when CMake found
+liblz4. asdf-cxx also writes its own LZ4 frame encoding under the token
+`lz4f`, which Python does not read.

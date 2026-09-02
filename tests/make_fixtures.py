@@ -6,7 +6,7 @@ between the YAML tree and the first block, and a block index, so files that
 exercise the other cases have to come from another writer. This script uses
 the Python reference implementation (https://pypi.org/project/asdf/):
 
-    mamba create -p ./asdf-env -c conda-forge python asdf   # or: pip install asdf
+    mamba create -p ./asdf-env -c conda-forge python asdf lz4   # or: pip install asdf lz4
     ./asdf-env/bin/python tests/make_fixtures.py
 
 The fixtures are committed so that the test suite does not depend on Python.
@@ -55,5 +55,14 @@ af = asdf.AsdfFile(make_tree())
 compress(af)
 af.write_to(os.path.join(here, "python-default.asdf"))
 
+# lz4.asdf: the standard lz4 encoding (block token "lz4"), which requires the
+# Python `lz4` package to write. asdf-cxx also has its own LZ4 frame encoding
+# (token "lz4f") that Python cannot read.
+af = asdf.AsdfFile(make_tree())
+af.set_array_compression(af["b"], "lz4")
+af.set_array_compression(af["c"], "lz4")
+af.write_to(os.path.join(here, "lz4.asdf"))
+
 print("wrote", os.path.join(here, "padded.asdf"))
 print("wrote", os.path.join(here, "python-default.asdf"))
+print("wrote", os.path.join(here, "lz4.asdf"))

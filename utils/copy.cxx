@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
       return;
     cerr << msg << "Syntax: " << argv[0]
          << " [--array=(block|inline)] "
-            "[--compression=(none|blosc|blosc2|bzip2|liblz4|libzstd|zlib)] "
+            "[--compression=(none|blosc|blosc2|bzip2|lz4|lz4f|libzstd|zlib)] "
             "[--compression-level=[0-9]] <input file> <output file>\n"
          << "Aborting.\n";
     exit(1);
@@ -57,10 +57,14 @@ int main(int argc, char **argv) {
       check(compression == compression_t::undefined,
             "Compression type already set\n");
       compression = compression_t::bzip2;
-    } else if (opt == "--compression=liblz4") {
+    } else if (opt == "--compression=lz4") {
       check(compression == compression_t::undefined,
             "Compression type already set\n");
-      compression = compression_t::liblz4;
+      compression = compression_t::lz4;
+    } else if (opt == "--compression=lz4f" || opt == "--compression=liblz4") {
+      check(compression == compression_t::undefined,
+            "Compression type already set\n");
+      compression = compression_t::lz4f;
     } else if (opt == "--compression=libzstd") {
       check(compression == compression_t::undefined,
             "Compression type already set\n");

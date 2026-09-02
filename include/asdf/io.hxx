@@ -26,7 +26,10 @@ enum class compression_t {
   blosc,
   blosc2,
   bzip2,
-  liblz4,
+  lz4,           // ASDF standard lz4 encoding (block token "lz4"), read and
+                 // written by the Python reference implementation
+  lz4f,          // LZ4 frame format (block token "lz4f"), an asdf-cxx extension
+  liblz4 = lz4f, // deprecated name for lz4f
   libzstd,
   zlib
 };
