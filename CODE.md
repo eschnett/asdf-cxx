@@ -25,6 +25,7 @@ asdf-cxx/
 │   ├── byteorder.hxx         byteorder_t, host_byteorder(), xtoh/htox byte swapping
 │   ├── datatype.hxx          Scalar type ids, C++ type mapping, datatype_t / field_t
 │   ├── entry.hxx             The `entry` class hierarchy (tree nodes) + make_entry()
+│   ├── error.hxx             ASDF::error exception, ASDF_ERROR / ASDF_CHECK macros
 │   ├── io.hxx                block_format_t, compression_t, reader_state, writer, copy_state
 │   ├── memoized.hxx          memoized<T>: lazily evaluated, cached shared_ptr<T>
 │   ├── ndarray.hxx           block_t storage classes, block_info_t, ndarray
@@ -32,7 +33,7 @@ asdf-cxx/
 │   ├── stl.hxx               yaml_encode/yaml_decode for std::vector and std::map
 │   └── table.hxx             table / column (dormant, see §4.8)
 ├── src/                      One .cxx per header (asdf, byteorder, config, datatype,
-│                             entry, io, ndarray, reference, table)
+│                             entry, error, io, ndarray, reference, table)
 ├── utils/
 │   ├── copy.cxx              asdf-copy: read → copy(copy_state) → write
 │   └── ls.cxx                asdf-ls: dump YAML tree + per-block info
@@ -44,7 +45,8 @@ asdf-cxx/
 │   ├── demo-large.cxx        asdf-demo-large: 1000×1000×250 float64 (2 GB) — not a test
 │   └── *.py                  Python demos for the (stale) SWIG binding
 ├── tests/                    Fixtures written by Python asdf (padded blocks, default
-│                             Python output, lz4) + make_fixtures.py to regenerate them
+│                             Python output, lz4, deliberately corrupt files),
+│                             make_fixtures.py to regenerate them, expect-error.sh
 ├── asdf.i                    SWIG interface (stale, not built — see §10)
 ├── cmp.cpp                   Unfinished compare tool (stale, not built — see §10)
 ├── diff-commands.sh          Test helper: diff two commands' output, ignoring
@@ -76,9 +78,9 @@ Every header ends with a `#define <GUARD>_DONE` and a trailing
 
 - CMake ≥ 3.13, C++17 (`target_compile_features(... cxx_std_17)`).
 - Out-of-source builds are enforced (`CMAKE_DISABLE_IN_SOURCE_BUILD`).
-- **`-DNDEBUG` is deliberately stripped** from `CMAKE_CXX_FLAGS_RELEASE`
-  and `..._RELWITHDEBINFO`. The library uses `assert` as its primary
-  error-handling mechanism, so asserts must stay live in all build types.
+- Release builds define `NDEBUG` as usual. Input validation uses
+  `ASDF_CHECK`, not `assert` (§8), so nothing user-visible depends on
+  asserts being live. CI builds and tests both Debug and Release.
 - Required dependency: yaml-cpp. Optional: OpenSSL (MD5 checksums),
   bzip2, c-blosc, c-blosc2, lz4, zlib, zstd. Each optional dependency
   sets a `HAVE_*` CMake variable that becomes `ASDF_HAVE_*` in the
@@ -343,8 +345,8 @@ always big-endian and handled separately by `input`/`output` helpers in
 
 ### 5.2 `asdf::from_yaml` and block discovery
 
-1. Read 5 bytes; must be `#ASDF`, otherwise print a diagnostic and
-   `exit(2)`. The format version after it is **not** checked.
+1. Read 5 bytes; must be `#ASDF`, otherwise throw. The format version
+   after it is **not** checked.
 2. Read the stream line by line, appending to a string, until a line
    equal to `...` (YAML end-of-document). `YAML::Load` the accumulated
    text. The tree is therefore fully buffered in memory as text.
@@ -376,7 +378,7 @@ value goes through `make_entry`. Dispatch order in `src/entry.cxx`:
 
 1. **By tag**: `core/complex-1.0.0` → `complex_entry`;
    `core/software-1.0.0` → `software`; `core/ndarray-1.0.0` or
-   `core/ndarray-1.1.0` → `ndarray_entry`. Any other non-empty tag hits `assert`.
+   `core/ndarray-1.1.0` → `ndarray_entry`. Any other non-empty tag throws.
 2. **Null** node → `null_entry`.
 3. **Scalar**: try `as<bool>`, then `as<int64_t>`, then `as<double>`,
    else `string_entry`.
@@ -507,9 +509,17 @@ that files written by earlier versions stay readable.
 - Ownership: trees are `shared_ptr` everywhere; `group`/`sequence` hold
   their containers behind a `shared_ptr` so `get_group()` /
   `get_sequence()` hand out a live view.
-- **Error handling is `assert` and `exit`.** There is no exception-based
-  error path except a few `throw std::invalid_argument` in
-  `get_scalar_type_size`. Do not build with `NDEBUG`.
+- **Error handling.** Malformed input, unsupported features, caller
+  misuse, and failing compression or checksum calls throw `ASDF::error`
+  (`error.hxx`, derived from `std::runtime_error`; `what()` carries the
+  message plus `file:line`). Use `ASDF_CHECK(cond, message)` or
+  `ASDF_ERROR(message)`; both are active in every build type, and the
+  message is only built on failure. `assert` is reserved for internal
+  invariants and is compiled out in Release. yaml-cpp's own exceptions
+  may also propagate. The tools and demos catch `std::exception` in
+  `main`, print `<program>: error: <what>` and return 1. `writer::flush`
+  moves the pending block tasks out before running them so that an
+  exception inside a task does not trip the destructor's invariant.
 - Formatting: clang-format (LLVM base, 80 cols, 2 spaces, no tabs).
   Run `clang-format -i` on touched files.
 - Feature probes at runtime: `have_compression_*()`, `have_checksum()`,
@@ -550,7 +560,9 @@ filtering lines mentioning compress/checksum because compressed sizes
 and checksums are not guaranteed to match between writers) → `external`
 → `compression` → `padded-*`, `python-default-*` and, when liblz4 was
 found, `lz4-*` (read, copy and re-list the Python-written fixtures in
-`tests/`; see `tests/README.md`).
+`tests/`; see `tests/README.md`) → `error-*` (deliberately broken files
+must fail with exit status 1 and an `error:` message, checked by
+`tests/expect-error.sh`; `error-checksum` needs OpenSSL).
 asdf-demo-large is built but not registered as a test.
 
 There is no unit-test framework. The fixtures in `tests/` are the only
@@ -591,7 +603,7 @@ Debug, `CODE_COVERAGE=ON`, build → ctest → install → lcov + Codecov
 1. **Masks are not supported.** Read ignores `mask:`; write asserts
    the mask is empty.
 2. **Only `core/ndarray-1.0.0` and `-1.1.0` tags are recognised**, by
-   exact string comparison; any other unknown tag aborts. `history` is
+   exact string comparison; any other unknown tag throws. `history` is
    dropped on read.
 3. **`lz4f` blocks are asdf-cxx specific.** Use `compression_t::lz4` for
    files other implementations must read (§7).
@@ -601,13 +613,13 @@ Debug, `CODE_COVERAGE=ON`, build → ctest → install → lcov + Codecov
    sequentially. Streamed blocks and exploded (`source:` as a URI
    string) files are unsupported.
 6. **YAML head is read line-by-line until `...`** and buffered as text.
-   A file whose YAML lacks the `...` terminator fails with "Stream input
-   error".
+   A file whose YAML lacks the `...` terminator throws.
 7. `ascii`/`ucs4` scalar types are declared but unimplemented, including
    the standard's two-element `[ascii, N]` form.
 8. `asdf-copy` accepts `--compression-level` only as ten literal
-   strings (`--compression-level=0` … `=9`); anything else asserts.
-9. The `asdf(readers=...)` hook for custom tags asserts if non-empty.
+   strings (`--compression-level=0` … `=9`); anything else prints the
+   usage and exits.
+9. The `asdf(readers=...)` hook for custom tags throws if non-empty.
 10. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).
 11. Blosc and blosc2 code paths compile only where those libraries are
@@ -647,6 +659,11 @@ Debug, `CODE_COVERAGE=ON`, build → ctest → install → lcov + Codecov
 `datatype.cxx` (static_asserts, `get_scalar_type_size`, name
 string ↔ id, `yaml_decode`/`yaml_encode`, `parse_scalar`,
 `emit_scalar`).
+
+**Report an error**: `ASDF_CHECK(cond, "message")` for a condition,
+`ASDF_ERROR("message")` unconditionally; the message may be a
+`std::string` expression and is only evaluated on failure. Reserve
+`assert` for invariants that cannot be caused by input.
 
 **Add a Python-written fixture**: extend `tests/make_fixtures.py`, run it
 with an environment that has `asdf` and `numpy`, and register ctest

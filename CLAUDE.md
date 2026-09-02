@@ -38,8 +38,12 @@ columns, 2 spaces).
 
 ## Things that are easy to get wrong
 
-- Error handling is `assert` and `exit`. `-DNDEBUG` is deliberately
-  stripped from Release flags in `CMakeLists.txt`; do not add it back.
+- Errors from input files, unsupported features, caller misuse, or
+  library calls are thrown as `ASDF::error` via `ASDF_CHECK(cond, msg)`
+  and `ASDF_ERROR(msg)` from `include/asdf/error.hxx`. `assert` is only
+  for internal invariants and is compiled out in Release. Tools catch
+  exceptions in `main` and exit with status 1; `tests/expect-error.sh`
+  checks that.
 - Every serialisable class has three constructors: value,
   `(shared_ptr<reader_state>, YAML::Node)` for reading, and
   `(copy_state, const T&)` for copying, plus `to_yaml(writer&)`. Follow
