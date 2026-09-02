@@ -5,6 +5,7 @@
 #include <asdf/config.hxx>
 #include <asdf/datatype.hxx>
 #include <asdf/entry.hxx>
+#include <asdf/error.hxx>
 #include <asdf/io.hxx>
 #include <asdf/ndarray.hxx>
 #include <asdf/reference.hxx>
@@ -50,7 +51,7 @@ public:
   // // }
   asdf(map<string, string> tags1, shared_ptr<group> grp1)
       : tags(std::move(tags1)), grp(std::move(grp1)) {
-    assert(grp);
+    ASDF_CHECK(grp, "The root group must not be null");
   }
   asdf(map<string, string> tags1, map<string, YAML::Node> nodes1)
       : tags(std::move(tags1)), nodes(std::move(nodes1)) {}

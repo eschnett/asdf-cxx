@@ -28,8 +28,8 @@ public:
   column(string name1, shared_ptr<ndarray> data1, string description1)
       : name(std::move(name1)), data(std::move(data1)),
         description(std::move(description1)) {
-    assert(!name.empty());
-    assert(data);
+    ASDF_CHECK(!name.empty(), "Column name must not be empty");
+    ASDF_CHECK(data, "Column data must not be null");
   }
 
   column(const shared_ptr<reader_state> &rs, const YAML::Node &node);

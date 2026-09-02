@@ -88,8 +88,7 @@ static_assert(get_scalar_type_id<ucs4_t>() == id_ucs4, "");
 size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
   switch (scalar_type_id) {
   case id_error:
-    throw std::invalid_argument(
-        "Scalar type `scalar_type_id_t::id_error` does not have a size\n");
+    ASDF_ERROR("Scalar type id_error does not have a size");
   case id_bool8:
     return sizeof(bool8_t);
   case id_int8:
@@ -135,8 +134,8 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
     // case id_ascii
     // case id_ucs4
   default:
-    throw std::invalid_argument("Invalid `scalar_type_id_t` value " +
-                                std::to_string(int(scalar_type_id)) + "\n");
+    ASDF_ERROR("Invalid scalar_type_id_t value " +
+               std::to_string(int(scalar_type_id)));
   }
 }
 
@@ -180,8 +179,7 @@ void yaml_decode(const YAML::Node &node,
   else {
     // case id_ascii
     // case id_ucs4
-    assert(0);
-    scalar_type_id = id_error;
+    ASDF_ERROR("Unknown datatype \"" + str + "\"");
   }
 }
 
@@ -242,7 +240,8 @@ YAML::Node yaml_encode(scalar_type_id_t scalar_type_id) {
     // case id_ascii
     // case id_ucs4
   default:
-    assert(0);
+    ASDF_ERROR("Cannot encode invalid scalar type id " +
+               std::to_string(int(scalar_type_id)));
   }
   return node;
 }
@@ -266,8 +265,6 @@ void yaml_decode(const YAML::Node &node, int64_t &val) {
 void yaml_decode(const YAML::Node &node, int128_t &val) {
   // yaml-cpp does not support `int128_t`
   // TODO: Parse as string, then convert ourselves
-  assert(val >= std::numeric_limits<int64_t>::min() &&
-         val <= std::numeric_limits<int64_t>::max());
   val = int128_t(node.as<int64_t>());
 }
 #endif
@@ -305,7 +302,8 @@ void yaml_decode(const YAML::Node &node, float64_t &val) {
 namespace {
 template <typename T>
 void yaml_decode_complex(const YAML::Node &node, complex<T> &val) {
-  assert(node.Tag() == "tag:stsci.edu:asdf/core/complex-1.0.0");
+  ASDF_CHECK(node.Tag() == "tag:stsci.edu:asdf/core/complex-1.0.0",
+             "Expected tag core/complex-1.0.0, found \"" + node.Tag() + "\"");
   static const string ieee = "([-+]?[0-9]*\\.?[0-9]+(e[-+]?[0-9]+)?|inf|nan)";
   static const regex cmplx("\\(?(" + ieee + ")?((" + ieee + ")[ij])?\\)?",
                            regex::icase | regex::optimize);
@@ -313,7 +311,7 @@ void yaml_decode_complex(const YAML::Node &node, complex<T> &val) {
   const auto &str = node.Scalar();
   smatch m;
   bool didmatch = regex_match(str, m, cmplx);
-  assert(didmatch);
+  ASDF_CHECK(didmatch, "Cannot parse complex number \"" + str + "\"");
   const T re = m[1].matched ? static_cast<T>(stod(m[1].str())) : 0;
   const T im = m[6].matched ? static_cast<T>(stod(m[6].str())) : 0;
   val = {re, im};
@@ -360,8 +358,9 @@ YAML::Node yaml_encode(int64_t val) {
 YAML::Node yaml_encode(int128_t val) {
   YAML::Node node;
   // TODO: Represent as string
-  assert(val >= std::numeric_limits<int64_t>::min() &&
-         val <= std::numeric_limits<int64_t>::max());
+  ASDF_CHECK(val >= std::numeric_limits<int64_t>::min() &&
+                 val <= std::numeric_limits<int64_t>::max(),
+             "Cannot encode int128 values outside the int64 range");
   node = int64_t(val);
   return node;
 }
@@ -390,7 +389,8 @@ YAML::Node yaml_encode(uint64_t val) {
 YAML::Node yaml_encode(uint128_t val) {
   YAML::Node node;
   // TODO: Represent as string
-  assert(val <= std::numeric_limits<uint64_t>::max());
+  ASDF_CHECK(val <= std::numeric_limits<uint64_t>::max(),
+             "Cannot encode uint128 values outside the uint64 range");
   node = uint64_t(val);
   return node;
 }
@@ -525,7 +525,8 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
   // case id_ascii
   // case id_ucs4
   default:
-    assert(0);
+    ASDF_ERROR("Parsing scalars of this datatype is not supported (ascii and "
+               "ucs4 are not implemented)");
   }
 }
 
@@ -595,7 +596,8 @@ YAML::Node emit_scalar(const unsigned char *data,
   // case id_ascii
   // case id_ucs4
   default:
-    assert(0);
+    ASDF_ERROR("Emitting scalars of this datatype is not supported (ascii and "
+               "ucs4 are not implemented)");
   }
   return node;
 }
@@ -611,7 +613,7 @@ field_t::field_t(string name, shared_ptr<datatype_t> datatype,
       have_byteorder(have_byteorder), byteorder(byteorder),
       shape(std::move(shape)) {
   // (The constructor argument has been moved from)
-  assert(this->datatype);
+  ASDF_CHECK(this->datatype, "A field requires a datatype");
 }
 
 field_t::field_t(const shared_ptr<reader_state> &rs, const YAML::Node &node)
@@ -621,11 +623,13 @@ field_t::field_t(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     datatype = make_shared<datatype_t>(rs, node);
     return;
   }
-  assert(node.IsMap());
+  ASDF_CHECK(node.IsMap(),
+             "A datatype field must be a scalar type name or a mapping");
   if (node["name"].IsDefined())
     name = node["name"].Scalar();
   // The datatype is the only required entry. It can itself be structured.
-  assert(node["datatype"].IsDefined());
+  ASDF_CHECK(node["datatype"].IsDefined(),
+             "A datatype field must have a \"datatype\" entry");
   datatype = make_shared<datatype_t>(rs, node["datatype"]);
   if (node["byteorder"].IsDefined()) {
     have_byteorder = true;
@@ -643,7 +647,7 @@ field_t::field_t(const copy_state &cs, const field_t &field)
 size_t field_t::type_size() const {
   size_t size = datatype->type_size();
   for (const auto &s : shape) {
-    assert(s >= 0);
+    ASDF_CHECK(s >= 0, "Field shape must not have negative extents");
     size *= s;
   }
   return size;
@@ -684,7 +688,8 @@ datatype_t::datatype_t(const shared_ptr<reader_state> &rs,
     yaml_decode(node, scalar_type_id);
     return;
   }
-  assert(node.IsSequence());
+  ASDF_CHECK(node.IsSequence(),
+             "A datatype must be a scalar type name or a list of fields");
   is_scalar = false;
   scalar_type_id = id_error;
   fields.reserve(node.size());
@@ -724,8 +729,9 @@ void parse_field(const YAML::Node &node, unsigned char *&ptr,
     ptr += datatype->type_size();
     return;
   }
-  assert(node.IsSequence());
-  assert(node.size() == static_cast<size_t>(shape.at(dim)));
+  ASDF_CHECK(node.IsSequence() &&
+                 node.size() == static_cast<size_t>(shape.at(dim)),
+             "Sub-array field data does not match the field shape");
   for (YAML::const_iterator ni = node.begin(), ne = node.end(); ni != ne; ++ni)
     parse_field(*ni, ptr, datatype, shape, dim + 1, byteorder);
 }
@@ -754,8 +760,9 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
   if (datatype->is_scalar)
     return parse_scalar(node, data, datatype->scalar_type_id, byteorder);
   // A structured element is a sequence with one entry per field
-  assert(node.IsSequence());
-  assert(node.size() == datatype->fields.size());
+  ASDF_CHECK(
+      node.IsSequence() && node.size() == datatype->fields.size(),
+      "A structured element must be a sequence with one entry per field");
   unsigned char *ptr = data;
   for (size_t i = 0; i < datatype->fields.size(); ++i) {
     const auto &field = datatype->fields.at(i);

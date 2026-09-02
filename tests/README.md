@@ -32,3 +32,12 @@ Arrays `b` and `c` use the standard `lz4` block encoding, which needs the
 Python `lz4` package to write. Its tests run only when CMake found
 liblz4. asdf-cxx also writes its own LZ4 frame encoding under the token
 `lz4f`, which Python does not read.
+
+## Deliberately broken files
+
+`corrupt-tag.asdf`, `corrupt-checksum.asdf`, `corrupt-truncated.asdf` and
+`not-asdf.asdf` are derived from `python-default.asdf` by the fixture
+script. The `error-*` tests run `asdf-ls` or `asdf-copy` on them through
+`expect-error.sh`, which requires exit status 1 and an `error:` message
+on stderr, so a crash does not count as passing. `error-checksum` only
+runs when asdf-cxx was built with OpenSSL.

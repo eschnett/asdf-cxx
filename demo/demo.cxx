@@ -16,7 +16,7 @@
 using namespace std;
 using namespace ASDF;
 
-int main(int argc, char **argv) {
+int run(int argc, char **argv) {
   cout << "asdf-demo: Create a simple ASDF file\n";
   ASDF_CHECK_VERSION();
 
@@ -118,4 +118,13 @@ int main(int argc, char **argv) {
 
   cout << "Done.\n";
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return run(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << argv[0] << ": error: " << e.what() << "\n";
+    return 1;
+  }
 }

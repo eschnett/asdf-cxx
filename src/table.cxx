@@ -5,7 +5,8 @@ namespace ASDF {
 // Table and Column
 
 column::column(const shared_ptr<reader_state> &rs, const YAML::Node &node) {
-  assert(node.Tag() == "tag:stsci.edu:asdf/core/column-1.0.0");
+  ASDF_CHECK(node.Tag() == "tag:stsci.edu:asdf/core/column-1.0.0",
+             "Expected tag core/column-1.0.0, found \"" + node.Tag() + "\"");
   name = node["name"].Scalar();
   data = make_shared<ndarray>(rs, node["data"]);
   if (node["description"].IsDefined())
@@ -26,7 +27,8 @@ writer &column::to_yaml(writer &w) const {
 }
 
 table::table(const shared_ptr<reader_state> &rs, const YAML::Node &node) {
-  assert(node.Tag() == "tag:stsci.edu:asdf/core/table-1.0.0");
+  ASDF_CHECK(node.Tag() == "tag:stsci.edu:asdf/core/table-1.0.0",
+             "Expected tag core/table-1.0.0, found \"" + node.Tag() + "\"");
   for (const auto &col : node["columns"])
     columns.push_back(make_shared<column>(rs, col));
 }

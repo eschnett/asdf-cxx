@@ -1,6 +1,7 @@
 #ifndef ASDF_IO_HXX
 #define ASDF_IO_HXX
 
+#include <asdf/error.hxx>
 #include <asdf/memoized.hxx>
 
 #include <yaml-cpp/yaml.h>
@@ -72,7 +73,10 @@ public:
                const string &filename = {});
 
   memoized<block_t> get_block(int64_t index) const {
-    assert(index >= 0);
+    ASDF_CHECK(index >= 0 && size_t(index) < blocks.size(),
+               "Block index " + std::to_string(index) +
+                   " is out of range; the file has " +
+                   std::to_string(blocks.size()) + " blocks");
     return blocks.at(index);
   }
 

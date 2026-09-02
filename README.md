@@ -38,8 +38,9 @@ are:
   not supported. (Full URI references are supported.)
 - Streaming writes and reading streamed datasets is not supported.
 - String types (i.e. arrays of fixed length strings) are not supported.
-- Errors are not handled gracefully; the code will simply abort on
-  most errors.
+- Errors (malformed files, unsupported features, failing compression
+  libraries) are reported by throwing `ASDF::error`. The command line
+  tools print the message and exit with status 1.
 
 Other minor limitations are:
 - Non-YAML Comments (using a `//` key) are ignored, and there is no

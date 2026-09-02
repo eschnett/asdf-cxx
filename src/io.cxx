@@ -127,7 +127,10 @@ reader_state::reader_state(const YAML::Node &tree,
 }
 
 block_info_t reader_state::get_block_info(int64_t index) const {
-  assert(index >= 0);
+  ASDF_CHECK(index >= 0 && size_t(index) < block_infos.size(),
+             "Block index " + std::to_string(index) +
+                 " is out of range; the file has " +
+                 std::to_string(block_infos.size()) + " blocks");
   return block_infos.at(index);
 }
 
@@ -143,8 +146,8 @@ YAML::Node reader_state::resolve_reference(const vector<string> &path) const {
         try {
           return stoi(elem);
         } catch (exception &) {
-          assert(0);
-          std::abort();
+          ASDF_ERROR("Reference path element \"" + elem +
+                     "\" is not a valid sequence index");
         }
       }();
       node = unique_ptr<YAML::Node>(new YAML::Node((*node)[idx]));
@@ -152,10 +155,11 @@ YAML::Node reader_state::resolve_reference(const vector<string> &path) const {
       node = unique_ptr<YAML::Node>(new YAML::Node((*node)[elem]));
     } else {
       // Could not resolve reference
-      // TODO: Output an actual error message
-      assert(0);
+      ASDF_ERROR("Reference path element \"" + elem +
+                 "\" cannot be applied to a scalar node");
     }
-    assert(node->IsDefined());
+    ASDF_CHECK(node->IsDefined(),
+               "Reference path element \"" + elem + "\" not found");
   }
   return *node;
 }
@@ -176,7 +180,9 @@ reader_state::resolve_reference(const shared_ptr<reader_state> &rs,
       ref_filename = filename;
     } else {
       // preprend current path
-      assert(!rs->filename.empty()); // We could allow this
+      ASDF_CHECK(!rs->filename.empty(),
+                 "Cannot resolve the relative reference \"" + filename +
+                     "\" because the current file's name is unknown");
       auto slashpos = rs->filename.rfind('/');
       if (slashpos == string::npos)
         ref_filename = filename;
@@ -215,13 +221,16 @@ writer::~writer() { assert(tasks.empty()); }
 void writer::flush() {
   emitter << YAML::EndDoc;
   if (!tasks.empty()) {
+    // Take the tasks out first so that the destructor's invariant holds even
+    // if a task throws
+    const auto tasks1 = std::move(tasks);
+    tasks.clear();
     YAML::Emitter index;
     index << YAML::BeginDoc << YAML::Flow << YAML::BeginSeq;
-    for (auto &&task : tasks) {
+    for (const auto &task : tasks1) {
       index << os.tellp();
-      std::move(task)(os);
+      task(os);
     }
-    tasks.clear();
     index << YAML::EndSeq << YAML::EndDoc;
     // yaml-cpp does not support comments without leading space
     os << "#ASDF BLOCK INDEX\n"

@@ -34,11 +34,22 @@
 #endif
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
+#include <string>
 #include <type_traits>
 
 namespace ASDF {
+
+namespace {
+std::string compression_name(compression_t compression) {
+  std::ostringstream buf;
+  buf << compression;
+  return buf.str();
+}
+} // namespace
 
 #ifdef ASDF_HAVE_BLOSC2
 namespace {
@@ -70,15 +81,19 @@ void parse_inline_array_nd(const YAML::Node &node,
   if (rank == 0) {
     // A scalar element is a YAML scalar, a structured element is a YAML
     // sequence with one entry per field
-    assert(datatype->is_scalar ? node.IsScalar() : node.IsSequence());
+    ASDF_CHECK(
+        datatype->is_scalar ? node.IsScalar() : node.IsSequence(),
+        "Inline array element has the wrong YAML node type for its datatype");
     size_t oldsize = data.size();
     data.resize(oldsize + datatype->type_size());
     parse_scalar(node, &data[oldsize], datatype);
     return;
   }
   int64_t size = shape.at(shape.size() - rank);
-  assert(node.IsSequence());
-  assert(node.size() == static_cast<size_t>(size));
+  ASDF_CHECK(node.IsSequence(),
+             "Inline array data must be nested YAML sequences");
+  ASDF_CHECK(node.size() == static_cast<size_t>(size),
+             "Inline array data does not match the declared shape");
   for (YAML::const_iterator ni = node.begin(), ne = node.end(); ni != ne; ++ni)
     parse_inline_array_nd(*ni, datatype, shape, rank - 1, data);
 }
@@ -90,7 +105,7 @@ namespace {
 size_t element_nesting(const shared_ptr<datatype_t> &datatype) {
   if (datatype->is_scalar)
     return 0;
-  assert(!datatype->fields.empty());
+  ASDF_CHECK(!datatype->fields.empty(), "Structured datatype has no fields");
   const auto &field = datatype->fields.front();
   return 1 + field->shape.size() + element_nesting(field->datatype);
 }
@@ -112,10 +127,13 @@ void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
       // Note: `n = n[0]` would modify the tree instead of rebinding `n`
       n.reset(n[0]);
     }
-    assert(n.IsScalar());
+    ASDF_CHECK(n.IsScalar(), "Cannot infer the shape of an inline array: the "
+                             "innermost element is not a scalar");
     // The nesting of a structured element is not part of the array shape
     const size_t nesting = have_datatype ? element_nesting(datatype) : 0;
-    assert(shape.size() >= nesting);
+    ASDF_CHECK(shape.size() >= nesting,
+               "Inline array data is nested less deeply than its structured "
+               "datatype requires");
     shape.erase(shape.end() - nesting, shape.end());
   }
   int64_t npoints = 1;
@@ -144,7 +162,8 @@ void parse_inline_array(const YAML::Node &node, shared_ptr<block_t> &data,
         } catch (const YAML::RepresentationException &) {
           // bool8_t
           // ucs4_t
-          assert(0);
+          ASDF_ERROR("Cannot infer the datatype of an inline array; only "
+                     "int64, float64, and complex128 are inferred");
         }
       }
     }
@@ -216,14 +235,14 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
                 compression_t compression,
                 const array<unsigned char, 16> &want_checksum) {
   istream &is = *pis;
-  assert(is);
+  ASDF_CHECK(is, "Input stream is in a failed state");
   is.seekg(block_begin);
-  assert(is);
+  ASDF_CHECK(is, "Cannot seek to the block data");
   // The payload occupies the first `used_space` bytes of the block; the
   // remaining `allocated_space - used_space` bytes are padding
   vector<unsigned char> indata(used_space);
   is.read(reinterpret_cast<char *>(indata.data()), indata.size());
-  assert(is);
+  ASDF_CHECK(is, "Unexpected end of file while reading block data");
 
   // check checksum
 #ifdef ASDF_HAVE_OPENSSL
@@ -231,18 +250,19 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
                                                 0, 0, 0, 0, 0}) {
     array<unsigned char, 16> checksum;
     EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
-    assert(mdctx);
+    ASDF_CHECK(mdctx, "OpenSSL: EVP_MD_CTX_new failed");
     int ires = EVP_DigestInit_ex(mdctx, EVP_md5(), NULL);
-    assert(ires == 1);
+    ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
     ires = EVP_DigestUpdate(mdctx, indata.data(), indata.size());
-    assert(ires == 1);
+    ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
     assert(static_cast<size_t>(EVP_MD_size(EVP_md5())) == checksum.size());
     unsigned int digest_size;
     ires = EVP_DigestFinal_ex(mdctx, checksum.data(), &digest_size);
     assert(digest_size == checksum.size());
-    assert(ires == 1);
+    ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
     EVP_MD_CTX_free(mdctx);
-    assert(checksum == want_checksum);
+    ASDF_CHECK(checksum == want_checksum,
+               "Block checksum mismatch: the block data are corrupted");
   }
 #endif
 
@@ -251,7 +271,8 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   switch (compression) {
 
   case compression_t::none:
-    assert(data_space == used_space);
+    ASDF_CHECK(data_space == used_space,
+               "Uncompressed block: data_size differs from used_size");
     data = std::move(indata);
     break;
 
@@ -259,11 +280,12 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   case compression_t::blosc: {
     const int numinternalthreads = 1;
     data.resize(data_space);
-    assert(data.size() <= size_t(INT_MAX));
+    ASDF_CHECK(data.size() <= size_t(INT_MAX),
+               "blosc blocks are limited to 2 GiB");
     int dsize = blosc_decompress_ctx(indata.data(), data.data(), data.size(),
                                      numinternalthreads);
-    assert(dsize > 0);
-    assert(dsize == data.size());
+    ASDF_CHECK(dsize > 0 && size_t(dsize) == data.size(),
+               "blosc decompression failed");
     break;
   }
 #endif
@@ -283,8 +305,8 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
       const int output_size = blosc2_schunk_decompress_chunk(
           schunk, chunk, output_ptr,
           int(min(total_output_size, int64_t(INT_MAX))));
-      assert(output_size > 0);
-      assert(output_size <= total_output_size);
+      ASDF_CHECK(output_size > 0 && output_size <= total_output_size,
+                 "blosc2 decompression failed");
       output_ptr += output_size;
       total_output_size -= output_size;
     }
@@ -318,11 +340,12 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
       avail_out -= this_avail_out - strm.avail_out;
       if (iret == BZ_STREAM_END)
         break;
-      assert(iret == BZ_OK);
+      ASDF_CHECK(iret == BZ_OK, "bzip2 decompression failed with error " +
+                                    std::to_string(iret));
     }
     BZ2_bzDecompressEnd(&strm);
-    assert(avail_in == 0);
-    assert(avail_out == 0);
+    ASDF_CHECK(avail_in == 0 && avail_out == 0,
+               "bzip2: decompressed size does not match the block header");
     break;
   }
 #endif
@@ -337,27 +360,30 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     size_t inpos = 0;
     size_t outpos = 0;
     while (inpos < indata.size()) {
-      assert(inpos + 4 <= indata.size());
+      ASDF_CHECK(inpos + 4 <= indata.size(), "lz4: truncated chunk header");
       uint32_t chunk_size = 0;
       for (int i = 0; i < 4; ++i)
         chunk_size = (chunk_size << 8) | indata[inpos + i];
       inpos += 4;
-      assert(chunk_size >= 4);
-      assert(inpos + chunk_size <= indata.size());
+      ASDF_CHECK(chunk_size >= 4, "lz4: invalid chunk size");
+      ASDF_CHECK(inpos + chunk_size <= indata.size(),
+                 "lz4: chunk extends past the end of the block");
       uint32_t uncompressed_size = 0;
       for (int i = 3; i >= 0; --i)
         uncompressed_size = (uncompressed_size << 8) | indata[inpos + i];
-      assert(outpos + uncompressed_size <= data.size());
+      ASDF_CHECK(outpos + uncompressed_size <= data.size(),
+                 "lz4: decompressed size exceeds data_size");
       const int nbytes = LZ4_decompress_safe(
           reinterpret_cast<const char *>(indata.data() + inpos + 4),
           reinterpret_cast<char *>(data.data() + outpos), int(chunk_size - 4),
           int(uncompressed_size));
-      assert(nbytes >= 0);
-      assert(uint32_t(nbytes) == uncompressed_size);
+      ASDF_CHECK(nbytes >= 0 && uint32_t(nbytes) == uncompressed_size,
+                 "lz4 decompression failed");
       inpos += chunk_size;
       outpos += uncompressed_size;
     }
-    assert(outpos == data.size());
+    ASDF_CHECK(outpos == data.size(),
+               "lz4: decompressed size does not match the block header");
     break;
   }
 
@@ -376,17 +402,19 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     LZ4F_dctx *dctx;
     LZ4F_errorCode_t ierr =
         LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
-    assert(!LZ4F_isError(ierr));
+    ASDF_CHECK(!LZ4F_isError(ierr),
+               "lz4f: cannot create decompression context");
     assert(dctx);
 
     size_t dstSize = data.size();
     size_t srcSize = indata.size();
     const std::size_t nbytes_expected = LZ4F_decompress(
         dctx, data.data(), &dstSize, indata.data(), &srcSize, &dOpt);
-    assert(nbytes_expected == 0);
+    ASDF_CHECK(nbytes_expected == 0,
+               "lz4f decompression failed or the frame is incomplete");
 
     ierr = LZ4F_freeDecompressionContext(dctx);
-    assert(!LZ4F_isError(ierr));
+    ASDF_CHECK(!LZ4F_isError(ierr), "lz4f: cannot free decompression context");
     break;
   }
 #endif
@@ -397,8 +425,10 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     // The uncompressed size is known, so a single-shot decompression suffices
     const size_t ret =
         ZSTD_decompress(data.data(), data.size(), indata.data(), indata.size());
-    assert(!ZSTD_isError(ret));
-    assert(ret == data_space);
+    ASDF_CHECK(!ZSTD_isError(ret), std::string("zstd decompression failed: ") +
+                                       ZSTD_getErrorName(ret));
+    ASDF_CHECK(ret == data_space,
+               "zstd: decompressed size does not match the block header");
     break;
   }
 #endif
@@ -427,17 +457,19 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
       avail_out -= this_avail_out - strm.avail_out;
       if (iret == Z_STREAM_END)
         break;
-      assert(iret == Z_OK);
+      ASDF_CHECK(iret == Z_OK, "zlib decompression failed with error " +
+                                   std::to_string(iret));
     }
     inflateEnd(&strm);
-    assert(avail_in == 0);
-    assert(avail_out == 0);
+    ASDF_CHECK(avail_in == 0 && avail_out == 0,
+               "zlib: decompressed size does not match the block header");
     break;
   }
 #endif
 
   default:
-    assert(0);
+    ASDF_ERROR("Block uses compression \"" + compression_name(compression) +
+               "\", which is not available in this build");
   }
 
   return make_shared<typed_block_t<unsigned char>>(std::move(data));
@@ -478,7 +510,8 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
   // flags
   uint32_t flags;
   input(is, flags);
-  assert(flags == 0);
+  ASDF_CHECK(flags == 0, "Unsupported block flags " + std::to_string(flags) +
+                             " (streamed blocks are not supported)");
   // compression
   array<unsigned char, 4> comp;
   for (auto &ch : comp)
@@ -501,15 +534,20 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
     compression = compression_t::libzstd;
   else if ((comp == array<unsigned char, 4>{'z', 'l', 'i', 'b'}))
     compression = compression_t::zlib;
-  else
-    assert(0);
+  else {
+    std::string token;
+    for (const auto ch : comp)
+      token += std::isprint(ch) ? char(ch) : '?';
+    ASDF_ERROR("Unknown block compression token \"" + token + "\"");
+  }
   // allocated_space
   uint64_t allocated_space;
   input(is, allocated_space);
   // used_space
   uint64_t used_space;
   input(is, used_space);
-  assert(used_space <= allocated_space);
+  ASDF_CHECK(used_space <= allocated_space,
+             "Block header: used_size exceeds allocated_size");
   // data_space
   uint64_t data_space;
   input(is, data_space);
@@ -520,7 +558,8 @@ ndarray::read_block(const shared_ptr<istream> &pis) {
   // finish reading header
   auto header_end = is.tellg();
   int64_t header_read = header_end - header_prefix_end;
-  assert(header_read <= header_size);
+  ASDF_CHECK(header_read <= header_size,
+             "Block header is shorter than expected");
   if (header_read < header_size)
     is.seekg(header_size - header_read, ios_base::cur);
   // read data
@@ -592,7 +631,8 @@ void ndarray::write_block(ostream &os) const {
     const int blocksize = 0;
     const int numinternalthreads = 1;
 
-    assert(get_data()->nbytes() <= size_t(INT_MAX));
+    ASDF_CHECK(get_data()->nbytes() <= size_t(INT_MAX),
+               "blosc blocks are limited to 2 GiB");
 
     // Allocate `BLOSC_MAX_OVERHEAD` more
     outdata = make_shared<typed_block_t<unsigned char>>(
@@ -601,7 +641,7 @@ void ndarray::write_block(ostream &os) const {
         blosc_compress_ctx(level, doshuffle, typesize, get_data()->nbytes(),
                            get_data()->ptr(), outdata->ptr(), outdata->nbytes(),
                            compressor, blocksize, numinternalthreads);
-    assert(bytes_written > 0);
+    ASDF_CHECK(bytes_written > 0, "blosc compression failed");
     outdata->resize(bytes_written);
     if (outdata->nbytes() >= get_data()->nbytes()) {
       // Skip compression if it does not reduce the size
@@ -640,7 +680,7 @@ void ndarray::write_block(ostream &os) const {
       const int input_size = min(total_input_size, chunk_size);
       const int nchunks =
           blosc2_schunk_append_buffer(schunk, input_ptr, input_size);
-      assert(nchunks > 0);
+      ASDF_CHECK(nchunks > 0, "blosc2 compression failed");
       input_ptr += input_size;
       total_input_size -= input_size;
     }
@@ -692,9 +732,10 @@ void ndarray::write_block(ostream &os) const {
       avail_out -= this_avail_out - strm.avail_out;
       if (iret == BZ_STREAM_END)
         break;
-      assert(iret == BZ_RUN_OK);
+      ASDF_CHECK(iret == BZ_RUN_OK,
+                 "bzip2 compression failed with error " + std::to_string(iret));
     }
-    assert(avail_in == 0);
+    ASDF_CHECK(avail_in == 0, "bzip2 compression did not consume all input");
     outdata->resize(outdata->nbytes() - avail_out);
     if (outdata->nbytes() >= get_data()->nbytes()) {
       // Skip compression if it does not reduce the size
@@ -723,7 +764,7 @@ void ndarray::write_block(ostream &os) const {
       const size_t n = min(chunk_size, src_size - pos);
       const int nbytes = LZ4_compress_HC(src + pos, buf.data(), int(n),
                                          int(buf.size()), level);
-      assert(nbytes > 0);
+      ASDF_CHECK(nbytes > 0, "lz4 compression failed");
       // big-endian length of the chunk, including the size prefix below
       const uint32_t chunk_len = uint32_t(nbytes) + 4;
       for (int i = 3; i >= 0; --i)
@@ -777,7 +818,8 @@ void ndarray::write_block(ostream &os) const {
     const size_t nbytes =
         ZSTD_compress(outdata->ptr(), outdata->nbytes(), get_data()->ptr(),
                       get_data()->nbytes(), level);
-    assert(!ZSTD_isError(nbytes));
+    ASDF_CHECK(!ZSTD_isError(nbytes), std::string("zstd compression failed: ") +
+                                          ZSTD_getErrorName(nbytes));
     outdata->resize(nbytes);
     if (outdata->nbytes() >= get_data()->nbytes()) {
       // Skip compression if it does not reduce the size
@@ -801,7 +843,7 @@ void ndarray::write_block(ostream &os) const {
     strm.zfree = Z_NULL;
     strm.opaque = Z_NULL;
     int iret = deflateInit(&strm, level);
-    assert(iret == Z_OK);
+    ASDF_CHECK(iret == Z_OK, "zlib: deflateInit failed");
     strm.next_in = reinterpret_cast<unsigned char *>(
         const_cast<void *>(get_data()->ptr()));
     strm.next_out = reinterpret_cast<unsigned char *>(outdata->ptr());
@@ -820,9 +862,10 @@ void ndarray::write_block(ostream &os) const {
       avail_out -= this_avail_out - strm.avail_out;
       if (iret == Z_STREAM_END)
         break;
-      assert(iret == Z_OK);
+      ASDF_CHECK(iret == Z_OK,
+                 "zlib compression failed with error " + std::to_string(iret));
     }
-    assert(avail_in == 0);
+    ASDF_CHECK(avail_in == 0, "zlib compression did not consume all input");
     outdata->resize(outdata->nbytes() - avail_out);
     if (outdata->nbytes() >= get_data()->nbytes()) {
       // Skip compression if it does not reduce the size
@@ -834,7 +877,9 @@ void ndarray::write_block(ostream &os) const {
 #endif
 
   default:
-    assert(0);
+    ASDF_ERROR("Cannot write a block with compression \"" +
+               compression_name(compression) +
+               "\": not available in this build");
   }
 
   for (auto ch : comp)
@@ -853,16 +898,16 @@ void ndarray::write_block(ostream &os) const {
   array<unsigned char, 16> checksum;
 #ifdef ASDF_HAVE_OPENSSL
   EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
-  assert(mdctx);
+  ASDF_CHECK(mdctx, "OpenSSL: EVP_MD_CTX_new failed");
   int ires = EVP_DigestInit_ex(mdctx, EVP_md5(), NULL);
-  assert(ires == 1);
+  ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
   ires = EVP_DigestUpdate(mdctx, outdata->ptr(), outdata->nbytes());
-  assert(ires == 1);
+  ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
   assert(EVP_MD_size(EVP_md5()) == checksum.size());
   unsigned int digest_size;
   ires = EVP_DigestFinal_ex(mdctx, checksum.data(), &digest_size);
   assert(digest_size == checksum.size());
-  assert(ires == 1);
+  ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
   EVP_MD_CTX_free(mdctx);
 #else
   checksum = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -895,14 +940,16 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : block_format(block_format_t::undefined),
       compression(compression_t::undefined), compression_level(-1),
       byteorder(byteorder_t::undefined), offset(-1) {
-  assert(node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.0.0" ||
-         node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.1.0");
+  ASDF_CHECK(node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.0.0" ||
+                 node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.1.0",
+             "Expected tag core/ndarray-1.0.0 or -1.1.0, found \"" +
+                 node.Tag() + "\"");
   if (node["source"].IsDefined())
     block_format = block_format_t::block;
   else if (node["data"].IsDefined())
     block_format = block_format_t::inline_array;
   else
-    assert(0);
+    ASDF_ERROR("An ndarray must have either \"source\" or \"data\"");
 
   switch (block_format) {
 
@@ -993,7 +1040,7 @@ writer &ndarray::to_yaml(writer &w) const {
              datatype, byteorder, shape, strides);
   }
   // mask
-  assert(mask.empty());
+  ASDF_CHECK(mask.empty(), "Writing masked arrays is not supported");
   // datatype
   w << YAML::Key << "datatype" << YAML::Value << datatype->to_yaml(w);
   if (block_format == block_format_t::block) {
@@ -1017,7 +1064,8 @@ void ndarray::check_shape() const {
   int64_t npoints = 1;
   for (int d = 0; d < rank; ++d)
     npoints *= shape[d];
-  assert(mdata->nbytes() == npoints * datatype->type_size());
+  ASDF_CHECK(mdata->nbytes() == npoints * datatype->type_size(),
+             "Block size does not match the array shape and datatype");
 }
 
 } // namespace ASDF

@@ -10,7 +10,7 @@
 using namespace ASDF;
 using namespace std;
 
-int main(int argc, char **argv) {
+int run(int argc, char **argv) {
   cout << "asdf-copy: Copy the content of an ASDF file\n";
   ASDF_CHECK_VERSION();
 
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
     } else if (opt == "--compression-level=9") {
       compression_level = 9;
     } else {
-      assert(0);
+      check(false, "Unknown option " + opt + "\n");
     }
     args.erase(args.begin());
   }
@@ -121,4 +121,13 @@ int main(int argc, char **argv) {
 
   cout << "Done.\n";
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return run(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << argv[0] << ": error: " << e.what() << "\n";
+    return 1;
+  }
 }

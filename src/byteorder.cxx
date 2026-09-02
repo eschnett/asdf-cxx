@@ -13,7 +13,8 @@ void yaml_decode(const YAML::Node &node, byteorder_t &byteorder) {
   else if (str == "little")
     byteorder = byteorder_t::little;
   else
-    assert(0);
+    ASDF_ERROR("Unknown byte order \"" + str +
+               "\"; expected \"big\" or \"little\"");
 }
 
 YAML::Node yaml_encode(byteorder_t byteorder) {
@@ -26,7 +27,7 @@ YAML::Node yaml_encode(byteorder_t byteorder) {
     node = "little";
     break;
   default:
-    assert(0);
+    ASDF_ERROR("Cannot encode an undefined byte order");
   }
   return node;
 }

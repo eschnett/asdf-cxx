@@ -46,11 +46,13 @@ public:
   virtual void *ptr() override { return data.data(); }
   virtual size_t nbytes() const override { return data.size() * sizeof(T); }
   virtual void reserve(size_t nbytes) override {
-    assert(nbytes % sizeof(T) == 0);
+    ASDF_CHECK(nbytes % sizeof(T) == 0,
+               "Block size is not a multiple of the element size");
     data.reserve(nbytes / sizeof(T));
   }
   virtual void resize(size_t nbytes) override {
-    assert(nbytes % sizeof(T) == 0);
+    ASDF_CHECK(nbytes % sizeof(T) == 0,
+               "Block size is not a multiple of the element size");
     data.resize(nbytes / sizeof(T));
   }
 };
@@ -81,7 +83,7 @@ public:
   ptr_block_t() = delete;
 
   ptr_block_t(void *data, size_t size) : data(data), size(size) {
-    assert(data);
+    ASDF_CHECK(data, "A ptr_block_t requires a non-null pointer");
   }
   template <typename T>
   ptr_block_t(vector<T> &data)
@@ -92,8 +94,12 @@ public:
   virtual const void *ptr() const override { return data; }
   virtual void *ptr() override { return data; }
   virtual size_t nbytes() const override { return size; }
-  virtual void reserve(size_t nbytes) override { assert(0); }
-  virtual void resize(size_t nbytes) override { assert(0); }
+  virtual void reserve(size_t nbytes) override {
+    ASDF_ERROR("A ptr_block_t cannot be resized");
+  }
+  virtual void resize(size_t nbytes) override {
+    ASDF_ERROR("A ptr_block_t cannot be resized");
+  }
 };
 
 // Information about a block
@@ -154,16 +160,17 @@ public:
     // Check shape
     int rank = shape.size();
     for (int d = 0; d < rank; ++d)
-      assert(shape[d] >= 0);
+      ASDF_CHECK(shape[d] >= 0, "Array shape must not have negative extents");
     // Check data size
     int64_t npoints = 1;
     for (int d = 0; d < rank; ++d)
       npoints *= shape[d];
     // Check mask
     if (!mask.empty())
-      assert(int64_t(mask.size()) == npoints);
+      ASDF_CHECK(int64_t(mask.size()) == npoints,
+                 "Mask size does not match the array shape");
     // offset
-    assert(offset >= 0);
+    ASDF_CHECK(offset >= 0, "Array offset must not be negative");
     // Check strides
     if (strides.empty()) {
       strides.resize(rank);
@@ -173,9 +180,10 @@ public:
         str *= shape.at(d);
       }
     }
-    assert(int(strides.size()) == rank);
+    ASDF_CHECK(int(strides.size()) == rank,
+               "Number of strides does not match the array rank");
     for (int d = 0; d < rank; ++d)
-      assert(strides.at(d) >= 1 || strides.at(d) <= -1);
+      ASDF_CHECK(strides.at(d) != 0, "Array strides must not be zero");
     // TODO: check that strides are multiples of the element size
   }
 
@@ -216,14 +224,17 @@ public:
   std::optional<block_info_t> get_block_info() const { return block_info; }
 
   template <typename T> vector<T> get_data_vector() const {
-    assert(datatype->is_scalar);
-    assert(datatype->scalar_type_id == get_scalar_type_id<T>());
+    ASDF_CHECK(datatype->is_scalar &&
+                   datatype->scalar_type_id == get_scalar_type_id<T>(),
+               "get_data_vector: the requested element type does not match the "
+               "array's datatype");
     int64_t npoints = 1;
     for (size_t d = 0; d < shape.size(); ++d)
       npoints *= shape.at(d);
     const T *ptr = static_cast<const T *>(mdata->ptr());
     size_t nbytes = mdata->nbytes();
-    assert(nbytes == npoints * sizeof(T));
+    ASDF_CHECK(nbytes == npoints * sizeof(T),
+               "Block size does not match the array shape");
     vector<T> data(npoints);
     for (int64_t i = 0; i < npoints; ++i)
       data[i] = ptr[i];
@@ -237,20 +248,21 @@ public:
 
   int64_t linear_index(const vector<int64_t> &idx) const {
     int rank = shape.size();
-    assert(int(idx.size()) == rank);
+    ASDF_CHECK(int(idx.size()) == rank,
+               "Index rank does not match the array rank");
     int64_t lin = offset;
     for (int d = 0; d < rank; ++d) {
-      assert(idx[d] >= 0 && idx[d] < shape[d]);
+      ASDF_CHECK(idx[d] >= 0 && idx[d] < shape[d], "Array index out of bounds");
       lin += strides[d] * idx[d];
     }
     return lin;
   }
   template <size_t D> int64_t linear_index(const array<int64_t, D> &idx) const {
     int rank = shape.size();
-    assert(int(D) == rank);
+    ASDF_CHECK(int(D) == rank, "Index rank does not match the array rank");
     int64_t lin = offset;
     for (int d = 0; d < rank; ++d) {
-      assert(idx[d] >= 0 && idx[d] < shape[d]);
+      ASDF_CHECK(idx[d] >= 0 && idx[d] < shape[d], "Array index out of bounds");
       lin += strides[d] * idx[d];
     }
     return lin;
