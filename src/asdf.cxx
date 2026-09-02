@@ -23,7 +23,16 @@ asdf::asdf(const shared_ptr<reader_state> &rs, const YAML::Node &node,
 
   // TODO: data, table
 
-  grp = std::make_shared<group>(rs, node);
+  // History entries are not supported and are ignored when reading. (Their
+  // tagged extension metadata would otherwise be rejected as unknown tags.)
+  assert(node.IsMap());
+  grp = std::make_shared<group>();
+  for (const auto &key_value : node) {
+    const auto key = key_value.first.Scalar();
+    if (key == "history")
+      continue;
+    grp->insert(key, make_entry(rs, key_value.second));
+  }
 }
 
 asdf::asdf(const copy_state &cs, const asdf &project) {

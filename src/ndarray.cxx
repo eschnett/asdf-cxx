@@ -377,12 +377,29 @@ std::tuple<memoized<block_t>, block_info_t>
 ndarray::read_block(const shared_ptr<istream> &pis) {
   istream &is = *pis;
   // block_magic_token
+  // Other writers may pad between the YAML tree and the first block, so scan
+  // forward until the magic token is found. Stop at the end of the file or at
+  // the block index ("#ASDF BLOCK INDEX"), leaving the stream in a good state
+  // and positioned at whatever was found.
   array<unsigned char, 4> token;
-  for (auto &ch : token)
-    input(is, ch);
-  if (token != block_magic_token) {
-    is.seekg(-int64_t(token.size()), ios_base::cur);
-    return {};
+  for (;;) {
+    const auto pos = is.tellg();
+    is.read(reinterpret_cast<char *>(token.data()), token.size());
+    if (!is) {
+      // End of file: no more blocks
+      is.clear();
+      is.seekg(pos);
+      return {};
+    }
+    if (token == block_magic_token)
+      break;
+    if (token[0] == '#') {
+      // Block index
+      is.seekg(pos);
+      return {};
+    }
+    // Padding: skip one byte and try again
+    is.seekg(pos + streamoff(1));
   }
   // header_size
   uint16_t header_size;
@@ -769,7 +786,8 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : block_format(block_format_t::undefined),
       compression(compression_t::undefined), compression_level(-1),
       byteorder(byteorder_t::undefined), offset(-1) {
-  assert(node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.0.0");
+  assert(node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.0.0" ||
+         node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.1.0");
   if (node["source"].IsDefined())
     block_format = block_format_t::block;
   else if (node["data"].IsDefined())
