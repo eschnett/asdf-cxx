@@ -40,6 +40,19 @@
 
 namespace ASDF {
 
+#ifdef ASDF_HAVE_BLOSC2
+namespace {
+// blosc2 must be initialised once per process before its schunk API is used
+void ensure_blosc2_initialized() {
+  static const bool initialized = [] {
+    blosc2_init();
+    return true;
+  }();
+  (void)initialized;
+}
+} // namespace
+#endif
+
 // Multi-dimensional array
 
 typed_block_t<bool>::typed_block_t(const vector<bool> &data) {
@@ -257,7 +270,7 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
 
 #ifdef ASDF_HAVE_BLOSC2
   case compression_t::blosc2: {
-    blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
+    ensure_blosc2_initialized();
     // TODO: Don't copy the data
     blosc2_schunk *const schunk =
         blosc2_schunk_from_buffer(indata.data(), indata.size(), false);
@@ -602,6 +615,7 @@ void ndarray::write_block(ostream &os) const {
 #ifdef ASDF_HAVE_BLOSC2
   case compression_t::blosc2: {
     comp = {'b', 'l', 's', '2'};
+    ensure_blosc2_initialized();
 
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.compcode = BLOSC_BLOSCLZ;
