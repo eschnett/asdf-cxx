@@ -2,10 +2,13 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <cassert>
 #include <complex>
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -46,6 +49,46 @@ int main(int argc, char **argv) {
       vector<bool8_t>{true}, block_format_t::block, compression_t::zlib, 9,
       vector<bool>(), vector<int64_t>{1, 1, 1, 1, 1, 1, 1, 1});
   grp->emplace("epsilon", array8d);
+
+  // A structured (record) datatype with three fields, the last one a
+  // sub-array
+  auto record_datatype = make_shared<datatype_t>(vector<shared_ptr<field_t>>{
+      make_shared<field_t>("x", make_shared<datatype_t>(id_int32), false,
+                           byteorder_t::undefined, vector<int64_t>()),
+      make_shared<field_t>("y", make_shared<datatype_t>(id_float64), false,
+                           byteorder_t::undefined, vector<int64_t>()),
+      make_shared<field_t>("v", make_shared<datatype_t>(id_int16), false,
+                           byteorder_t::undefined, vector<int64_t>{2})});
+  // Pack the records by hand, in host byte order and without padding
+  vector<unsigned char> record_data;
+  const auto append = [&record_data](const auto &val) {
+    const auto *const ptr = reinterpret_cast<const unsigned char *>(&val);
+    record_data.insert(record_data.end(), ptr, ptr + sizeof val);
+  };
+  const int64_t nrecords = 3;
+  for (int64_t n = 0; n < nrecords; ++n) {
+    append(int32_t(n + 1));
+    append(float64_t(1.5 * (n + 1)));
+    append(int16_t(10 * n));
+    append(int16_t(10 * n + 1));
+  }
+  assert(record_data.size() == nrecords * record_datatype->type_size());
+
+  auto record_array = make_shared<ndarray>(
+      make_constant_memoized(shared_ptr<block_t>(
+          make_shared<typed_block_t<unsigned char>>(record_data))),
+      optional<block_info_t>(), block_format_t::block, compression_t::none, 0,
+      vector<bool>(), record_datatype, host_byteorder(),
+      vector<int64_t>{nrecords});
+  grp->emplace("theta", record_array);
+
+  auto record_arrayb = make_shared<ndarray>(
+      make_constant_memoized(shared_ptr<block_t>(
+          make_shared<typed_block_t<unsigned char>>(record_data))),
+      optional<block_info_t>(), block_format_t::inline_array,
+      compression_t::none, 0, vector<bool>(), record_datatype, host_byteorder(),
+      vector<int64_t>{nrecords});
+  grp->emplace("thetab", record_arrayb);
 
   auto seq = make_shared<sequence>();
   seq->emplace_back(array1d);
