@@ -1,6 +1,11 @@
 Testing
 build
+build-*
 coverage.info
 *.asdf
 !tests/*.asdf
 BUILD.md
+# Fetched by tests/fetch-reference-files.sh, never committed
+asdf-standard
+# A Python environment with the packages in tests/requirements.txt
+asdf-env

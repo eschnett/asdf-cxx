@@ -1,0 +1,10 @@
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+---
+counts: !core/ndarray-1.0.0
+  data: [1, 2, 3]
+  datatype: int64
+  shape: [3]
+...

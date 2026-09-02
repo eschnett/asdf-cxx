@@ -18,7 +18,7 @@ int run(int argc, char **argv) {
   auto check = [=](bool cond, const string &msg) {
     if (cond)
       return;
-    cerr << msg << "Syntax: " << argv[0]
+    cerr << argv[0] << ": error: " << msg << "Syntax: " << argv[0]
          << " [--array=(block|inline)] "
             "[--compression=(none|blosc|blosc2|bzip2|lz4|lz4f|libzstd|zlib)] "
             "[--compression-level=[0-9]] <input file> <output file>\n"

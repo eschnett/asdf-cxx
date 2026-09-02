@@ -51,6 +51,27 @@ std::string compression_name(compression_t compression) {
 }
 } // namespace
 
+#ifdef ASDF_HAVE_OPENSSL
+namespace {
+array<unsigned char, 16> md5(const void *data, size_t nbytes) {
+  array<unsigned char, 16> checksum;
+  EVP_MD_CTX *const mdctx = EVP_MD_CTX_new();
+  ASDF_CHECK(mdctx, "OpenSSL: EVP_MD_CTX_new failed");
+  int ires = EVP_DigestInit_ex(mdctx, EVP_md5(), NULL);
+  ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
+  ires = EVP_DigestUpdate(mdctx, data, nbytes);
+  ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
+  assert(static_cast<size_t>(EVP_MD_size(EVP_md5())) == checksum.size());
+  unsigned int digest_size;
+  ires = EVP_DigestFinal_ex(mdctx, checksum.data(), &digest_size);
+  assert(digest_size == checksum.size());
+  ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
+  EVP_MD_CTX_free(mdctx);
+  return checksum;
+}
+} // namespace
+#endif
+
 #ifdef ASDF_HAVE_BLOSC2
 namespace {
 // blosc2 must be initialised once per process before its schunk API is used
@@ -244,26 +265,18 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   is.read(reinterpret_cast<char *>(indata.data()), indata.size());
   ASDF_CHECK(is, "Unexpected end of file while reading block data");
 
-  // check checksum
+  // Check the checksum against the stored (compressed) bytes. This is what
+  // the Python reference implementation writes and verifies. Files written by
+  // much older versions of it -- among them asdf-standard's `compressed.asdf`
+  // reference files -- instead checksum the uncompressed data, so a mismatch
+  // here is re-checked after decompressing rather than reported right away.
+  bool checksum_matched = true;
 #ifdef ASDF_HAVE_OPENSSL
-  if (want_checksum != array<unsigned char, 16>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                                0, 0, 0, 0, 0}) {
-    array<unsigned char, 16> checksum;
-    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
-    ASDF_CHECK(mdctx, "OpenSSL: EVP_MD_CTX_new failed");
-    int ires = EVP_DigestInit_ex(mdctx, EVP_md5(), NULL);
-    ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
-    ires = EVP_DigestUpdate(mdctx, indata.data(), indata.size());
-    ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
-    assert(static_cast<size_t>(EVP_MD_size(EVP_md5())) == checksum.size());
-    unsigned int digest_size;
-    ires = EVP_DigestFinal_ex(mdctx, checksum.data(), &digest_size);
-    assert(digest_size == checksum.size());
-    ASDF_CHECK(ires == 1, "OpenSSL: MD5 digest failed");
-    EVP_MD_CTX_free(mdctx);
-    ASDF_CHECK(checksum == want_checksum,
-               "Block checksum mismatch: the block data are corrupted");
-  }
+  const bool have_checksum =
+      want_checksum !=
+      array<unsigned char, 16>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  if (have_checksum)
+    checksum_matched = md5(indata.data(), indata.size()) == want_checksum;
 #endif
 
   // decompress data
@@ -471,6 +484,13 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     ASDF_ERROR("Block uses compression \"" + compression_name(compression) +
                "\", which is not available in this build");
   }
+
+#ifdef ASDF_HAVE_OPENSSL
+  if (have_checksum && !checksum_matched)
+    checksum_matched = md5(data.data(), data.size()) == want_checksum;
+#endif
+  ASDF_CHECK(checksum_matched,
+             "Block checksum mismatch: the block data are corrupted");
 
   return make_shared<typed_block_t<unsigned char>>(std::move(data));
 }

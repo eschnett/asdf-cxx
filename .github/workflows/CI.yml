@@ -30,18 +30,36 @@ jobs:
       run: |
         sudo apt-get update -q
         sudo apt-get install -y lcov libblosc-dev libblosc2-dev libbz2-dev liblz4-dev libssl-dev libyaml-cpp-dev libzstd-dev ninja-build zlib1g-dev
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+        cache-dependency-path: tests/requirements.txt
+    - name: Install the ASDF reference implementation
+      # The conformance tests cross-check what asdf-cxx writes against Python
+      # asdf; see tests/python_check.py
+      run: |
+        python -m venv "$RUNNER_TEMP/asdf-env"
+        "$RUNNER_TEMP/asdf-env/bin/python" -m pip install --upgrade pip
+        "$RUNNER_TEMP/asdf-env/bin/python" -m pip install -r tests/requirements.txt
+        echo "ASDF_PYTHON=$RUNNER_TEMP/asdf-env/bin/python" >> "$GITHUB_ENV"
+    - name: Fetch the asdf-standard reference files
+      # Pinned in tests/asdf-standard.pin; deliberately not committed here
+      run: |
+        dir=$(tests/fetch-reference-files.sh "$RUNNER_TEMP/asdf-standard")
+        echo "ASDF_REFERENCE_FILES_DIR=$dir" >> "$GITHUB_ENV"
     - name: Configure
       # ASDF_REQUIRE_ALL_DEPENDENCIES makes the configuration fail if any
       # optional compression or checksum library is missing, so that every
       # code path is built and tested
-      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="${HOME}/install" -DCODE_COVERAGE=ON -DASDF_REQUIRE_ALL_DEPENDENCIES=ON
+      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="${HOME}/install" -DCODE_COVERAGE=ON -DASDF_REQUIRE_ALL_DEPENDENCIES=ON -DASDF_PYTHON="$ASDF_PYTHON" -DASDF_REFERENCE_FILES_DIR="$ASDF_REFERENCE_FILES_DIR"
     - name: Build
       run: cmake --build build --parallel $(nproc)
     - name: Test
       run: ctest --test-dir build --output-on-failure
     - name: Configure (Release)
       # Release builds define NDEBUG; make sure nothing depends on `assert`
-      run: cmake -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DASDF_REQUIRE_ALL_DEPENDENCIES=ON
+      run: cmake -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DASDF_REQUIRE_ALL_DEPENDENCIES=ON -DASDF_PYTHON="$ASDF_PYTHON" -DASDF_REFERENCE_FILES_DIR="$ASDF_REFERENCE_FILES_DIR"
     - name: Build (Release)
       run: cmake --build build-release --parallel $(nproc)
     - name: Test (Release)

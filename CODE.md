@@ -30,10 +30,9 @@ asdf-cxx/
 │   ├── memoized.hxx          memoized<T>: lazily evaluated, cached shared_ptr<T>
 │   ├── ndarray.hxx           block_t storage classes, block_info_t, ndarray
 │   ├── reference.hxx         `reference` ($ref / JSON-pointer style links)
-│   ├── stl.hxx               yaml_encode/yaml_decode for std::vector and std::map
-│   └── table.hxx             table / column (dormant, see §4.8)
+│   └── stl.hxx               yaml_encode/yaml_decode for std::vector and std::map
 ├── src/                      One .cxx per header (asdf, byteorder, config, datatype,
-│                             entry, error, io, ndarray, reference, table)
+│                             entry, error, io, ndarray, reference)
 ├── utils/
 │   ├── copy.cxx              asdf-copy: read → copy(copy_state) → write
 │   └── ls.cxx                asdf-ls: dump YAML tree + per-block info
@@ -44,14 +43,14 @@ asdf-cxx/
 │   ├── demo-compression.cxx  asdf-demo-compression: round-trips every available compressor
 │   ├── demo-large.cxx        asdf-demo-large: 1000×1000×250 float64 (2 GB) — not a test
 │   └── *.py                  Python demos for the (stale) SWIG binding
-├── tests/                    Fixtures written by Python asdf (padded blocks, default
-│                             Python output, lz4, deliberately corrupt files),
-│                             make_fixtures.py to regenerate them, expect-error.sh
+├── tests/                    Fixtures (make_fixtures.py regenerates them), the
+│                             conformance test registration (conformance.cmake),
+│                             the shell helpers, python_check.py and the source of
+│                             asdf-read-check — see tests/README.md
 ├── asdf.i                    SWIG interface (stale, not built — see §10)
 ├── cmp.cpp                   Unfinished compare tool (stale, not built — see §10)
 ├── diff-commands.sh          Test helper: diff two commands' output, ignoring
 │                             lines containing "compress" or "checksum"
-├── test-std.sh               Manual script: asdf-copy the asdf-standard reference files
 ├── pkg-config.pc.in          Template for asdf-cxx.pc
 ├── .github/workflows/CI.yml  GitHub Actions (4 OS matrix, coverage on Ubuntu)
 ├── .clang-format             80 columns, 2-space indent, no tabs
@@ -65,7 +64,7 @@ memoized.hxx   byteorder.hxx   config.hxx (generated)
       └──► io.hxx
            ├──► datatype.hxx ──► stl.hxx
            ├──► reference.hxx
-           └──► ndarray.hxx ──► table.hxx
+           └──► ndarray.hxx
                  └──► entry.hxx ──► asdf.hxx
 ```
 
@@ -92,7 +91,8 @@ Every header ends with a `#define <GUARD>_DONE` and a trailing
   always includes as `<asdf/xxx.hxx>`.
 - Targets: static library `asdf-cxx`, executables `asdf-copy`,
   `asdf-ls`, `asdf-demo`, `asdf-demo-compression`, `asdf-demo-external`,
-  `asdf-demo-large`, `asdf-demo-nonstandard`.
+  `asdf-demo-large`, `asdf-demo-nonstandard`, and the test helper
+  `asdf-read-check` (built from `tests/read-check.cxx`, not installed).
 - `CODE_COVERAGE=ON` adds `--coverage` (used by CI).
 - `ASDF_REQUIRE_ALL_DEPENDENCIES=ON` turns a missing optional dependency
   into a configure error (CI uses it so every code path is tested).
@@ -318,14 +318,7 @@ later. `make_constant_memoized(shared_ptr<T>)` wraps already-present
 data. `valid()` is false for a default-constructed handle (used as the
 "no more blocks" sentinel by `read_block`).
 
-### 4.8 `table` / `column` (`table.hxx`, `src/table.cxx`) — dormant
-
-Implements `!core/table-1.0.0` / `!core/column-1.0.0` read/write, but
-nothing in `asdf` or `make_entry` references them (the wiring is
-commented out in `asdf.hxx`/`asdf.cxx`). Usable only by constructing
-them directly.
-
-### 4.9 `byteorder.hxx`
+### 4.8 `byteorder.hxx`
 
 `byteorder_t {undefined, big, little}`, `host_byteorder()` (runtime
 check), `xtoh<T>(bytes, order)` → host value, `htox<T>(value, order)`
@@ -403,10 +396,12 @@ value goes through `make_entry`. Dispatch order in `src/entry.cxx`:
 
 ### 5.5 `read_block_data` (lazy block load)
 
-Seeks to the data offset, reads `used_space` bytes, verifies the
-MD5 checksum if OpenSSL is available and the stored checksum is
-non-zero, then decompresses according to the compression code into a
-buffer of `data_space` bytes. Returns a `typed_block_t<unsigned char>`.
+Seeks to the data offset, reads `used_space` bytes, decompresses
+according to the compression code into a buffer of `data_space` bytes,
+and — if OpenSSL is available and the stored checksum is non-zero —
+verifies the MD5 checksum against the stored bytes, falling back to the
+uncompressed data for files that use the older convention (§7). Returns
+a `typed_block_t<unsigned char>`.
 
 ---
 
@@ -478,6 +473,15 @@ The reader tolerates padded blocks (`used_space < allocated_space`),
 padding between the tree and the first block, and a missing block index;
 `tests/padded.asdf` covers all three.
 
+The checksum is written over the payload as stored, that is, over the
+compressed bytes; this matches what Python asdf writes and verifies.
+Files from before that convention was settled — among them
+asdf-standard's `compressed.asdf` reference files, which Python itself
+refuses to open with `validate_checksums=True` — checksum the
+uncompressed data instead. `read_block_data` therefore checks the stored
+bytes first and, only if that fails, re-checks against the decompressed
+data before reporting corruption.
+
 lz4 comes in two encodings. `compression_t::lz4` (token `lz4\0`) is the
 standard's chunked encoding that Python asdf reads and writes: each chunk
 is a 4-byte big-endian length followed by LZ4 block-format data that
@@ -539,7 +543,19 @@ that files written by earlier versions stay readable.
 - **asdf-copy** `[--array=block|inline] [--compression=none|blosc|blosc2|bzip2|lz4|lz4f|libzstd|zlib] [--compression-level=0..9] <in> <out>`
   — read, `copy(copy_state)`, write. Without `--compression`, each block
   keeps the compressor it had in the input (§5.4). `--compression=liblz4`
-  is still accepted as an alias for `lz4f`.
+  is still accepted as an alias for `lz4f`. A bad option prints
+  `<argv[0]>: error: <what> ` followed by the usage and exits with
+  status 1.
+- **asdf-read-check** `<file>...` — a test helper (`tests/read-check.cxx`,
+  built but not installed). Walks the tree in a deterministic order and
+  prints one line per ndarray, `<path>: <datatype> [<shape>] <values>`.
+  Scalar arrays go through `ndarray::get_data_vector<T>()`, so the
+  committed expected outputs in `tests/expected/` are a regression test
+  for the library's data access; structured arrays, float16 and the
+  types no build is guaranteed to have are decoded from the array's
+  bytes. The output is platform-independent by construction: `%.9g` for
+  float32 and `%.17g` for float64, NaN always prints unsigned, and
+  float16 is converted to float in software.
 
 ### Demos (also serve as the test suite)
 
@@ -551,35 +567,60 @@ that files written by earlier versions stay readable.
 | asdf-demo-compression | compression.asdf | Writes a 101³ float64 array with every available compressor, reads back, verifies equality |
 | asdf-demo-large | large.asdf | 2 GB single block; stress/perf only |
 
-### ctest (`CMakeLists.txt`)
+### ctest, part one (`CMakeLists.txt`)
 
-`demo` → `ls demo.asdf` → `demo-nonstandard` → `ls2 nonstandard.asdf` →
-`copy demo.asdf demo2.asdf` → `ls3 demo2.asdf` → `compare-demo`
-(`diff-commands.sh` diffs `asdf-ls` output of original and copy,
-filtering lines mentioning compress/checksum because compressed sizes
-and checksums are not guaranteed to match between writers) → `external`
-→ `compression` → `padded-*`, `python-default-*` and, when liblz4 was
-found, `lz4-*` (read, copy and re-list the Python-written fixtures in
-`tests/`; see `tests/README.md`) → `error-*` (deliberately broken files
-must fail with exit status 1 and an `error:` message, checked by
-`tests/expect-error.sh`; `error-checksum` needs OpenSSL).
-asdf-demo-large is built but not registered as a test.
+Always registered: `demo` → `ls demo.asdf` → `demo-nonstandard` →
+`ls2 nonstandard.asdf` → `copy demo.asdf demo2.asdf` → `ls3 demo2.asdf`
+→ `compare-demo` (`diff-commands.sh` diffs `asdf-ls` output of original
+and copy, filtering lines mentioning compress/checksum because
+compressed sizes and checksums are not guaranteed to match between
+writers) → `external` → `compression` → `padded-*`,
+`python-default-*` and, when liblz4 was found, `lz4-*` (read, copy and
+re-list the Python-written fixtures in `tests/`; see `tests/README.md`)
+→ `error-*` (deliberately broken files must fail with exit status 1 and
+an `error:` message, checked by `tests/expect-error.sh`;
+`error-checksum` needs OpenSSL). asdf-demo-large is built but not
+registered as a test.
 
-There is no unit-test framework. The fixtures in `tests/` are the only
-automated check against the Python reference implementation;
-`tests/make_fixtures.py` regenerates them. For ad-hoc cross-checks,
-Python asdf reads the files this library writes and validates them
-against the schemas on `asdf.open`. `test-std.sh` is an older manual
-helper that expects the asdf-standard reference files under
-`~/src/asdf/`.
+There is no unit-test framework.
+
+### ctest, part two (`tests/conformance.cmake`)
+
+The standard-conformance tests, included from `CMakeLists.txt` after the
+tests above. They need input that is deliberately not committed, so each
+family is opt-in through a CMake cache variable and a plain configure
+still passes:
+
+- `ASDF_REFERENCE_FILES_DIR` — the `reference_files` directory of
+  asdf-standard, as printed by `tests/fetch-reference-files.sh`, which
+  does a sparse depth-1 clone at the commit in `tests/asdf-standard.pin`.
+  It registers, per standard version in `ASDF_REFERENCE_VERSIONS` and
+  per reference file, `ref-<version>-<name>-{ls,copy,ls2}`, plus
+  `-values`/`-values2` where the library reads the data correctly, and
+  `ref-<version>-<name>-unsupported` for the files that must fail
+  cleanly.
+- `ASDF_PYTHON` — an interpreter with `tests/requirements.txt`. It
+  registers the `py-*` tests, which run `tests/python_check.py`:
+  `validate` opens a file with Python asdf and insists that the tree
+  comes back fully deserialised, `compare` checks that a copy holds the
+  same data as its original.
+
+`tests/README.md` documents the helper scripts, the fixtures and the
+rule for what may be committed (under ~4 KB, and only what asdf-cxx
+cannot write itself). `docs/standard-conformance-plan.md` is the plan
+these tests are being built out for; `tests/conformance.cmake` notes
+which phase switches on each family that is still dormant.
 
 ### CI (`.github/workflows/CI.yml`)
 
 Matrix: macOS 15 (Intel and ARM), Ubuntu 24.04 (x86-64 and ARM). Ninja,
 Debug, `CODE_COVERAGE=ON`, build → ctest → install → lcov + Codecov
-(Ubuntu only; lcov errors on macOS). Note the install prefix is written
-`"{$HOME}/install"` (braces outside the `$`), so it lands in a literal
-`{…}` directory; harmless.
+(Ubuntu only; lcov errors on macOS). Before configuring it sets up a
+Python 3.12 virtual environment from `tests/requirements.txt` and
+fetches the reference files, and passes both to CMake, so the
+conformance tests run on all four platforms. Note the install prefix is
+written `"{$HOME}/install"` (braces outside the `$`), so it lands in a
+literal `{…}` directory; harmless.
 
 ---
 

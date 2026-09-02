@@ -87,11 +87,11 @@ int run(int argc, char **argv) {
   seq->emplace_back(array2d);
   grp->emplace("zeta", seq);
 
-  auto ref = make_shared<reference>("", vector<string>{"group", "1"});
+  auto ref = make_shared<reference>("", vector<string>{"zeta", "1"});
   grp->emplace("eta", ref);
 
   vector<uint8_t> data4d;
-  data4d.resize(4 * 2 * 16 * 8);
+  data4d.reserve(4 * 2 * 16 * 8);
   for (int l = 0; l < 8; ++l)
     for (int k = 0; k < 16; ++k)
       for (int j = 0; j < 2; ++j)

@@ -1,0 +1,18 @@
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+answer: !core/constant-1.0.0 42
+custom: !<asdf://example.org/foo-1.0.0>
+  x: 1
+  y: [1, 2]
+  nested: !<asdf://example.org/bar-1.0.0> {z: 3}
+when: !time/time-1.1.0 2027-01-01T00:00:00.000
+unit: !unit/unit-1.0.0 DN
+ratio: !<asdf://example.org/scalar-1.0.0> 1.0
+counts: !core/ndarray-1.0.0
+  data: [1, 2, 3]
+  datatype: int64
+  shape: [3]
+...

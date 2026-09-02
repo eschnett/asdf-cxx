@@ -1,0 +1,9 @@
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+a: &f {name: x, k: [1, 2]}
+b: *f
+c: [*f]
+...
