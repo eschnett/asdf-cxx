@@ -202,6 +202,7 @@ add_test(NAME compare-demo
   COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
   "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
 add_test(NAME external COMMAND ./asdf-demo-external)
+add_test(NAME compression COMMAND ./asdf-demo-compression)
 
 # These tests are broken in Python 3:
 # SWIG does not translate between numpy integer arrays and C++ std::vector
