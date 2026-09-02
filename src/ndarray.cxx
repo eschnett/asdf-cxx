@@ -319,6 +319,18 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   }
 #endif
 
+#ifdef ASDF_HAVE_LIBZSTD
+  case compression_t::libzstd: {
+    data.resize(data_space);
+    // The uncompressed size is known, so a single-shot decompression suffices
+    const size_t ret =
+        ZSTD_decompress(data.data(), data.size(), indata.data(), indata.size());
+    assert(!ZSTD_isError(ret));
+    assert(ret == data_space);
+    break;
+  }
+#endif
+
 #ifdef ASDF_HAVE_ZLIB
   case compression_t::zlib: {
     data.resize(data_space);
@@ -617,6 +629,33 @@ void ndarray::write_block(ostream &os) const {
         LZ4F_compressFrame(outdata->ptr(), outdata->nbytes(), get_data()->ptr(),
                            get_data()->nbytes(), &preferences);
     outdata->resize(nbytes);
+    break;
+  }
+#endif
+
+#ifdef ASDF_HAVE_LIBZSTD
+  case compression_t::libzstd: {
+    comp = {'z', 's', 't', 'd'};
+
+    // A level of zero means "use the default level"
+    int level =
+        compression_level == 0 ? ZSTD_CLEVEL_DEFAULT : compression_level;
+    level = max(ZSTD_minCLevel(), min(ZSTD_maxCLevel(), level));
+
+    const size_t max_nbytes = ZSTD_compressBound(get_data()->nbytes());
+    outdata = make_shared<typed_block_t<unsigned char>>(
+        vector<unsigned char>(max_nbytes));
+
+    const size_t nbytes =
+        ZSTD_compress(outdata->ptr(), outdata->nbytes(), get_data()->ptr(),
+                      get_data()->nbytes(), level);
+    assert(!ZSTD_isError(nbytes));
+    outdata->resize(nbytes);
+    if (outdata->nbytes() >= get_data()->nbytes()) {
+      // Skip compression if it does not reduce the size
+      comp = {0, 0, 0, 0};
+      outdata = get_data().get();
+    }
     break;
   }
 #endif
