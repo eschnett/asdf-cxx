@@ -10,14 +10,14 @@
 namespace ASDF {
 
 bool have_datatype_int128() {
-#ifdef HAVE_INT128
+#ifdef ASDF_HAVE_INT128
   return true;
 #else
   return false;
 #endif
 }
 bool have_datatype_float16() {
-#ifdef HAVE_FLOAT16
+#ifdef ASDF_HAVE_FLOAT16
   return true;
 #else
   return false;

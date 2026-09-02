@@ -741,9 +741,6 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
   case block_format_t::block: {
     int64_t source;
     yaml_decode(node["source"], source);
-    // TODO: This is just a default choice
-    compression = compression_t::zlib;
-    compression_level = 9;
     datatype = make_shared<datatype_t>(rs, node["datatype"]);
     yaml_decode(node["byteorder"], byteorder);
     yaml_decode(node["shape"], shape);
@@ -764,11 +761,18 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     }
     mdata = rs->get_block(source);
     block_info = std::make_optional<block_info_t>(rs->get_block_info(source));
+    // Remember the block's compressor so that a copy preserves it. The
+    // original compression level is not recorded in the file.
+    compression = block_info->compression;
+    compression_level = compression == compression_t::none ? 0 : 9;
     break;
   }
 
   case block_format_t::inline_array: {
-    // compression remains uninitialized
+    // Inline arrays are not compressed. Use "none" so that converting to
+    // block format produces a valid (uncompressed) block.
+    compression = compression_t::none;
+    compression_level = 0;
     bool have_datatype = node["datatype"].IsDefined();
     if (have_datatype)
       datatype = make_shared<datatype_t>(rs, node["datatype"]);

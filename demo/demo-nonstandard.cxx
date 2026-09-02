@@ -19,6 +19,10 @@ int main(int argc, char **argv) {
 
   auto grp = make_shared<group>();
 
+  // Use blosc where available, otherwise fall back to zlib
+  const compression_t blosc_or_zlib =
+      have_compression_blosc() ? compression_t::blosc : compression_t::zlib;
+
   auto array0d = make_shared<ndarray>(
       vector<int64_t>{42}, block_format_t::inline_array, compression_t::none, 0,
       vector<bool>(), vector<int64_t>{});
@@ -57,7 +61,7 @@ int main(int argc, char **argv) {
 #ifdef ASDF_HAVE_FLOAT16
   auto array3d16 = make_shared<ndarray>(
       vector<complex32_t>{{1, 0}, {-2, 0}, {0, 3}, {-4, 0}, {5, 1}, {6, -1}},
-      block_format_t::block, compression_t::blosc, 9, vector<bool>(),
+      block_format_t::block, blosc_or_zlib, 9, vector<bool>(),
       vector<int64_t>{1, 2, 3});
   grp->emplace("delta16", array3d16);
 #endif
@@ -65,7 +69,7 @@ int main(int argc, char **argv) {
 #ifdef ASDF_HAVE_INT128
   auto array3d128 = make_shared<ndarray>(
       vector<int128_t>{1, -2, 3, -4, 5, 6}, block_format_t::block,
-      compression_t::blosc, 9, vector<bool>(), vector<int64_t>{1, 2, 3});
+      blosc_or_zlib, 9, vector<bool>(), vector<int64_t>{1, 2, 3});
   grp->emplace("delta128", array3d128);
 #endif
 
