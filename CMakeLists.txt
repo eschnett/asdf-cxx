@@ -203,6 +203,14 @@ add_test(NAME compare-demo
   "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
 add_test(NAME external COMMAND ./asdf-demo-external)
 add_test(NAME compression COMMAND ./asdf-demo-compression)
+# Read a file with padded blocks (allocated_size > used_size), which only
+# other writers produce; see tests/README.md
+add_test(NAME padded-ls
+  COMMAND ./asdf-ls ${CMAKE_SOURCE_DIR}/tests/padded.asdf)
+add_test(NAME padded-copy
+  COMMAND ./asdf-copy ${CMAKE_SOURCE_DIR}/tests/padded.asdf padded2.asdf)
+add_test(NAME padded-ls2 COMMAND ./asdf-ls padded2.asdf)
+set_tests_properties(padded-ls2 PROPERTIES DEPENDS padded-copy)
 
 # These tests are broken in Python 3:
 # SWIG does not translate between numpy integer arrays and C++ std::vector
