@@ -382,25 +382,6 @@ allowed; `set_standard_version(options, spec)` parses the CLI spelling.
 them, and `version_mode_t::input` uses the standard version from there.
 `content_requirements` is what `asdf::requirements()` collects.
 
-### 4.9 `version_t`, `standard_info_t` (`version.hxx`, `src/version.cxx`)
-
-`standard_versions()` is the table of the seven ASDF standard versions
-1.0.0 to 1.6.0 and the tags each of them uses. Nothing outside
-`src/version.cxx` may spell a `core/…` tag.
-
-| Standard | core/asdf | core/ndarray | float16 | history.extensions |
-|---|---|---|---|---|
-| 1.0.0, 1.1.0 | 1.0.0 | 1.0.0 | no | no |
-| 1.2.0 … 1.5.0 | 1.1.0 | 1.0.0 | no | yes |
-| 1.6.0 | 1.1.0 | 1.1.0 | yes | yes |
-
-`core/software`, `core/complex` and `core/history_entry` are 1.0.0 in
-every version. `standard_info(v)` looks a version up (and raises an
-error listing the supported ones), `default_standard_version()` is
-1.2.0, `latest_standard_version()` is 1.6.0, and
-`classify_core_tag(full_tag)` maps a full tag URI to `core_tag_t` for
-any known version — that is what the readers dispatch on.
-
 ### 4.6 `reference` (`reference.hxx`, `src/reference.cxx`)
 
 Represents `{$ref: "<file>#<fragment>"}`.
@@ -434,6 +415,25 @@ trait that lives here for that reason); `htox<N>` is the raw form and
 reverses all `N` bytes, so a caller converting a complex number calls it
 once per component. Block headers are always big-endian and handled
 separately by `input`/`output` helpers in `src/ndarray.cxx`.
+
+### 4.9 `version_t`, `standard_info_t` (`version.hxx`, `src/version.cxx`)
+
+`standard_versions()` is the table of the seven ASDF standard versions
+1.0.0 to 1.6.0 and the tags each of them uses. Nothing outside
+`src/version.cxx` may spell a `core/…` tag.
+
+| Standard | core/asdf | core/ndarray | float16 | history.extensions |
+|---|---|---|---|---|
+| 1.0.0, 1.1.0 | 1.0.0 | 1.0.0 | no | no |
+| 1.2.0 … 1.5.0 | 1.1.0 | 1.0.0 | no | yes |
+| 1.6.0 | 1.1.0 | 1.1.0 | yes | yes |
+
+`core/software`, `core/complex` and `core/history_entry` are 1.0.0 in
+every version. `standard_info(v)` looks a version up (and raises an
+error listing the supported ones), `default_standard_version()` is
+1.2.0, `latest_standard_version()` is 1.6.0, and
+`classify_core_tag(full_tag)` maps a full tag URI to `core_tag_t` for
+any known version — that is what the readers dispatch on.
 
 ---
 
