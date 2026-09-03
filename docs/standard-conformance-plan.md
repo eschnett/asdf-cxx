@@ -925,3 +925,55 @@ Per phase:
   behaviour above; the README's "Standard conformance" section lists every
   contract-table feature as refused and string datatypes and Roman files as
   supported.
+
+---
+
+## Reviewing a phase PR (procedure for a fresh session)
+
+This is what the reviews of PRs #20 and #21 did. A new Claude session
+started in this repository has `CLAUDE.md`, `CODE.md`, this plan, and the
+project memory notes; nothing from earlier conversations is needed.
+
+1. **Read** the PR description (it must list the tests switched on, the
+   tests added, verification output, and every deviation with its reason),
+   then this plan's section for the phase and the Status section.
+2. **Diff review** against `main`: every file the phase names, plus
+   anything unexpected in `git diff --stat`. Check the conventions (three
+   constructors, `ASDF_CHECK` for input errors, no hard-coded tags outside
+   `version.hxx` once it exists), the error-message contract table, and the
+   Roman constraints. Confirm nothing large or generated was committed
+   (`git ls-tree -r -l origin/<branch> -- tests docs | sort -n -k4 | tail`).
+3. **Fresh builds**, never the repository's stale `build/`, and never by
+   switching branches in a checkout another session may be using: use
+   `git worktree add <dir> <branch>` for the PR branch. Create a Python
+   3.11+ environment from `tests/requirements.txt` (on the maintainer's
+   machine via mamba, see the implementer notes) and fetch the reference
+   files with `tests/fetch-reference-files.sh`. Build and run ctest for
+   Debug and Release with `-DASDF_PYTHON=... -DASDF_REFERENCE_FILES_DIR=...`,
+   and a plain configure without them (must register no `ref-*`/`py-*`
+   tests). Where the phase touches optional types, also build with
+   `-DASDF_HAVE_FLOAT16=FALSE`.
+4. **Run the phase's Verification bullet** at the end of this plan by hand
+   and compare against the PR's claimed output. Do not take the PR's word
+   for a result that is cheap to reproduce.
+5. **Probe one or two edge cases** the tests do not cover, chosen from the
+   cross-cutting checklist: a hostile file (huge shape, stride or field
+   shape derived from `tests/python-default.asdf` by text substitution), a
+   round trip that exercises the new code in a second form (`--array=inline`,
+   `--standard-version=...`), a real Roman file if one is at hand.
+6. **Verify the deviations independently** where they rest on a factual
+   claim about Python asdf or the standard. The Phase 0 review needed two
+   attempts to confirm the checksum-convention claim because Python only
+   validates checksums when array data is accessed; access the data.
+7. **Confirm CI** is green on all four platforms and that the logs show the
+   new test families executed, not skipped.
+8. **Report** to the maintainer: a results table, the deviations judged,
+   any new findings with severity, and whether they block the merge. Then
+   record non-blocking findings in this plan's Status section and in the
+   phase that will fix them (a docs-only PR is fine), and update the
+   project memory note so the implementing session sees them.
+
+Suggested kickoff for a reviewing session:
+"Review PR <N> (Phase <X>) of asdf-cxx against
+docs/standard-conformance-plan.md; follow the 'Reviewing a phase PR'
+procedure there; do not merge."
