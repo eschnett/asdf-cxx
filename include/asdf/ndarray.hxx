@@ -207,6 +207,14 @@ public:
 
   ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   ndarray(const copy_state &cs, const ndarray &arr);
+
+  // Add what this array needs of the standard version it will be written as:
+  // `float16` data needs standard 1.6.0, and `complex32`, `int128`, `uint128`
+  // and rank-0 arrays are described by no version at all. Only the datatype
+  // and the shape are inspected; the block data is never loaded.
+  void collect_requirements(content_requirements &req,
+                            const std::string &path) const;
+
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const ndarray &arr) {
     return arr.to_yaml(w);

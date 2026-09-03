@@ -94,6 +94,11 @@ void output(
 void output(std::ostream &os, const int indent,
             const std::shared_ptr<asdf> &project) {
   os << "Project:\n";
+  const auto &header = project->get_input_header();
+  os << std::string(indent + indent_step, ' ') << "standard version: "
+     << (header.standard_version.empty() ? std::string("unknown")
+                                         : header.standard_version)
+     << "\n";
   output(os, indent + indent_step, project->get_group());
 }
 

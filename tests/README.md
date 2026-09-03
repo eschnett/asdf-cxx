@@ -44,6 +44,10 @@ default).
 - `check-header.sh <file> [options]` — assertions about a file's YAML
   head: the `#ASDF`/`#ASDF_STANDARD` lines, the root tag, the
   `core/ndarray` tag version, and strings that must or must not occur.
+  `--root-tag` also insists that the root tag sits on the `---` line and
+  that the head holds no bare `---`. The `header-*` and `ref-*-header`
+  tests use it to pin down which standard version a written file
+  declares and that its tags belong to that version.
 - `python_check.py validate|compare` — opens files with the Python
   reference implementation. `validate` insists that the tree comes back
   fully deserialised (an `AsdfConversionWarning` is an error, so a file

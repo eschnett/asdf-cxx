@@ -321,7 +321,7 @@ void yaml_decode(const YAML::Node &node, float64_t &val) {
 namespace {
 template <typename T>
 void yaml_decode_complex(const YAML::Node &node, complex<T> &val) {
-  ASDF_CHECK(node.Tag() == "tag:stsci.edu:asdf/core/complex-1.0.0",
+  ASDF_CHECK(classify_core_tag(node.Tag()) == core_tag_t::complex_,
              "Expected tag core/complex-1.0.0, found \"" + node.Tag() + "\"");
   static const string ieee = "([-+]?[0-9]*\\.?[0-9]+(e[-+]?[0-9]+)?|inf|nan)";
   static const regex cmplx("\\(?(" + ieee + ")?((" + ieee + ")[ij])?\\)?",
@@ -447,8 +447,10 @@ template <typename T> YAML::Node yaml_encode_complex(const complex<T> &val) {
   buf << im.c_str() << "i";
 
   YAML::Node node;
-  // TODO: Use a local tag
-  node.SetTag("tag:stsci.edu:asdf/core/complex-1.0.0");
+  // TODO (Phase 4): emit a local tag; a `YAML::Node` tag is always emitted
+  // verbatim, so this is the one place that still spells the full URI
+  node.SetTag(string(asdf_tag_prefix) +
+              standard_info(latest_standard_version()).complex_tag);
   node = buf.str();
   return node;
 }

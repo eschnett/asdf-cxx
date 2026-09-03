@@ -4,8 +4,10 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <string>
+#include <vector>
 
 using namespace ASDF;
 using namespace std;
@@ -21,13 +23,21 @@ int run(int argc, char **argv) {
     cerr << argv[0] << ": error: " << msg << "Syntax: " << argv[0]
          << " [--array=(block|inline)] "
             "[--compression=(none|blosc|blosc2|bzip2|lz4|lz4f|libzstd|zlib)] "
-            "[--compression-level=[0-9]] <input file> <output file>\n"
+            "[--compression-level=[0-9]] "
+            "[--standard-version=(minimal|latest|input|X.Y.Z)] "
+            "[--allow-nonstandard] <input file> <output file>\n"
          << "Aborting.\n";
     exit(1);
   };
   block_format_t block_format = block_format_t::undefined;
   compression_t compression = compression_t::undefined;
   int compression_level = -1;
+  // Preserve the input file's declared standard version by default. An input
+  // that declares no version, or one this library does not know, falls back
+  // to the lowest version that fits the content.
+  write_options options;
+  options.version_mode = write_options::version_mode_t::input;
+  bool standard_version_set = false;
   vector<string> args;
   for (int argi = 1; argi < argc; ++argi)
     args.push_back(argv[argi]);
@@ -73,26 +83,17 @@ int run(int argc, char **argv) {
       check(compression == compression_t::undefined,
             "Compression type already set\n");
       compression = compression_t::zlib;
-    } else if (opt == "--compression-level=0") { // Dont' judge me for this
-      compression_level = 0;
-    } else if (opt == "--compression-level=1") {
-      compression_level = 1;
-    } else if (opt == "--compression-level=2") {
-      compression_level = 2;
-    } else if (opt == "--compression-level=3") {
-      compression_level = 3;
-    } else if (opt == "--compression-level=4") {
-      compression_level = 4;
-    } else if (opt == "--compression-level=5") {
-      compression_level = 5;
-    } else if (opt == "--compression-level=6") {
-      compression_level = 6;
-    } else if (opt == "--compression-level=7") {
-      compression_level = 7;
-    } else if (opt == "--compression-level=8") {
-      compression_level = 8;
-    } else if (opt == "--compression-level=9") {
-      compression_level = 9;
+    } else if (opt.rfind("--compression-level=", 0) == 0) {
+      const string value = opt.substr(strlen("--compression-level="));
+      check(value.size() == 1 && value[0] >= '0' && value[0] <= '9',
+            "Compression level \"" + value + "\" is not a digit 0-9\n");
+      compression_level = value[0] - '0';
+    } else if (opt.rfind("--standard-version=", 0) == 0) {
+      check(!standard_version_set, "Standard version already set\n");
+      standard_version_set = true;
+      set_standard_version(options, opt.substr(strlen("--standard-version=")));
+    } else if (opt == "--allow-nonstandard") {
+      options.allow_nonstandard = true;
     } else {
       check(false, "Unknown option " + opt + "\n");
     }
@@ -117,7 +118,7 @@ int run(int argc, char **argv) {
   auto project2 = project.copy(cs);
 
   // Write project
-  project2.write(outputfilename);
+  project2.write(outputfilename, options);
 
   cout << "Done.\n";
   return 0;

@@ -50,6 +50,33 @@ function(asdf_test_depends name)
   endif()
 endfunction()
 
+# The core tags an ASDF standard version uses; see include/asdf/version.hxx
+function(asdf_standard_tags version root_var ndarray_var)
+  if(version VERSION_LESS 1.2.0)
+    set(${root_var} core/asdf-1.0.0 PARENT_SCOPE)
+  else()
+    set(${root_var} core/asdf-1.1.0 PARENT_SCOPE)
+  endif()
+  if(version VERSION_LESS 1.6.0)
+    set(${ndarray_var} core/ndarray-1.0.0 PARENT_SCOPE)
+  else()
+    set(${ndarray_var} core/ndarray-1.1.0 PARENT_SCOPE)
+  endif()
+endfunction()
+
+# Register a tests/check-header.sh invocation on a written file
+function(asdf_add_header_test name file)
+  add_test(NAME ${name}
+    COMMAND "${ASDF_TESTS_DIR}/check-header.sh" ${file} ${ARGN})
+endfunction()
+
+# `check-header.sh --standard <v>` plus the root and ndarray tags of <v>
+function(asdf_add_version_test name file version)
+  asdf_standard_tags(${version} root_tag ndarray_tag)
+  asdf_add_header_test(${name} ${file} --standard ${version}
+    --root-tag ${root_tag} --ndarray-tag ${ndarray_tag} ${ARGN})
+endfunction()
+
 # Register an `asdf-read-check` test against a committed expected output
 function(asdf_add_values_test name expected)
   if(NOT EXISTS "${ASDF_EXPECTED_DIR}/${expected}")
@@ -113,8 +140,21 @@ if(ASDF_REFERENCE_FILES_DIR)
         asdf_add_values_test(${prefix}-values2 "${name}.txt" "${copy}")
         asdf_test_depends(${prefix}-values2 ${prefix}-copy)
       endif()
-      # Phase 2 adds ${prefix}-header (the copy's declared version and tags).
+      # asdf-copy preserves the input file's declared standard version, so
+      # the copy has to carry the tags that belong to that version
+      asdf_add_version_test(${prefix}-header "${copy}" ${version}
+        --absent "offset: 0")
+      asdf_test_depends(${prefix}-header ${prefix}-copy)
     endforeach()
+
+    # `shared.asdf` holds a second view of one block: `subset` is
+    # `base[1::2]`, which needs both an offset and explicit strides
+    if(version STREQUAL "1.6.0")
+      asdf_add_header_test(ref-${version}-shared-strides
+        "ref-${version}-shared.asdf"
+        --present "offset: 8" --present "strides: [16]")
+      asdf_test_depends(ref-${version}-shared-strides ref-${version}-shared-copy)
+    endif()
 
     foreach(name ${ASDF_REF_UNSUPPORTED})
       # Phase 3 adds the error-message contract substrings (-m ...) here.
@@ -127,9 +167,14 @@ endif()
 
 # Python checks of the files the demos and the fixtures produce ################
 
-# asdf-cxx writes ASDF 1.2.0 with core/ndarray-1.0.0 tags. Phase 2 adds
-# `--root-tag core/asdf-1.1.0`, which needs the root tag on the `---` line.
-set(ASDF_WRITTEN_TAGS --standard 1.2.0 --ndarray-tag core/ndarray-1.0.0)
+# A file asdf-cxx writes from scratch declares the lowest standard version
+# that fits its content, which for all the demos is 1.2.0
+set(ASDF_WRITTEN_TAGS --standard 1.2.0 --root-tag core/asdf-1.1.0
+  --ndarray-tag core/ndarray-1.0.0)
+# tests/python-default.asdf and the other Python-written fixtures declare
+# 1.6.0, and asdf-copy preserves that
+set(ASDF_WRITTEN_TAGS_1_6_0 --standard 1.6.0 --root-tag core/asdf-1.1.0
+  --ndarray-tag core/ndarray-1.1.0)
 
 asdf_add_python_test(py-validate-demo validate ${ASDF_WRITTEN_TAGS} demo.asdf)
 asdf_test_depends(py-validate-demo demo)
@@ -150,7 +195,7 @@ asdf_add_python_test(py-compare-python-default
 asdf_test_depends(py-compare-python-default python-default-copy)
 # Phase 3 preserves `history`, so this gains --expect-history
 asdf_add_python_test(py-validate-python-default2
-  validate ${ASDF_WRITTEN_TAGS} python-default2.asdf)
+  validate ${ASDF_WRITTEN_TAGS_1_6_0} python-default2.asdf)
 asdf_test_depends(py-validate-python-default2 python-default-copy)
 
 if(LIBLZ4_FOUND)
@@ -253,9 +298,11 @@ asdf_add_values_test(values-float16 float16.txt
   "${ASDF_TESTS_DIR}/float16.asdf")
 asdf_add_values_test(values-float16-2 float16.txt float16-2.asdf)
 asdf_test_depends(values-float16-2 float16-copy)
-# py-compare-float16 waits for Phase 2: the copy declares standard 1.2.0 but
-# needs core/ndarray-1.1.0 tags for its float16 datatype, so Python rejects
-# it against the 1.0.0 ndarray schema.
+# The copy preserves the input's 1.6.0, so its float16 arrays are tagged
+# core/ndarray-1.1.0 and Python validates them against the right schema
+asdf_add_python_test(py-compare-float16
+  compare "${ASDF_TESTS_DIR}/float16.asdf" float16-2.asdf)
+asdf_test_depends(py-compare-float16 float16-copy)
 
 # float16-inline.asdf holds the same array inline, which needs the C++ type
 # to parse the values
@@ -264,6 +311,10 @@ if(ASDF_HAVE_FLOAT16)
     COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/float16-inline.asdf")
   asdf_add_values_test(values-float16-inline float16.txt
     "${ASDF_TESTS_DIR}/float16-inline.asdf")
+else()
+  add_test(NAME error-float16-inline
+    COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m float16 -m "this build"
+    ./asdf-ls "${ASDF_TESTS_DIR}/float16-inline.asdf")
 endif()
 
 # Python must be able to read what asdf-demo-strided writes: arrays with an
@@ -341,9 +392,132 @@ add_test(NAME error-bad-string-length
   COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m "ucs4 datatype must be"
   ./asdf-ls "${ASDF_TESTS_DIR}/bad-string-length.asdf")
 
+# Standard version selection and the write options ############################
+#
+# `asdf-copy` preserves the input file's declared standard version; a file
+# written from scratch gets the lowest version that fits its content. The
+# tests below pin down both, plus the flags that override them.
+#
+# The copies here are named `<what>-copy` rather than `copy-<what>`: a test
+# name containing "py-" would show up in the `ctest -N | grep -c 'ref-\|py-'`
+# count that must be zero for a plain configure, and "copy-" contains "py-".
+
+asdf_add_header_test(header-demo demo.asdf --standard 1.2.0
+  --root-tag core/asdf-1.1.0 --ndarray-tag core/ndarray-1.0.0
+  --absent "offset: 0" --absent "strides:")
+asdf_test_depends(header-demo demo)
+# demo.asdf declares 1.2.0, so the default (preserving) copy keeps it
+asdf_add_header_test(header-demo2 demo2.asdf --standard 1.2.0
+  --root-tag core/asdf-1.1.0 --ndarray-tag core/ndarray-1.0.0
+  --absent "offset: 0" --absent "strides:")
+asdf_test_depends(header-demo2 copy)
+
+# nonstandard.asdf holds float16 and complex32 where the build has them,
+# which needs standard 1.6.0; otherwise its int128 arrays and rank-0 array
+# fit into the default version
+if(ASDF_HAVE_FLOAT16)
+  asdf_add_version_test(header-nonstandard nonstandard.asdf 1.6.0)
+else()
+  asdf_add_version_test(header-nonstandard nonstandard.asdf 1.2.0)
+endif()
+asdf_test_depends(header-nonstandard demo-nonstandard)
+
+# --standard-version=X.Y.Z writes that version, with its tags
+add_test(NAME demo-1.6.0-copy
+  COMMAND ./asdf-copy --standard-version=1.6.0 demo.asdf demo-1.6.0.asdf)
+set_tests_properties(demo-1.6.0-copy PROPERTIES DEPENDS demo)
+asdf_add_version_test(header-demo-1.6.0 demo-1.6.0.asdf 1.6.0)
+asdf_test_depends(header-demo-1.6.0 demo-1.6.0-copy)
+asdf_add_python_test(py-validate-demo-1.6.0
+  validate ${ASDF_WRITTEN_TAGS_1_6_0} demo-1.6.0.asdf)
+asdf_test_depends(py-validate-demo-1.6.0 demo-1.6.0-copy)
+asdf_add_python_test(py-compare-demo-1.6.0 compare demo.asdf demo-1.6.0.asdf)
+asdf_test_depends(py-compare-demo-1.6.0 demo demo-1.6.0-copy)
+
+# 1.0.0 uses the older root tag
+add_test(NAME demo-1.0.0-copy
+  COMMAND ./asdf-copy --standard-version=1.0.0 demo.asdf demo-1.0.0.asdf)
+set_tests_properties(demo-1.0.0-copy PROPERTIES DEPENDS demo)
+asdf_add_version_test(header-demo-1.0.0 demo-1.0.0.asdf 1.0.0)
+asdf_test_depends(header-demo-1.0.0 demo-1.0.0-copy)
+asdf_add_python_test(py-validate-demo-1.0.0 validate --standard 1.0.0
+  --root-tag core/asdf-1.0.0 --ndarray-tag core/ndarray-1.0.0 demo-1.0.0.asdf)
+asdf_test_depends(py-validate-demo-1.0.0 demo-1.0.0-copy)
+
+add_test(NAME demo-latest-copy
+  COMMAND ./asdf-copy --standard-version=latest demo.asdf demo-latest.asdf)
+set_tests_properties(demo-latest-copy PROPERTIES DEPENDS demo)
+asdf_add_version_test(header-demo-latest demo-latest.asdf 1.6.0)
+asdf_test_depends(header-demo-latest demo-latest-copy)
+
+# tests/python-default.asdf declares 1.6.0: the default copy keeps it, and
+# --standard-version=minimal falls back to the default 1.2.0
+asdf_add_version_test(header-python-default2 python-default2.asdf 1.6.0)
+asdf_test_depends(header-python-default2 python-default-copy)
+add_test(NAME python-default-minimal-copy
+  COMMAND ./asdf-copy --standard-version=minimal
+  "${ASDF_TESTS_DIR}/python-default.asdf" python-default-minimal.asdf)
+asdf_add_version_test(header-python-default-minimal
+  python-default-minimal.asdf 1.2.0)
+asdf_test_depends(header-python-default-minimal python-default-minimal-copy)
+asdf_add_python_test(py-validate-python-default-minimal
+  validate ${ASDF_WRITTEN_TAGS} python-default-minimal.asdf)
+asdf_test_depends(py-validate-python-default-minimal
+  python-default-minimal-copy)
+
+# tests/padded.asdf declares 1.0.0, and so does its copy
+asdf_add_version_test(header-padded2 padded2.asdf 1.0.0)
+asdf_test_depends(header-padded2 padded-copy)
+
+# Content no version of the standard describes is refused unless it is
+# explicitly allowed
+add_test(NAME error-nonstandard-copy
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m nonstandard
+  ./asdf-copy nonstandard.asdf nonstandard-refused.asdf)
+set_tests_properties(error-nonstandard-copy PROPERTIES DEPENDS demo-nonstandard)
+add_test(NAME nonstandard-allowed-copy
+  COMMAND ./asdf-copy --allow-nonstandard nonstandard.asdf nonstandard2.asdf)
+set_tests_properties(nonstandard-allowed-copy
+  PROPERTIES DEPENDS demo-nonstandard)
+add_test(NAME ls-nonstandard2 COMMAND ./asdf-ls nonstandard2.asdf)
+asdf_test_depends(ls-nonstandard2 nonstandard-allowed-copy)
+
+# Bad options
+add_test(NAME error-standard-version-unknown
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m "standard version"
+  ./asdf-copy --standard-version=2.0.0 demo.asdf unknown-version.asdf)
+set_tests_properties(error-standard-version-unknown PROPERTIES DEPENDS demo)
+add_test(NAME error-compression-level
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m "compression level"
+  ./asdf-copy --compression-level=10 demo.asdf bad-level.asdf)
+set_tests_properties(error-compression-level PROPERTIES DEPENDS demo)
+
+# float16 is a legitimate feature of standard 1.6.0, never "nonstandard": a
+# copy of a float16 file stays 1.6.0, even at --standard-version=minimal, and
+# an explicitly requested older version is an error rather than a silent
+# downgrade
+asdf_add_version_test(header-float16-copy float16-2.asdf 1.6.0)
+asdf_test_depends(header-float16-copy float16-copy)
+asdf_add_python_test(py-validate-float16
+  validate ${ASDF_WRITTEN_TAGS_1_6_0} float16-2.asdf)
+asdf_test_depends(py-validate-float16 float16-copy)
+add_test(NAME float16-minimal-copy
+  COMMAND ./asdf-copy --standard-version=minimal
+  "${ASDF_TESTS_DIR}/float16.asdf" float16-minimal.asdf)
+asdf_add_version_test(header-float16-minimal float16-minimal.asdf 1.6.0)
+asdf_test_depends(header-float16-minimal float16-minimal-copy)
+add_test(NAME error-float16-1.0.0
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m requires -m 1.6.0
+  ./asdf-copy --standard-version=1.0.0 "${ASDF_TESTS_DIR}/float16.asdf"
+  float16-refused.asdf)
+add_test(NAME float16-1.0.0-allowed-copy
+  COMMAND ./asdf-copy --standard-version=1.0.0 --allow-nonstandard
+  "${ASDF_TESTS_DIR}/float16.asdf" float16-1.0.0.asdf)
+asdf_add_version_test(header-float16-1.0.0 float16-1.0.0.asdf 1.0.0)
+asdf_test_depends(header-float16-1.0.0 float16-1.0.0-allowed-copy)
+
 # The remaining fixtures are switched on by the phase that makes them work:
 #
-#   Phase 2   py-compare-float16
 #   Phase 3   masked.asdf (must become an error; it is silently read today),
 #             unknown-tags.asdf, untagged-root.asdf, roman-like.asdf
 #

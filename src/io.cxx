@@ -113,10 +113,47 @@ std::ostream &operator<<(std::ostream &os, compression_t compression) {
   }
 }
 
+// Standard version selection
+
+version_t content_requirements::minimum_version() const {
+  if (needs_float16) {
+    // `float16` exists only since standard 1.6.0
+    for (const auto &info : standard_versions())
+      if (info.has_float16)
+        return info.version;
+  }
+  // Everything else this library writes fits into every known version
+  return standard_versions().front().version;
+}
+
+void set_standard_version(write_options &options, const string &spec) {
+  if (spec == "minimal") {
+    options.version_mode = write_options::version_mode_t::minimal;
+  } else if (spec == "latest") {
+    options.version_mode = write_options::version_mode_t::latest;
+  } else if (spec == "input") {
+    options.version_mode = write_options::version_mode_t::input;
+  } else {
+    const version_t version = [&]() {
+      try {
+        return version_t::parse(spec);
+      } catch (const error &) {
+        ASDF_ERROR("Unknown standard version \"" + spec +
+                   "\"; expected \"minimal\", \"latest\", \"input\", or "
+                   "\"X.Y.Z\"");
+      }
+    }();
+    // Rejects a well-formed version this library does not know
+    standard_info(version);
+    options.version_mode = write_options::version_mode_t::explicit_version;
+    options.explicit_version = version;
+  }
+}
+
 reader_state::reader_state(const YAML::Node &tree,
                            const shared_ptr<istream> &pis,
-                           const string &filename)
-    : tree(tree), filename(filename) {
+                           const string &filename, const file_header &header)
+    : tree(tree), filename(filename), header(header) {
   for (;;) {
     const auto [block, block_info] = ndarray::read_block(pis);
     if (!block.valid())
@@ -191,9 +228,10 @@ reader_state::resolve_reference(const shared_ptr<reader_state> &rs,
     }
     if (!rs->other_files.count(ref_filename)) {
       auto pis = make_shared<ifstream>(ref_filename, ios::binary | ios::in);
-      auto doc = asdf::from_yaml((istream &)*pis);
+      file_header ref_header;
+      auto doc = asdf::from_yaml((istream &)*pis, ref_header);
       rs->other_files[ref_filename] =
-          make_shared<reader_state>(doc, pis, ref_filename);
+          make_shared<reader_state>(doc, pis, ref_filename, ref_header);
     }
     refrs = rs->other_files.at(ref_filename);
   }
@@ -202,29 +240,38 @@ reader_state::resolve_reference(const shared_ptr<reader_state> &rs,
   return make_pair(refrs, node);
 }
 
-writer::writer(ostream &os, const map<string, string> &tags)
-    : os(os), emitter(os) {
+// The standard's examples put the root tag on the document start marker
+// (`--- !core/asdf-1.1.0`). yaml-cpp's `BeginDoc` always writes `---\n`, so
+// the writer emits the marker itself and the first thing the emitter writes
+// is the root tag.
+writer::writer(ostream &os, const map<string, string> &tags,
+               const standard_info_t &standard, const bool allow_nonstandard)
+    : os(os), emitter(os), standard_(&standard),
+      allow_nonstandard_(allow_nonstandard) {
   // yaml-cpp does not support comments without leading space
   os << "#ASDF " << asdf_format_version << "\n"
-     << "#ASDF_STANDARD " << asdf_standard_version() << "\n"
+     << "#ASDF_STANDARD " << standard.version.str() << "\n"
      << "# This is an ASDF file <https://asdf-standard.readthedocs.io/>\n"
      // yaml-cpp does not support writing a YAML tag
      << "%YAML 1.1\n"
-     << "%TAG ! tag:stsci.edu:asdf/\n";
+     << "%TAG ! " << asdf_tag_prefix << "\n";
   for (const auto &kv : tags)
     os << "%TAG !" << kv.first << "! " << kv.second << "\n";
-  emitter << YAML::BeginDoc;
+  os << "--- ";
 }
 
 writer::~writer() { assert(tasks.empty()); }
 
 void writer::flush() {
+  // Take the tasks out first so that the destructor's invariant holds even if
+  // a task, or the emitter check below, throws
+  const auto tasks1 = std::move(tasks);
+  tasks.clear();
   emitter << YAML::EndDoc;
-  if (!tasks.empty()) {
-    // Take the tasks out first so that the destructor's invariant holds even
-    // if a task throws
-    const auto tasks1 = std::move(tasks);
-    tasks.clear();
+  // yaml-cpp reports emitter errors only through this flag; without the check
+  // a malformed emission would silently truncate the file
+  ASDF_CHECK(emitter.good(), "YAML emitter error: " + emitter.GetLastError());
+  if (!tasks1.empty()) {
     YAML::Emitter index;
     index << YAML::BeginDoc << YAML::Flow << YAML::BeginSeq;
     for (const auto &task : tasks1) {

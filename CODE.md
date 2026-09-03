@@ -30,9 +30,11 @@ asdf-cxx/
 │   ├── memoized.hxx          memoized<T>: lazily evaluated, cached shared_ptr<T>
 │   ├── ndarray.hxx           block_t storage classes, block_info_t, ndarray
 │   ├── reference.hxx         `reference` ($ref / JSON-pointer style links)
-│   └── stl.hxx               yaml_encode/yaml_decode for std::vector and std::map
+│   ├── stl.hxx               yaml_encode/yaml_decode for std::vector and std::map
+│   └── version.hxx           version_t, standard_info_t: the ASDF standard version
+│                             table — the only place that spells a core tag
 ├── src/                      One .cxx per header (asdf, byteorder, config, datatype,
-│                             entry, error, io, ndarray, reference)
+│                             entry, error, io, ndarray, reference, version)
 ├── utils/
 │   ├── copy.cxx              asdf-copy: read → copy(copy_state) → write
 │   └── ls.cxx                asdf-ls: dump YAML tree + per-block info
@@ -62,7 +64,7 @@ asdf-cxx/
 Header dependency order (each header includes only those above it):
 
 ```
-memoized.hxx   byteorder.hxx   config.hxx (generated)
+memoized.hxx   byteorder.hxx   config.hxx (generated)   version.hxx
       └──► io.hxx
            ├──► datatype.hxx ──► stl.hxx
            ├──► reference.hxx
@@ -344,21 +346,60 @@ and returns `{memoized<block_t>, block_info_t}` (§5.2).
   the same or an external file first.
 
 `writer` wraps a `YAML::Emitter` on an `ostream`:
-- constructor writes the `#ASDF …`, `#ASDF_STANDARD …`, comment,
-  `%YAML 1.1`, `%TAG ! tag:stsci.edu:asdf/` lines plus any user tags,
-  then `BeginDoc`
+- constructor takes the `standard_info_t` of the version being written
+  and an `allow_nonstandard` flag, and writes the `#ASDF …`,
+  `#ASDF_STANDARD <that version>`, comment, `%YAML 1.1`,
+  `%TAG ! tag:stsci.edu:asdf/` lines plus any user tags, then the
+  literal `"--- "`. It does **not** emit `YAML::BeginDoc`, which would
+  write `---\n` on a line of its own; the caller's first emission is
+  therefore the root tag and the result is
+  `--- !core/asdf-1.1.0`. A caller using `writer` directly must know
+  this: after construction the stream already holds `--- `, so the very
+  next thing it emits has to be the root tag and map.
+- `standard()` is where every core tag comes from; `allow_nonstandard()`
+  says whether `ndarray::to_yaml` may emit content no standard version
+  describes
 - `operator<<` forwards to the emitter, with a special overload for
-  `std::complex<T>`
+  `std::complex<T>` that emits the local `core/complex-…` tag from
+  `standard()`
 - `add_task(fn(ostream&))` queues a block-writing closure and returns
   its index — this index **is** the `source:` value in the YAML
-- `flush()` emits `EndDoc`, runs the queued tasks in order (writing the
-  binary blocks and recording their offsets), then writes the block
-  index
+- `flush()` emits `EndDoc`, checks `emitter.good()` (yaml-cpp otherwise
+  drops output silently) and turns an emitter error into an
+  `ASDF::error`, then runs the queued tasks in order (writing the binary
+  blocks and recording their offsets) and writes the block index
 - the destructor asserts that `flush()` was called
 
 `copy_state` is a small struct of `set_X` / `X` pairs for block format,
 compression and compression level. `ndarray(cs, arr)` applies the set
 ones; every other class's copy constructor just recurses.
+
+`write_options` chooses the standard version (`minimal`, `latest`,
+`input`, or an explicit `version_t`) and whether nonstandard content is
+allowed; `set_standard_version(options, spec)` parses the CLI spelling.
+`file_header` holds the `#ASDF` and `#ASDF_STANDARD` lines as read;
+`reader_state::get_input_header()` and `asdf::get_input_header()` expose
+them, and `version_mode_t::input` uses the standard version from there.
+`content_requirements` is what `asdf::requirements()` collects.
+
+### 4.9 `version_t`, `standard_info_t` (`version.hxx`, `src/version.cxx`)
+
+`standard_versions()` is the table of the seven ASDF standard versions
+1.0.0 to 1.6.0 and the tags each of them uses. Nothing outside
+`src/version.cxx` may spell a `core/…` tag.
+
+| Standard | core/asdf | core/ndarray | float16 | history.extensions |
+|---|---|---|---|---|
+| 1.0.0, 1.1.0 | 1.0.0 | 1.0.0 | no | no |
+| 1.2.0 … 1.5.0 | 1.1.0 | 1.0.0 | no | yes |
+| 1.6.0 | 1.1.0 | 1.1.0 | yes | yes |
+
+`core/software`, `core/complex` and `core/history_entry` are 1.0.0 in
+every version. `standard_info(v)` looks a version up (and raises an
+error listing the supported ones), `default_standard_version()` is
+1.2.0, `latest_standard_version()` is 1.6.0, and
+`classify_core_tag(full_tag)` maps a full tag URI to `core_tag_t` for
+any known version — that is what the readers dispatch on.
 
 ### 4.6 `reference` (`reference.hxx`, `src/reference.cxx`)
 
@@ -479,14 +520,26 @@ the same bytes. Returns a `typed_block_t<unsigned char>`.
 
 ## 6. Write path
 
-`asdf::write(filename)` opens an `ofstream` (binary, truncate) and calls
-`write(ostream&)`:
+`asdf::write(filename, options)` first runs `prepare_write(options)` —
+so that a refused write does not truncate the output file — then opens
+an `ofstream` (binary, truncate) and calls `write(ostream&, options)`:
 
-1. Construct `writer w(os, tags)` — writes the textual header lines and
-   `BeginDoc`.
+0. `prepare_write`:
+   - `requirements()` walks the root group (`entry::collect_requirements`,
+     `ndarray::collect_requirements`), touching only metadata, and
+     records `needs_float16` plus a list of nonstandard items. `nodes`
+     and `writers` cannot be walked, so `ndarray::to_yaml` repeats the
+     check while emitting.
+   - `resolve_standard_version` turns the `write_options` into a
+     `version_t`: `minimal` → `max(1.2.0, req.minimum_version())`,
+     `latest` → 1.6.0, `input` → the version the file was read from
+     (falling back to `minimal`), `explicit_version` → as given.
+   - Unless `allow_nonstandard`, nonstandard content is refused and a
+     version below `req.minimum_version()` raises the "requires" error.
+1. Construct `writer w(os, tags, standard, allow_nonstandard)` — writes
+   the textual header lines and the `--- ` document start marker.
 2. `w << *this` → `asdf::to_yaml`:
-   - `!core/asdf-1.1.0` map (this is the schema version that ASDF
-     standard 1.2.0 maps to, so the header and tag agree);
+   - `!<standard.asdf_tag>` map, on the same line as `---`;
    - `asdf_library:` → `software(ASDF_CXX_NAME, AUTHOR, HOMEPAGE, VERSION)`;
    - every entry of `grp` except a key literally named `asdf_library`, so a
      library entry read from another file is replaced rather than
@@ -500,7 +553,9 @@ the same bytes. Returns a `typed_block_t<unsigned char>`.
    `w.add_task(...)`, and writes the returned index as `source:`. For
    inline format it emits nested YAML sequences via `emit_inline_array`
    (honouring `strides` and `offset`). It always writes `datatype` and
-   `shape`; `byteorder`, `offset`, `strides` only for block format.
+   `shape`; `byteorder` only for block format, and `offset` and
+   `strides` only for block format and only when they differ from their
+   defaults (nonzero offset, non-C-contiguous strides).
    `assert(mask.empty())`.
 4. `w.flush()`:
    - `EndDoc` (`...`);
@@ -609,15 +664,18 @@ that files written by earlier versions stay readable.
 ### Utilities
 
 - **asdf-ls** `<file>...` — prints the YAML tree (via `from_yaml`), then
-  re-reads the file as an `asdf` and walks the tree printing, for every
+  re-reads the file as an `asdf`, prints the standard version the file
+  declares, and walks the tree printing, for every
   ndarray, its block's compressor, compressed/uncompressed sizes, ratio
   and checksum, or `inline array` for inline data. Scalars are not printed in the second pass (TODO in code).
-- **asdf-copy** `[--array=block|inline] [--compression=none|blosc|blosc2|bzip2|lz4|lz4f|libzstd|zlib] [--compression-level=0..9] <in> <out>`
+- **asdf-copy** `[--array=block|inline] [--compression=none|blosc|blosc2|bzip2|lz4|lz4f|libzstd|zlib] [--compression-level=0..9] [--standard-version=minimal|latest|input|X.Y.Z] [--allow-nonstandard] <in> <out>`
   — read, `copy(copy_state)`, write. Without `--compression`, each block
   keeps the compressor it had in the input (§5.4). `--compression=liblz4`
-  is still accepted as an alias for `lz4f`. A bad option prints
-  `<argv[0]>: error: <what> ` followed by the usage and exits with
-  status 1.
+  is still accepted as an alias for `lz4f`. The default standard version
+  is `input`, i.e. the copy declares what the original declared, falling
+  back to `minimal` for an input whose version this library does not
+  know (§6). A bad option prints `<argv[0]>: error: <what> ` followed by
+  the usage and exits with status 1.
 - **asdf-read-check** `<file>...` — a test helper (`tests/read-check.cxx`,
   built but not installed). Walks the tree in a deterministic order and
   prints one line per ndarray, `<path>: <datatype> [<shape>] <values>`.
@@ -636,7 +694,7 @@ that files written by earlier versions stay readable.
 | Executable | Output | Purpose |
 |---|---|---|
 | asdf-demo | demo.asdf | Mix of block/inline arrays, a structured (record) array, scalars, nested group, sequence, reference; bzip2 and zlib blocks. Must stay readable by stock Python asdf |
-| asdf-demo-nonstandard | nonstandard.asdf | Same plus 0-d arrays and, if available, float16/complex32/int128 arrays with blosc, or zlib when blosc is absent; an inline structured array (standard conformant, but Python asdf 5.3 with numpy 2 cannot read it) |
+| asdf-demo-nonstandard | nonstandard.asdf | Same plus 0-d arrays and, if available, float16/complex32/int128 arrays with blosc, or zlib when blosc is absent; an inline structured array (standard conformant, but Python asdf 5.3 with numpy 2 cannot read it). Sets `write_options::allow_nonstandard`, which is what makes the 0-d and 128-bit arrays writable |
 | asdf-demo-strided | strided.asdf | Arrays built with the general constructor: a strided view, a negative-stride view, Fortran order, a foreign byte order, `bool8`, big-endian complex (block and inline) and big-endian records. Checks `get_data_vector<T>()` / `get_data_bytes()` before writing and after reading back, and that an out-of-bounds array is rejected |
 | asdf-demo-external | external.asdf, metadata.asdf | Writes a file and a second file referencing it, then resolves local, remote, and remote-to-local references and prints the data |
 | asdf-demo-compression | compression.asdf | Writes a 101³ float64 array with every available compressor, reads back, verifies equality |
@@ -670,10 +728,12 @@ still passes:
   asdf-standard, as printed by `tests/fetch-reference-files.sh`, which
   does a sparse depth-1 clone at the commit in `tests/asdf-standard.pin`.
   It registers, per standard version in `ASDF_REFERENCE_VERSIONS` and
-  per reference file, `ref-<version>-<name>-{ls,copy,ls2}`, plus
+  per reference file, `ref-<version>-<name>-{ls,copy,ls2,header}`, plus
   `-values`/`-values2` for the names in `ASDF_REF_VALUES`, and
   `ref-<version>-<name>-unsupported` for the files that must fail
-  cleanly.
+  cleanly. `-header` runs `tests/check-header.sh` on the copy and pins
+  down that the copy declares the same standard version as the original
+  and carries that version's root and ndarray tags.
 - `ASDF_PYTHON` — an interpreter with `tests/requirements.txt`. It
   registers the `py-*` tests, which run `tests/python_check.py`:
   `validate` opens a file with Python asdf and insists that the tree
@@ -718,8 +778,8 @@ literal `{…}` directory; harmless.
 
 1. **Masks are not supported.** Read ignores `mask:`; write asserts
    the mask is empty.
-2. **Only `core/ndarray-1.0.0` and `-1.1.0` tags are recognised**, by
-   exact string comparison; any other unknown tag throws. `history` is
+2. **Only the core tags in the version table are recognised**
+   (`classify_core_tag`); any other unknown tag throws. `history` is
    dropped on read.
 3. **`lz4f` blocks are asdf-cxx specific.** Use `compression_t::lz4` for
    files other implementations must read (§7).
@@ -730,9 +790,8 @@ literal `{…}` directory; harmless.
    string) files are unsupported.
 6. **YAML head is read line-by-line until `...`** and buffered as text.
    A file whose YAML lacks the `...` terminator throws.
-7. `asdf-copy` accepts `--compression-level` only as ten literal
-   strings (`--compression-level=0` … `=9`); anything else prints the
-   usage and exits.
+7. `asdf-copy` parses `--compression-level=N` with a range check on the
+   single digit; anything else prints the usage and exits.
 8. The `asdf(readers=...)` hook for custom tags throws if non-empty.
 9. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).

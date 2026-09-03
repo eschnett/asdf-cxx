@@ -65,6 +65,12 @@ public:
 
   virtual std::shared_ptr<entry> copy(const copy_state &cs) const = 0;
 
+  // Add what this entry needs of the standard version it will be written as.
+  // `path` is the position in the tree, used for the error messages. Only
+  // metadata is inspected; block data is never loaded.
+  virtual void collect_requirements(content_requirements &req,
+                                    const std::string &path) const {}
+
   virtual writer &to_yaml(writer &w) const = 0;
   friend writer &operator<<(writer &w, const entry &ent) {
     return ent.to_yaml(w);
@@ -395,6 +401,11 @@ public:
     return std::make_shared<ndarray_entry>(cs, *this);
   }
 
+  virtual void collect_requirements(content_requirements &req,
+                                    const std::string &path) const override {
+    value->collect_requirements(req, path);
+  }
+
   virtual writer &to_yaml(writer &w) const override;
   friend writer &operator<<(writer &w, const ndarray_entry &ent) {
     return ent.to_yaml(w);
@@ -488,6 +499,9 @@ public:
     return std::make_shared<sequence>(cs, *this);
   }
 
+  virtual void collect_requirements(content_requirements &req,
+                                    const std::string &path) const override;
+
   virtual writer &to_yaml(writer &w) const override;
   friend writer &operator<<(writer &w, const sequence &ent) {
     return ent.to_yaml(w);
@@ -553,6 +567,9 @@ public:
   virtual std::shared_ptr<entry> copy(const copy_state &cs) const override {
     return std::make_shared<group>(cs, *this);
   }
+
+  virtual void collect_requirements(content_requirements &req,
+                                    const std::string &path) const override;
 
   virtual writer &to_yaml(writer &w) const override;
   friend writer &operator<<(writer &w, const group &ent) {

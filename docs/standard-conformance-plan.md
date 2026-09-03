@@ -11,7 +11,7 @@ the end is what the reviewer will run. Repository: `/Users/eschnett/src/asdf-cxx
 | 0 — test harness, CI, small cleanups | done | [#20](https://github.com/eschnett/asdf-cxx/pull/20) |
 | 1 — data access correctness | done | [#21](https://github.com/eschnett/asdf-cxx/pull/21) |
 | 1b — string datatypes | done | [#23](https://github.com/eschnett/asdf-cxx/pull/23) |
-| 2 — version table, write options, CLI | not started | |
+| 2 — version table, write options, CLI | done | [#24](https://github.com/eschnett/asdf-cxx/pull/24) |
 | 3 — lossless reader | not started | |
 | 4 — local complex tags | not started | |
 | 5 — documentation | not started | |
@@ -143,6 +143,62 @@ Review of Phase 1b found four non-blocking issues, all fixed in the same PR:
 - `[ucs4, abc]` reported yaml-cpp's `bad conversion`; the length is now
   parsed defensively and reported at datatype level
   (`tests/bad-string-length.asdf`).
+
+**Phase 2** (PR #24) deviations:
+
+- `content_requirements::minimum_version()` returns the **lowest** known
+  standard version (1.0.0) when the tree needs no `float16`, not
+  `default_standard_version()` as the sketch's comment says. Folding the
+  default floor into the content minimum would make the "requires" check
+  reject every legitimate write below 1.2.0, including `asdf-copy` of the
+  1.0.0 and 1.1.0 reference files. `minimal` is still
+  `max(default_standard_version(), minimum_version())`, exactly as specified.
+- `--standard-version=input` on a file whose declared version this library
+  does not know falls back to `minimal` rather than raising an error naming
+  the supported range. The two behaviours the plan asks for are not
+  distinguishable: `asdf-copy`'s default *is* `input`, so an explicit
+  `--standard-version=input` and the default reach `asdf::write` identically.
+- Test names: the plan's `copy-X` become `X-copy` (`demo-1.6.0-copy`,
+  `demo-1.0.0-copy`, `demo-latest-copy`, `python-default-minimal-copy`,
+  `nonstandard-allowed-copy`, `float16-minimal-copy`,
+  `float16-1.0.0-allowed-copy`), and `error-copy-nonstandard` becomes
+  `error-nonstandard-copy`. `copy-` contains `py-`, and these tests are
+  registered unconditionally, so a leading `copy-` would break the
+  `ctest -N | grep -c 'ref-\|py-'` check for a plain configure. Phase 1b
+  named `strided-copy` for the same reason.
+- The Verification line `grep -c '^---' demo.asdf` is **2**, not 1: the block
+  index is a second YAML document and starts with `---`, exactly as the files
+  Python asdf writes do. Inside the YAML head (everything up to `...`) the
+  count is 1 and the line is `--- !core/asdf-1.1.0`; that is what
+  `check-header.sh --root-tag` enforces, and it is the rule the plan means.
+- `roman-like-copy` is still not registered: `roman-like.asdf` is wrapped in
+  foreign tags, which the reader refuses until Phase 3.
+  `ref-1.5.0/1.6.0-basic-history` likewise waits for Phase 3.
+- `ref-<version>-shared-strides` is registered here (for 1.6.0, as written).
+  The plan lists it under Phase 0 "Extra", but it never was registered, and
+  it belongs with the other header assertions: it proves that `offset` and
+  `strides` are still written where they are *not* the defaults.
+- `version_t`'s members are named `major`/`minor`/`patch` as specified;
+  `version.hxx` `#undef`s the `major`/`minor` function-like macros that
+  `<sys/sysmacros.h>` defines on some systems and that would otherwise
+  mangle them.
+- `asdf(rs, node)` no longer accepts a `core/asdf-1.2.0` root tag. No version
+  of the standard defines that tag; the accepted set is now exactly what the
+  version table holds (`core/asdf-1.0.0` and `-1.1.0`).
+- `asdf::write(filename, options)` resolves the version and checks the
+  content *before* opening the output file, so a refused write no longer
+  truncates an existing file.
+- `standard_info_t::history_entry_tag` and `extension_metadata_tag` are in
+  the table but not used yet; Phase 3 is what writes `history`.
+- `yaml_encode(const complex<T> &)` still emits the tag verbatim, so inline
+  complex *arrays* keep their `!<tag:...>` spelling. Only
+  `complex_entry::to_yaml` moved to `w << value` and the local tag, which is
+  what 2a asks for; the array path is Phase 4's `emit_scalar` rework.
+- `asdf-ls` prints `standard version: <x>` (or `unknown`) under `Project:`.
+- Added beyond the plan: `header-python-default2`, `header-padded2`,
+  `header-python-default-minimal`, `py-validate-python-default-minimal`,
+  `header-float16-minimal`, `py-validate-float16`, and
+  `error-compression-level` (the `--compression-level=10` range check).
 
 ---
 

@@ -6,18 +6,9 @@
 namespace ASDF {
 
 // Standard version
-
-#define ASDF_STANDARD_VERSION_MAJOR 1
-#define ASDF_STANDARD_VERSION_MINOR 2
-#define ASDF_STANDARD_VERSION_PATCH 0
-
-#define ASDF_STANDARD_VERSION "1.2.0"
-
-int asdf_standard_version_major();
-int asdf_standard_version_minor();
-int asdf_standard_version_patch();
-
-std::string asdf_standard_version();
+//
+// The ASDF standard versions this library supports live in
+// `asdf/version.hxx`; they are a property of a file, not of the build.
 
 // Software version
 
