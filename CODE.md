@@ -39,6 +39,8 @@ asdf-cxx/
 ├── demo/
 │   ├── demo.cxx              asdf-demo: standard-conformant sample file (demo.asdf)
 │   ├── demo-nonstandard.cxx  asdf-demo-nonstandard: adds 0-d arrays, float16, int128
+│   ├── demo-strided.cxx      asdf-demo-strided: offsets, negative strides, Fortran
+│                             order, foreign byte order, bool8, records — self-checking
 │   ├── demo-external.cxx     asdf-demo-external: external + local references, resolves them
 │   ├── demo-compression.cxx  asdf-demo-compression: round-trips every available compressor
 │   ├── demo-large.cxx        asdf-demo-large: 1000×1000×250 float64 (2 GB) — not a test
@@ -91,8 +93,9 @@ Every header ends with a `#define <GUARD>_DONE` and a trailing
   always includes as `<asdf/xxx.hxx>`.
 - Targets: static library `asdf-cxx`, executables `asdf-copy`,
   `asdf-ls`, `asdf-demo`, `asdf-demo-compression`, `asdf-demo-external`,
-  `asdf-demo-large`, `asdf-demo-nonstandard`, and the test helper
-  `asdf-read-check` (built from `tests/read-check.cxx`, not installed).
+  `asdf-demo-large`, `asdf-demo-nonstandard`, `asdf-demo-strided`, and
+  the test helper `asdf-read-check` (built from `tests/read-check.cxx`,
+  not installed).
 - `CODE_COVERAGE=ON` adds `--coverage` (used by CI).
 - `ASDF_REQUIRE_ALL_DEPENDENCIES=ON` turns a missing optional dependency
   into a configure error (CI uses it so every code path is tested).
@@ -232,10 +235,37 @@ Constructors:
   strides when `strides` is empty.
 - `ndarray(rs, node)` — read; `ndarray(cs, arr)` — copy.
 
-Accessors: `get_datatype()`, `get_shape()`, `get_offset()`,
-`get_strides()`, `get_block_info()` (empty unless read from a binary block),
-`get_data_vector<T>()` (copies out, asserts type match),
-`linear_index(idx)`.
+Accessors: `get_datatype()`, `get_byteorder()`, `get_mask()`,
+`get_block_format()`, `get_compression()`, `get_compression_level()`,
+`get_shape()`, `get_offset()`, `get_strides()`, `num_elements()`,
+`is_c_contiguous()`, `get_block_info()` (empty unless read from a binary
+block), and `linear_index(idx)`, which returns a **byte** offset into the
+block (`offset` plus `strides[d] * idx[d]`), not an element index.
+
+Data extraction:
+
+- `get_data()` — the raw `memoized<block_t>`. Its bytes are exactly what
+  the file holds: the block's own byte order, and the array's `offset` and
+  `strides` still to be applied.
+- `get_data_bytes()` — the elements in C order, packed contiguously and
+  converted to the host byte order. `offset` and `strides` (including
+  negative ones) are applied by an odometer over `shape`; each element goes
+  through `convert_element_to_host` (§4.4). The result has
+  `num_elements() * datatype->type_size()` bytes.
+- `get_data_vector<T>()` — the same, as a `vector<T>`; `T` must match the
+  array's scalar datatype. `T = bool` has its own overload because
+  `vector<bool>` has no `data()` pointer and `bool8` stores one byte per
+  element (any nonzero byte is true).
+
+Both loaders bounds-check first, and both forget a block they had to load,
+so reading one array of a large file does not keep it in memory.
+
+`check_bounds(nbytes)` (private) computes the lowest and the highest byte
+offset any element occupies — negative strides run downwards from `offset`
+— in checked 64-bit arithmetic, and throws when they fall outside the
+block. It runs in the general constructor, in `ndarray(rs, node)` (from the
+block header's `data_space`, so it does not load anything) and in
+`get_data_bytes()` (against the real block size).
 
 `static read_block(shared_ptr<istream>)` parses one binary block header
 and returns `{memoized<block_t>, block_info_t}` (§5.2).
@@ -248,8 +278,13 @@ and returns `{memoized<block_t>, block_info_t}` (§5.2).
 - Compile-time mapping both ways: `get_scalar_type_id<T>::value` and
   `get_scalar_type_t<id>`. `static_assert`s at the top of
   `src/datatype.cxx` pin them together.
-- `int128`/`uint128`, `float16`/`complex32` exist only under
-  `ASDF_HAVE_INT128` / `ASDF_HAVE_FLOAT16`.
+- `int128`/`uint128`, `float16`/`complex32` exist as C++ types only under
+  `ASDF_HAVE_INT128` / `ASDF_HAVE_FLOAT16`, but
+  `get_scalar_type_size()` returns their sizes (2, 4, 16, 16) on **every**
+  build: a build without `_Float16` must still read, bounds-check and copy
+  a float16 block, as Roman WFI level-2 products contain. Only inline data
+  needs the C++ type, so `parse_scalar`/`emit_scalar` are the only places
+  that report "this build has no …" for them.
 - `ascii` and `ucs4` are declared but have no size, parse or emit
   support (all switch statements comment them out).
 - Per-type `yaml_decode(node, T&)` / `yaml_encode(T)` overloads.
@@ -257,7 +292,14 @@ and returns `{memoized<block_t>, block_info_t}` (§5.2).
   with tag `!core/complex-1.0.0`; decoding uses a regex.
 - `parse_scalar(node, unsigned char *dst, type_or_datatype, byteorder)`
   and `emit_scalar(const unsigned char *src, ...)` convert between a
-  YAML scalar and raw bytes, byte-swapping via `htox<N>` / `xtoh<T>`.
+  YAML scalar and raw bytes, byte-swapping via `htox<N>` / `xtoh<T>`. A
+  complex number is swapped once per component, never as one wide value.
+- `convert_element_to_host(src, dst, datatype, byteorder)` converts one
+  element of any datatype to the host byte order without changing its
+  layout: scalars are swapped by size, complex numbers per component,
+  `ucs4` per 4-byte code unit, `ascii` not at all, and a structured type
+  field by field, honouring each field's own `byteorder` and sub-array
+  `shape`. This is what `ndarray::get_data_bytes()` calls per element.
 - `datatype_t` is either scalar or a list of `field_t` (optional name, a
   datatype that may itself be structured, optional byteorder, optional
   sub-array shape). Structured types are packed with no alignment
@@ -322,9 +364,12 @@ data. `valid()` is false for a default-constructed handle (used as the
 
 `byteorder_t {undefined, big, little}`, `host_byteorder()` (runtime
 check), `xtoh<T>(bytes, order)` → host value, `htox<T>(value, order)`
-→ bytes, `htox<N>(bytes*, order)` in-place swap. Block headers are
-always big-endian and handled separately by `input`/`output` helpers in
-`src/ndarray.cxx`.
+→ bytes, `htox<N>(bytes*, order)` in-place swap. `xtoh<T>` and
+`htox<T>` swap a `std::complex` per component (they use the `is_complex`
+trait that lives here for that reason); `htox<N>` is the raw form and
+reverses all `N` bytes, so a caller converting a complex number calls it
+once per component. Block headers are always big-endian and handled
+separately by `input`/`output` helpers in `src/ndarray.cxx`.
 
 ---
 
@@ -385,7 +430,10 @@ value goes through `make_entry`. Dispatch order in `src/entry.cxx`:
   C-order). `mdata = rs->get_block(source)`; `block_info` recorded.
   `compression` is taken from the block header so that a later copy or
   write preserves it unless `copy_state` overrides it; the level is set
-  to 9 because the file does not record the original level.
+  to 9 because the file does not record the original level. The bounds
+  check (§4.3) runs against the header's `data_space`, so a file that
+  claims a shape, offset or stride reaching past its block is rejected
+  before any block data is read.
 - `data:` present → inline format. `shape` is inferred from the nesting
   if absent (for structured datatypes the element's own nesting is
   discounted); `datatype`, if absent, is inferred by attempting to parse
@@ -400,8 +448,9 @@ Seeks to the data offset, reads `used_space` bytes, decompresses
 according to the compression code into a buffer of `data_space` bytes,
 and — if OpenSSL is available and the stored checksum is non-zero —
 verifies the MD5 checksum against the stored bytes, falling back to the
-uncompressed data for files that use the older convention (§7). Returns
-a `typed_block_t<unsigned char>`.
+uncompressed data for files that use the older convention (§7). The
+fallback is skipped for an uncompressed block, where the two domains are
+the same bytes. Returns a `typed_block_t<unsigned char>`.
 
 ---
 
@@ -563,6 +612,7 @@ that files written by earlier versions stay readable.
 |---|---|---|
 | asdf-demo | demo.asdf | Mix of block/inline arrays, a structured (record) array, scalars, nested group, sequence, reference; bzip2 and zlib blocks. Must stay readable by stock Python asdf |
 | asdf-demo-nonstandard | nonstandard.asdf | Same plus 0-d arrays and, if available, float16/complex32/int128 arrays with blosc, or zlib when blosc is absent; an inline structured array (standard conformant, but Python asdf 5.3 with numpy 2 cannot read it) |
+| asdf-demo-strided | strided.asdf | Arrays built with the general constructor: a strided view, a negative-stride view, Fortran order, a foreign byte order, `bool8`, big-endian complex (block and inline) and big-endian records. Checks `get_data_vector<T>()` / `get_data_bytes()` before writing and after reading back, and that an out-of-bounds array is rejected |
 | asdf-demo-external | external.asdf, metadata.asdf | Writes a file and a second file referencing it, then resolves local, remote, and remote-to-local references and prints the data |
 | asdf-demo-compression | compression.asdf | Writes a 101³ float64 array with every available compressor, reads back, verifies equality |
 | asdf-demo-large | large.asdf | 2 GB single block; stress/perf only |
@@ -574,7 +624,7 @@ Always registered: `demo` → `ls demo.asdf` → `demo-nonstandard` →
 → `compare-demo` (`diff-commands.sh` diffs `asdf-ls` output of original
 and copy, filtering lines mentioning compress/checksum because
 compressed sizes and checksums are not guaranteed to match between
-writers) → `external` → `compression` → `padded-*`,
+writers) → `demo-strided` → `strided-ls` → `external` → `compression` → `padded-*`,
 `python-default-*` and, when liblz4 was found, `lz4-*` (read, copy and
 re-list the Python-written fixtures in `tests/`; see `tests/README.md`)
 → `error-*` (deliberately broken files must fail with exit status 1 and
@@ -596,7 +646,7 @@ still passes:
   does a sparse depth-1 clone at the commit in `tests/asdf-standard.pin`.
   It registers, per standard version in `ASDF_REFERENCE_VERSIONS` and
   per reference file, `ref-<version>-<name>-{ls,copy,ls2}`, plus
-  `-values`/`-values2` where the library reads the data correctly, and
+  `-values`/`-values2` for the names in `ASDF_REF_VALUES`, and
   `ref-<version>-<name>-unsupported` for the files that must fail
   cleanly.
 - `ASDF_PYTHON` — an interpreter with `tests/requirements.txt`. It
@@ -672,6 +722,17 @@ literal `{…}` directory; harmless.
 12. **External:** Python asdf 5.3 with numpy 2 cannot read inline
     structured arrays, its own included. Block-format structured arrays
     round-trip fine. Keep `demo.asdf` free of inline structured arrays.
+13. **A block shared by two arrays is duplicated on copy.** Two
+    `ndarray`s can describe different views of one block
+    (asdf-standard's `shared.asdf` does), and both read correctly, but
+    each registers its own write task, so the copy holds two independent
+    blocks with the same content. Deduplicating would mean keying
+    `writer::add_task` on the memoized state pointer.
+14. **External:** Python asdf cannot read an inline complex array that
+    contains NaN or infinity. yaml-cpp emits the YAML 1.1 spellings
+    `.nan` / `.inf`, which Python's `core/complex-1.0.0` parser rejects,
+    so the tagged scalars come back as plain strings and validation
+    fails. Block-format complex arrays are unaffected.
 
 ---
 

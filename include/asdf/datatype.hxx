@@ -72,12 +72,8 @@ typedef vector<unsigned char> ascii_t;
 typedef vector<char32_t> ucs4_t;
 
 // Convert a type to its id enum
-namespace {
-template <typename T> struct is_complex : false_type {};
-template <typename T> struct is_complex<complex<T>> : is_floating_point<T> {};
-// template <typename T> inline constexpr bool is_complex_v =
-// is_complex<T>::value;
-} // namespace
+// (`is_complex` lives in `byteorder.hxx`, which needs it to byte-swap
+// complex numbers per component)
 
 template <typename T>
 struct get_scalar_type_id
@@ -331,6 +327,15 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
 YAML::Node emit_scalar(const unsigned char *data,
                        const shared_ptr<datatype_t> &datatype,
                        byteorder_t byteorder = host_byteorder());
+
+// Copy one element of `datatype` from `src` to `dst`, converting it to the
+// host byte order. `src` and `dst` both hold `datatype.type_size()` bytes in
+// the packed layout the standard prescribes; only the byte order changes.
+// `byteorder` is the array's byte order, which a structured field may
+// override. Complex numbers are swapped per component and `ucs4` strings per
+// 4-byte code unit; `ascii` strings are copied unchanged.
+void convert_element_to_host(const unsigned char *src, unsigned char *dst,
+                             const datatype_t &datatype, byteorder_t byteorder);
 
 } // namespace ASDF
 

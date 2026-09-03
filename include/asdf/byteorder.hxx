@@ -7,6 +7,8 @@
 
 #include <array>
 #include <cassert>
+#include <complex>
+#include <type_traits>
 
 namespace ASDF {
 using namespace std;
@@ -14,6 +16,12 @@ using namespace std;
 // Byte order
 
 enum class byteorder_t { undefined, big, little };
+
+// Is `T` a `std::complex`? Complex numbers are stored as two consecutive
+// real components, and each component is byte-swapped on its own; reversing
+// all bytes of a complex number would exchange its real and imaginary part.
+template <typename T> struct is_complex : false_type {};
+template <typename T> struct is_complex<complex<T>> : true_type {};
 
 void yaml_decode(const YAML::Node &node, byteorder_t &byteorder);
 YAML::Node yaml_encode(byteorder_t byteorder);
@@ -29,6 +37,20 @@ inline byteorder_t host_byteorder() {
              : byteorder_t::big;
 }
 
+namespace detail {
+// Reverse `count` groups of `size` consecutive bytes, each group on its own
+inline void reverse_components(unsigned char *data, size_t size, size_t count) {
+  for (size_t c = 0; c < count; ++c) {
+    unsigned char *const comp = data + c * size;
+    for (size_t i = 0; i < size / 2; ++i) {
+      const unsigned char tmp = comp[i];
+      comp[i] = comp[size - 1 - i];
+      comp[size - 1 - i] = tmp;
+    }
+  }
+}
+} // namespace detail
+
 // Convert to host byte order
 template <typename T>
 inline T xtoh(const unsigned char *data, byteorder_t byteorder) {
@@ -36,7 +58,12 @@ inline T xtoh(const unsigned char *data, byteorder_t byteorder) {
     return *reinterpret_cast<const T *>(data);
   array<unsigned char, sizeof(T)> res;
   for (size_t i = 0; i < sizeof(T); ++i)
-    res[i] = data[sizeof(T) - 1 - i];
+    res[i] = data[i];
+  // A complex number is swapped per component, everything else as a whole
+  if constexpr (is_complex<T>::value)
+    detail::reverse_components(res.data(), sizeof(T) / 2, 2);
+  else
+    detail::reverse_components(res.data(), sizeof(T), 1);
   return *reinterpret_cast<const T *>(&res);
 }
 
@@ -50,20 +77,20 @@ inline array<unsigned char, sizeof(T)> htox(const T &val,
     data[i] = ptr[i];
   if (byteorder == host_byteorder())
     return data;
-  array<unsigned char, sizeof(T)> res;
-  for (size_t i = 0; i < sizeof(T); ++i)
-    res[i] = data[sizeof(T) - 1 - i];
-  return res;
+  if constexpr (is_complex<T>::value)
+    detail::reverse_components(data.data(), sizeof(T) / 2, 2);
+  else
+    detail::reverse_components(data.data(), sizeof(T), 1);
+  return data;
 }
 
+// Swap `N` bytes in place. This is the raw form: it reverses all `N` bytes,
+// so a caller converting a complex number must call it once per component.
 template <size_t N>
 inline void htox(unsigned char *val, byteorder_t byteorder) {
   if (byteorder != host_byteorder()) {
     ASDF_CHECK(byteorder != byteorder_t::undefined, "Byte order is undefined");
-    array<unsigned char, N> tmp;
-    for (size_t i = 0; i < N; ++i)
-      tmp[i] = val[N - 1 - i];
-    *reinterpret_cast<array<unsigned char, N> *>(val) = tmp;
+    detail::reverse_components(val, N, 1);
   }
 }
 

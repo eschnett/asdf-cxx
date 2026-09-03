@@ -1,0 +1,12 @@
+datatype<i1: int8 [3] 127 -128 0
+datatype<i2: int16 [3] 32767 -32768 0
+datatype<i4: int32 [3] 2147483647 -2147483648 0
+datatype<u1: uint8 [2] 255 0
+datatype<u2: uint16 [2] 65535 0
+datatype<u4: uint32 [2] 4294967295 0
+datatype>i1: int8 [3] 127 -128 0
+datatype>i2: int16 [3] 32767 -32768 0
+datatype>i4: int32 [3] 2147483647 -2147483648 0
+datatype>u1: uint8 [2] 255 0
+datatype>u2: uint16 [2] 65535 0
+datatype>u4: uint32 [2] 4294967295 0

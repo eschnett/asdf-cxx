@@ -486,7 +486,9 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
   }
 
 #ifdef ASDF_HAVE_OPENSSL
-  if (have_checksum && !checksum_matched)
+  // For an uncompressed block the stored bytes *are* the data, so the second
+  // domain cannot differ from the first
+  if (have_checksum && !checksum_matched && compression != compression_t::none)
     checksum_matched = md5(data.data(), data.size()) == want_checksum;
 #endif
   ASDF_CHECK(checksum_matched,
@@ -646,7 +648,10 @@ void ndarray::write_block(ostream &os) const {
     comp = {'b', 'l', 's', 'c'};
     const int level = compression_level;
     const int doshuffle = BLOSC_BITSHUFFLE;
-    const size_t typesize = get_scalar_type_size(datatype->scalar_type_id);
+    // The shuffle filter works on fixed-size items; a structured datatype has
+    // no scalar type id, so use the whole element size
+    const size_t typesize =
+        min(datatype->type_size(), size_t(BLOSC_MAX_TYPESIZE));
     const char *const compressor = BLOSC_BLOSCLZ_COMPNAME;
     const int blocksize = 0;
     const int numinternalthreads = 1;
@@ -680,7 +685,7 @@ void ndarray::write_block(ostream &os) const {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.compcode = BLOSC_BLOSCLZ;
     cparams.clevel = compression_level;
-    cparams.typesize = get_scalar_type_size(datatype->scalar_type_id);
+    cparams.typesize = min(datatype->type_size(), size_t(BLOSC_MAX_TYPESIZE));
     cparams.nthreads = 1;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
 
@@ -986,6 +991,9 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     if (node["strides"].IsDefined()) {
       yaml_decode(node["strides"], strides);
     } else {
+      // Rejects negative extents and a shape whose size overflows, so that
+      // the strides below cannot overflow either
+      packed_nbytes();
       int rank = shape.size();
       strides.resize(rank);
       int64_t str = datatype->type_size();
@@ -1000,6 +1008,9 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     // original compression level is not recorded in the file.
     compression = block_info->compression;
     compression_level = compression == compression_t::none ? 0 : 9;
+    // The block header knows the uncompressed size, so this does not load
+    // the block data
+    check_bounds(block_info->data_space);
     break;
   }
 
@@ -1020,6 +1031,7 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
                        shape);
     mdata = memoized<block_t>([=]() { return data; });
     offset = 0;
+    packed_nbytes();
     int rank = shape.size();
     strides.resize(rank);
     int64_t str = datatype->type_size();
@@ -1027,6 +1039,7 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
       strides.at(d) = str;
       str *= shape.at(d);
     }
+    check_bounds(mdata->nbytes());
     break;
   }
 
@@ -1079,13 +1092,118 @@ writer &ndarray::to_yaml(writer &w) const {
   return w;
 }
 
-void ndarray::check_shape() const {
-  int rank = shape.size();
-  int64_t npoints = 1;
-  for (int d = 0; d < rank; ++d)
-    npoints *= shape[d];
-  ASDF_CHECK(mdata->nbytes() == npoints * datatype->type_size(),
-             "Block size does not match the array shape and datatype");
+namespace {
+
+// Checked signed 64-bit arithmetic. A file can claim any shape, offset and
+// strides it likes, so the bounds check must not overflow before it can
+// reject them.
+bool add_overflows(int64_t a, int64_t b, int64_t &result) {
+  if (b > 0 && a > numeric_limits<int64_t>::max() - b)
+    return true;
+  if (b < 0 && a < numeric_limits<int64_t>::min() - b)
+    return true;
+  result = a + b;
+  return false;
+}
+
+bool mul_overflows(int64_t a, int64_t b, int64_t &result) {
+  const bool negative = (a < 0) != (b < 0);
+  // |a| and |b|, computed without overflowing at INT64_MIN
+  const uint64_t ua = a < 0 ? uint64_t(-(a + 1)) + 1 : uint64_t(a);
+  const uint64_t ub = b < 0 ? uint64_t(-(b + 1)) + 1 : uint64_t(b);
+  if (ua != 0 && ub > numeric_limits<uint64_t>::max() / ua)
+    return true;
+  const uint64_t product = ua * ub;
+  if (product == 0) {
+    result = 0;
+    return false;
+  }
+  const uint64_t limit = uint64_t(numeric_limits<int64_t>::max()) + negative;
+  if (product > limit)
+    return true;
+  // `-int64_t(product)` would overflow at INT64_MIN
+  result = negative ? -int64_t(product - 1) - 1 : int64_t(product);
+  return false;
+}
+
+string describe_extents(const vector<int64_t> &values) {
+  ostringstream buf;
+  buf << "[";
+  for (size_t d = 0; d < values.size(); ++d)
+    buf << (d == 0 ? "" : ", ") << values.at(d);
+  buf << "]";
+  return buf.str();
+}
+
+} // namespace
+
+void ndarray::check_bounds(uint64_t nbytes) const {
+  if (num_elements() == 0)
+    return;
+  const int rank = shape.size();
+  const int64_t elemsize = datatype->type_size();
+  // The lowest and the highest byte offset any element occupies. A negative
+  // stride runs downwards from `offset`, a positive one upwards.
+  int64_t lo = offset, hi = offset;
+  bool ok = true;
+  for (int d = 0; d < rank && ok; ++d) {
+    int64_t extent;
+    ok = !mul_overflows(strides.at(d), shape.at(d) - 1, extent);
+    if (ok)
+      ok = extent < 0 ? !add_overflows(lo, extent, lo)
+                      : !add_overflows(hi, extent, hi);
+  }
+  int64_t hi_end = 0;
+  if (ok)
+    ok = !add_overflows(hi, elemsize, hi_end);
+  if (ok)
+    ok = lo >= 0 && hi_end >= 0 && uint64_t(hi_end) <= nbytes;
+  ASDF_CHECK(ok, "Array data (offset " + std::to_string(offset) + ", shape " +
+                     describe_extents(shape) + ", strides " +
+                     describe_extents(strides) + ", element size " +
+                     std::to_string(elemsize) + ") extends beyond the block (" +
+                     std::to_string(nbytes) + " bytes)");
+}
+
+void ndarray::check_scalar_type(scalar_type_id_t requested) const {
+  ASDF_CHECK(datatype->is_scalar && datatype->scalar_type_id == requested,
+             "get_data_vector: the requested element type does not match the "
+             "array's datatype");
+}
+
+vector<unsigned char> ndarray::get_data_bytes() const {
+  const size_t elemsize = datatype->type_size();
+  const int64_t npoints = num_elements();
+  vector<unsigned char> result(size_t(npoints) * elemsize);
+  if (npoints == 0)
+    return result;
+
+  // storage management: a block that was not loaded yet is forgotten again,
+  // so that reading one array of a large file does not keep it in memory
+  const bool old_ready = mdata.ready();
+  const shared_ptr<block_t> block = mdata.get();
+  check_bounds(block->nbytes());
+  const auto *const base = static_cast<const unsigned char *>(block->ptr());
+
+  // Odometer over `shape` in C order, i.e. with the last index fastest
+  const int rank = shape.size();
+  vector<int64_t> index(rank, 0);
+  for (int64_t n = 0; n < npoints; ++n) {
+    int64_t linear = offset;
+    for (int d = 0; d < rank; ++d)
+      linear += strides.at(d) * index.at(d);
+    convert_element_to_host(base + linear, &result.at(size_t(n) * elemsize),
+                            *datatype, byteorder);
+    for (int d = rank - 1; d >= 0; --d) {
+      if (++index.at(d) < shape.at(d))
+        break;
+      index.at(d) = 0;
+    }
+  }
+
+  if (!old_ready)
+    mdata.forget();
+  return result;
 }
 
 } // namespace ASDF

@@ -2,6 +2,7 @@
 #include <asdf/datatype.hxx>
 #include <asdf/stl.hxx>
 
+#include <cstring>
 #include <limits>
 #include <regex>
 #include <sstream>
@@ -85,54 +86,57 @@ static_assert(get_scalar_type_id<complex128_t>() == id_complex128, "");
 static_assert(get_scalar_type_id<ascii_t>() == id_ascii, "");
 static_assert(get_scalar_type_id<ucs4_t>() == id_ucs4, "");
 
+// The size a datatype occupies in a file. These are properties of the ASDF
+// standard, not of this build: a build without `_Float16` or `__int128` must
+// still be able to read, bounds-check and copy blocks of those types.
+#ifdef ASDF_HAVE_FLOAT16
+static_assert(sizeof(float16_t) == 2, "");
+static_assert(sizeof(complex32_t) == 4, "");
+#endif
+#ifdef ASDF_HAVE_INT128
+static_assert(sizeof(int128_t) == 16, "");
+static_assert(sizeof(uint128_t) == 16, "");
+#endif
+
 size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
   switch (scalar_type_id) {
   case id_error:
     ASDF_ERROR("Scalar type id_error does not have a size");
   case id_bool8:
-    return sizeof(bool8_t);
+    return 1;
   case id_int8:
-    return sizeof(int8_t);
+    return 1;
   case id_int16:
-    return sizeof(int16_t);
+    return 2;
   case id_int32:
-    return sizeof(int32_t);
+    return 4;
   case id_int64:
-    return sizeof(int64_t);
-#ifdef ASDF_HAVE_INT128
+    return 8;
   case id_int128:
-    return sizeof(int128_t);
-#endif
+    return 16;
   case id_uint8:
-    return sizeof(uint8_t);
+    return 1;
   case id_uint16:
-    return sizeof(uint16_t);
+    return 2;
   case id_uint32:
-    return sizeof(uint32_t);
+    return 4;
   case id_uint64:
-    return sizeof(uint64_t);
-#ifdef ASDF_HAVE_INT128
+    return 8;
   case id_uint128:
-    return sizeof(uint128_t);
-#endif
-#ifdef ASDF_HAVE_FLOAT16
+    return 16;
   case id_float16:
-    return sizeof(float16_t);
-#endif
+    return 2;
   case id_float32:
-    return sizeof(float32_t);
+    return 4;
   case id_float64:
-    return sizeof(float64_t);
-#ifdef ASDF_HAVE_FLOAT16
+    return 8;
   case id_complex32:
-    return sizeof(complex32_t);
-#endif
+    return 4;
   case id_complex64:
-    return sizeof(complex64_t);
+    return 8;
   case id_complex128:
-    return sizeof(complex128_t);
-    // case id_ascii
-    // case id_ucs4
+    return 16;
+    // `ascii` and `ucs4` carry their length in the datatype (Phase 1b)
   default:
     ASDF_ERROR("Invalid scalar_type_id_t value " +
                std::to_string(int(scalar_type_id)));
@@ -471,6 +475,10 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
     yaml_decode(node, *reinterpret_cast<int128_t *>(data));
     htox<sizeof(int128_t)>(data, byteorder);
     break;
+#else
+  case id_int128:
+    ASDF_ERROR("Cannot parse int128 values: this build has no 128-bit "
+               "integer type");
 #endif
   case id_uint8:
     yaml_decode(node, *reinterpret_cast<uint8_t *>(data));
@@ -493,12 +501,20 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
     yaml_decode(node, *reinterpret_cast<uint128_t *>(data));
     htox<sizeof(uint128_t)>(data, byteorder);
     break;
+#else
+  case id_uint128:
+    ASDF_ERROR("Cannot parse uint128 values: this build has no 128-bit "
+               "integer type");
 #endif
 #ifdef ASDF_HAVE_FLOAT16
   case id_float16:
     yaml_decode(node, *reinterpret_cast<float16_t *>(data));
     htox<sizeof(float16_t)>(data, byteorder);
     break;
+#else
+  case id_float16:
+    ASDF_ERROR("Cannot parse float16 values: this build has no 16-bit "
+               "floating-point type");
 #endif
   case id_float32:
     yaml_decode(node, *reinterpret_cast<float32_t *>(data));
@@ -511,16 +527,26 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
 #ifdef ASDF_HAVE_FLOAT16
   case id_complex32:
     yaml_decode(node, *reinterpret_cast<complex32_t *>(data));
-    htox<sizeof(complex32_t)>(data, byteorder);
+    // A complex number is swapped per component
+    htox<sizeof(complex32_t) / 2>(data, byteorder);
+    htox<sizeof(complex32_t) / 2>(data + sizeof(complex32_t) / 2, byteorder);
     break;
+#else
+  case id_complex32:
+    ASDF_ERROR("Cannot parse complex32 values: this build has no 16-bit "
+               "floating-point type");
 #endif
   case id_complex64:
     yaml_decode(node, *reinterpret_cast<complex64_t *>(data));
-    htox<sizeof(complex64_t)>(data, byteorder);
+    // A complex number is swapped per component
+    htox<sizeof(complex64_t) / 2>(data, byteorder);
+    htox<sizeof(complex64_t) / 2>(data + sizeof(complex64_t) / 2, byteorder);
     break;
   case id_complex128:
     yaml_decode(node, *reinterpret_cast<complex128_t *>(data));
-    htox<sizeof(complex128_t)>(data, byteorder);
+    // A complex number is swapped per component
+    htox<sizeof(complex128_t) / 2>(data, byteorder);
+    htox<sizeof(complex128_t) / 2>(data + sizeof(complex128_t) / 2, byteorder);
     break;
   // case id_ascii
   // case id_ucs4
@@ -553,6 +579,10 @@ YAML::Node emit_scalar(const unsigned char *data,
   case id_int128:
     node = yaml_encode(xtoh<int128_t>(data, byteorder));
     break;
+#else
+  case id_int128:
+    ASDF_ERROR("Cannot emit int128 values: this build has no 128-bit "
+               "integer type");
 #endif
   case id_uint8:
     node = yaml_encode(xtoh<uint8_t>(data, byteorder));
@@ -570,11 +600,19 @@ YAML::Node emit_scalar(const unsigned char *data,
   case id_uint128:
     node = yaml_encode(xtoh<uint128_t>(data, byteorder));
     break;
+#else
+  case id_uint128:
+    ASDF_ERROR("Cannot emit uint128 values: this build has no 128-bit "
+               "integer type");
 #endif
 #ifdef ASDF_HAVE_FLOAT16
   case id_float16:
     node = yaml_encode(xtoh<float16_t>(data, byteorder));
     break;
+#else
+  case id_float16:
+    ASDF_ERROR("Cannot emit float16 values: this build has no 16-bit "
+               "floating-point type");
 #endif
   case id_float32:
     node = yaml_encode(xtoh<float32_t>(data, byteorder));
@@ -586,6 +624,10 @@ YAML::Node emit_scalar(const unsigned char *data,
   case id_complex32:
     node = yaml_encode(xtoh<complex32_t>(data, byteorder));
     break;
+#else
+  case id_complex32:
+    ASDF_ERROR("Cannot emit complex32 values: this build has no 16-bit "
+               "floating-point type");
 #endif
   case id_complex64:
     node = yaml_encode(xtoh<complex64_t>(data, byteorder));
@@ -785,6 +827,85 @@ YAML::Node emit_scalar(const unsigned char *data,
                    field->have_byteorder ? field->byteorder : byteorder));
   assert(ptr == data + datatype->type_size());
   return node;
+}
+
+namespace {
+
+// The number of bytes that make up one byte-swappable component of a scalar
+// type, and how many of them there are per element. Complex numbers consist
+// of two independently swapped components, `ucs4` strings of one per code
+// unit, and `ascii` strings of single bytes that are never swapped.
+void scalar_component_layout(scalar_type_id_t scalar_type_id, size_t type_size,
+                             size_t &component_size, size_t &num_components) {
+  switch (scalar_type_id) {
+  case id_complex32:
+  case id_complex64:
+  case id_complex128:
+    component_size = type_size / 2;
+    num_components = 2;
+    break;
+  case id_ucs4:
+    component_size = 4;
+    num_components = type_size / 4;
+    break;
+  case id_bool8:
+  case id_int8:
+  case id_uint8:
+  case id_ascii:
+    component_size = 1;
+    num_components = type_size;
+    break;
+  default:
+    component_size = type_size;
+    num_components = 1;
+    break;
+  }
+}
+
+// One field of a structured element, including its sub-array `shape`
+void convert_field_to_host(const unsigned char *src, unsigned char *dst,
+                           const field_t &field, byteorder_t byteorder) {
+  const byteorder_t field_byteorder =
+      field.have_byteorder ? field.byteorder : byteorder;
+  const size_t elemsize = field.datatype->type_size();
+  int64_t count = 1;
+  for (const auto extent : field.shape) {
+    ASDF_CHECK(extent >= 0, "Field shape must not have negative extents");
+    count *= extent;
+  }
+  for (int64_t i = 0; i < count; ++i)
+    convert_element_to_host(src + size_t(i) * elemsize,
+                            dst + size_t(i) * elemsize, *field.datatype,
+                            field_byteorder);
+}
+
+} // namespace
+
+void convert_element_to_host(const unsigned char *src, unsigned char *dst,
+                             const datatype_t &datatype,
+                             byteorder_t byteorder) {
+  if (!datatype.is_scalar) {
+    size_t field_offset = 0;
+    for (const auto &field : datatype.fields) {
+      convert_field_to_host(src + field_offset, dst + field_offset, *field,
+                            byteorder);
+      field_offset += field->type_size();
+    }
+    assert(field_offset == datatype.type_size());
+    return;
+  }
+
+  const size_t type_size = datatype.type_size();
+  std::memcpy(dst, src, type_size);
+  if (byteorder == host_byteorder())
+    return;
+  ASDF_CHECK(byteorder != byteorder_t::undefined,
+             "Cannot convert array data: the byte order is undefined");
+  size_t component_size, num_components;
+  scalar_component_layout(datatype.scalar_type_id, type_size, component_size,
+                          num_components);
+  if (component_size > 1)
+    detail::reverse_components(dst, component_size, num_components);
 }
 
 } // namespace ASDF

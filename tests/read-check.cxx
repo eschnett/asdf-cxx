@@ -15,8 +15,10 @@
 // Scalar arrays go through the library's `get_data_vector<T>()` wherever that
 // accessor exists, so that the expected outputs test the library's data access
 // rather than a reimplementation of it. Structured arrays, float16 and the
-// types that no build is guaranteed to have are decoded from the array's
-// bytes instead.
+// types that no build is guaranteed to have go through
+// `ndarray::get_data_bytes()`, which applies `offset`, `strides` and the byte
+// order in the same way; the tool only formats the resulting host-order
+// bytes.
 
 #include <asdf/asdf.hxx>
 
@@ -109,41 +111,6 @@ string datatype_name(const datatype_t &datatype) {
 
 // Byte-level access -----------------------------------------------------
 
-// The array's elements in C order, gathered from its block through `offset`
-// and `strides`. TODO: use the library's own byte-level accessor once it has
-// one.
-vector<unsigned char> gather_bytes(const ndarray &arr) {
-  const auto datatype = arr.get_datatype();
-  const size_t elemsize = datatype->type_size();
-  const auto shape = arr.get_shape();
-  const auto strides = arr.get_strides();
-  const int64_t offset = arr.get_offset();
-  int64_t npoints = 1;
-  for (const auto extent : shape)
-    npoints *= extent;
-
-  const auto block = arr.get_data();
-  const auto *const base = static_cast<const unsigned char *>(block->ptr());
-  const size_t nbytes = block->nbytes();
-
-  vector<unsigned char> result(size_t(npoints) * elemsize);
-  vector<int64_t> index(shape.size(), 0);
-  for (int64_t n = 0; n < npoints; ++n) {
-    int64_t linear = offset;
-    for (size_t d = 0; d < shape.size(); ++d)
-      linear += strides.at(d) * index.at(d);
-    ASDF_CHECK(linear >= 0 && size_t(linear) + elemsize <= nbytes,
-               "Array element lies outside its block");
-    memcpy(&result.at(size_t(n) * elemsize), base + linear, elemsize);
-    for (int d = int(shape.size()) - 1; d >= 0; --d) {
-      if (++index.at(d) < shape.at(d))
-        break;
-      index.at(d) = 0;
-    }
-  }
-  return result;
-}
-
 string format_ucs4(const unsigned char *data, size_t length,
                    byteorder_t byteorder) {
   // Trailing null code units are padding, as in numpy's U dtype
@@ -221,9 +188,7 @@ string format_element(const unsigned char *data,
 }
 
 string format_field(const unsigned char *data, const field_t &field,
-                    byteorder_t array_byteorder) {
-  const byteorder_t byteorder =
-      field.have_byteorder ? field.byteorder : array_byteorder;
+                    byteorder_t byteorder) {
   const auto &datatype = *field.datatype;
   if (!datatype.is_scalar)
     return "(skipped)"; // nested structured fields
@@ -314,12 +279,14 @@ bool typed_accessor_values(const ndarray &arr, vector<string> &values) {
   }
 }
 
-// Values decoded from the array's bytes
+// Values decoded from the array's bytes. `get_data_bytes()` has already
+// applied `offset`, `strides` and every byte order, so the bytes it returns
+// are packed in C order and in host order.
 vector<string> byte_values(const ndarray &arr) {
   const auto datatype = arr.get_datatype();
-  const byteorder_t byteorder = arr.get_byteorder();
+  const byteorder_t byteorder = host_byteorder();
   const size_t elemsize = datatype->type_size();
-  const vector<unsigned char> bytes = gather_bytes(arr);
+  const vector<unsigned char> bytes = arr.get_data_bytes();
   const size_t npoints = elemsize == 0 ? 0 : bytes.size() / elemsize;
 
   vector<string> values;

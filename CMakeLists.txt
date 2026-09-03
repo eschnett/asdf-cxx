@@ -189,6 +189,9 @@ target_link_libraries(asdf-demo-large asdf-cxx ${LIBS})
 add_executable(asdf-demo-nonstandard demo/demo-nonstandard.cxx)
 target_link_libraries(asdf-demo-nonstandard asdf-cxx ${LIBS})
 
+add_executable(asdf-demo-strided demo/demo-strided.cxx)
+target_link_libraries(asdf-demo-strided asdf-cxx ${LIBS})
+
 # A test helper, not installed: prints the values of every array in a file
 add_executable(asdf-read-check tests/read-check.cxx)
 target_link_libraries(asdf-read-check asdf-cxx ${LIBS})
@@ -213,6 +216,12 @@ add_test(NAME ls3 COMMAND ./asdf-ls demo2.asdf)
 add_test(NAME compare-demo
   COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
   "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
+# Arrays with offsets, negative strides, Fortran order, foreign byte order
+# and structured elements: written, read back and checked against the values
+# the demo put in
+add_test(NAME demo-strided COMMAND ./asdf-demo-strided)
+add_test(NAME strided-ls COMMAND ./asdf-ls strided.asdf)
+set_tests_properties(strided-ls PROPERTIES DEPENDS demo-strided)
 add_test(NAME external COMMAND ./asdf-demo-external)
 add_test(NAME compression COMMAND ./asdf-demo-compression)
 # Read files written by the Python reference implementation; see
@@ -284,7 +293,7 @@ include(${CMAKE_SOURCE_DIR}/tests/conformance.cmake)
 # See <https://github.com/codecov/example-cpp11-cmake>
 option(CODE_COVERAGE "Enable coverage reporting" OFF)
 if(CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  foreach(target asdf-cxx asdf-copy asdf-ls asdf-demo asdf-demo-compression asdf-demo-external asdf-demo-large asdf-demo-nonstandard asdf-read-check)
+  foreach(target asdf-cxx asdf-copy asdf-ls asdf-demo asdf-demo-compression asdf-demo-external asdf-demo-large asdf-demo-nonstandard asdf-demo-strided asdf-read-check)
     # Add required flags (GCC & LLVM/Clang)
     target_compile_options(${target} INTERFACE
       -O0        # no optimization

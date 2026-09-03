@@ -4,6 +4,73 @@ Handoff plan. Implementation happens elsewhere; the "Verification" section at
 the end is what the reviewer will run. Repository: `/Users/eschnett/src/asdf-cxx`
 (C++17, version 8.0.0 unreleased). Read `CLAUDE.md` and `CODE.md` first.
 
+## Status
+
+| Phase | State | PR |
+|---|---|---|
+| 0 — test harness, CI, small cleanups | done | [#20](https://github.com/eschnett/asdf-cxx/pull/20) |
+| 1 — data access correctness | done | [#21](https://github.com/eschnett/asdf-cxx/pull/21) |
+| 1b — string datatypes | not started | |
+| 2 — version table, write options, CLI | not started | |
+| 3 — lossless reader | not started | |
+| 4 — local complex tags | not started | |
+| 5 — documentation | not started | |
+
+Deviations from this plan are recorded in the PR that made them, and the
+ones that change what a later phase has to do are repeated here.
+
+**Phase 0** (PR #20) lists nine deviations in its description. The three
+that matter for later phases:
+
+- Block checksums cover the stored (compressed) bytes; the reader now
+  accepts either domain because asdf-standard's `compressed.asdf`
+  reference files use the older uncompressed convention, which Python asdf
+  5.3.1 itself cannot verify. `python_check.py` gained
+  `--no-validate-checksums` for them (CODE.md §5.5/§7,
+  `tests/README.md`).
+- `ndarray::get_byteorder()` landed in Phase 0 rather than Phase 1, because
+  `asdf-read-check` needs it.
+- The `tests/` size budget as literally written ("no file over ~6 KB")
+  cannot hold, because the plan also asks for `read-check.cxx`,
+  `conformance.cmake`, `python_check.py` and `make_fixtures.py` to live
+  there. It is met for the data: fixtures under 4 KB each.
+
+The other six concern `--root-tag` (deferred to Phase 2), registering
+`-py-compare` for all nine reference names instead of the little-endian
+ones only, `asdf-read-check` gathering bytes itself until Phase 1 (now
+done), gating `copy-compression-*` on `ASDF_PYTHON`, a second bug in
+`demo/demo.cxx`, and `--expect-history` accepting
+`asdf.tags.core.ExtensionMetadata`.
+
+**Phase 1** (PR #21) deviations:
+
+- `py-compare-float16` is deferred to Phase 2. `asdf-copy` still declares
+  standard 1.2.0 while tagging arrays `core/ndarray-1.0.0`, whose schema
+  forbids `float16`, so Python rejects the copy. `float16-{ls,copy,ls2}`
+  and `values-float16` do pass, so the Roman requirement — float16 blocks
+  readable and copyable on every build — is met.
+- `ref-*-complex-values` is not registered and there is no
+  `expected/complex.txt`: the file would be 9 kB, more than all other
+  expected outputs together. The plan does not list `complex` among the
+  expected-output files either. The complex byte-order fix is covered by
+  `ref-*-complex-py-compare` and by big-endian complex arrays (block and
+  inline) plus an `emit_scalar`/`parse_scalar` round trip in
+  `asdf-demo-strided`.
+- The `is_complex` trait moved to `byteorder.hxx` rather than staying in
+  `datatype.hxx`, because `byteorder.hxx` is the header that needs it and
+  is included by `datatype.hxx`. It now matches every `std::complex<T>`,
+  not only floating-point ones.
+- The overflow guards in `check_bounds` are hand-written checked
+  arithmetic rather than `__builtin_*_overflow`, so they need no compiler
+  extension.
+- Added beyond the plan: `float16-inline-ls` and `values-float16-inline`
+  (only where the build has `_Float16`), `py-compare-bigendian-inline`,
+  and `py-validate-strided` / `strided-copy` / `strided-ls2` /
+  `py-compare-strided`, which prove that Python asdf reads what
+  `asdf-demo-strided` writes.
+
+---
+
 ## Context
 
 A conformance review against ASDF standard 1.0.0 to 1.6.0 and the Python
