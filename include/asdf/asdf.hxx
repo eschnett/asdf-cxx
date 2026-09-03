@@ -10,7 +10,6 @@
 #include <asdf/ndarray.hxx>
 #include <asdf/reference.hxx>
 #include <asdf/stl.hxx>
-#include <asdf/table.hxx>
 
 #include <yaml-cpp/yaml.h>
 
@@ -27,10 +26,6 @@ class asdf {
   map<string, string> tags; // tag directives
 
   // Content
-  // map<string, shared_ptr<ndarray>> data;
-  // // fits
-  // // wcs
-  // // shared_ptr<table> tab;
   shared_ptr<group> grp;
 
   map<string, YAML::Node> nodes;
@@ -43,12 +38,6 @@ public:
   asdf &operator=(const asdf &) = default;
   asdf &operator=(asdf &&) = default;
 
-  // asdf(map<string, string> tags1, map<string, shared_ptr<ndarray>> data1)
-  //     : tags(std::move(tags1)), data(std::move(data1)) {}
-  // // asdf(const map<string, string> &tags, const shared_ptr<table> &tab)
-  // //     : tags(tags), tab(tab) {
-  // //   assert(tab);
-  // // }
   asdf(map<string, string> tags1, shared_ptr<group> grp1)
       : tags(std::move(tags1)), grp(std::move(grp1)) {
     ASDF_CHECK(grp, "The root group must not be null");

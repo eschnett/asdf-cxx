@@ -242,6 +242,7 @@ public:
   }
 
   shared_ptr<datatype_t> get_datatype() const { return datatype; }
+  byteorder_t get_byteorder() const { return byteorder; }
   vector<int64_t> get_shape() const { return shape; }
   int64_t get_offset() const { return offset; }
   vector<int64_t> get_strides() const { return strides; }

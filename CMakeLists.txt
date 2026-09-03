@@ -149,7 +149,6 @@ set(ASDF_HEADERS
   include/asdf/ndarray.hxx
   include/asdf/reference.hxx
   include/asdf/stl.hxx
-  include/asdf/table.hxx
 )
 set(ASDF_SOURCES
   src/asdf.cxx
@@ -161,7 +160,6 @@ set(ASDF_SOURCES
   src/io.cxx
   src/ndarray.cxx
   src/reference.cxx
-  src/table.cxx
 )
 
 add_library(asdf-cxx ${ASDF_HEADERS} ${ASDF_SOURCES})
@@ -190,6 +188,10 @@ target_link_libraries(asdf-demo-large asdf-cxx ${LIBS})
 
 add_executable(asdf-demo-nonstandard demo/demo-nonstandard.cxx)
 target_link_libraries(asdf-demo-nonstandard asdf-cxx ${LIBS})
+
+# A test helper, not installed: prints the values of every array in a file
+add_executable(asdf-read-check tests/read-check.cxx)
+target_link_libraries(asdf-read-check asdf-cxx ${LIBS})
 
 # SWIG bindings
 
@@ -254,6 +256,10 @@ if(OPENSSL_FOUND)
     corrupt-checksum2.asdf)
 endif()
 
+# Standard-conformance tests; these need the asdf-standard reference files
+# and/or a Python interpreter with the ASDF reference implementation
+include(${CMAKE_SOURCE_DIR}/tests/conformance.cmake)
+
 # These tests are broken in Python 3:
 # SWIG does not translate between numpy integer arrays and C++ std::vector
 # if(PYTHONINTERP_FOUND AND PYTHONLIBS_FOUND AND SWIG_FOUND)
@@ -278,7 +284,7 @@ endif()
 # See <https://github.com/codecov/example-cpp11-cmake>
 option(CODE_COVERAGE "Enable coverage reporting" OFF)
 if(CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  foreach(target asdf-cxx asdf-copy asdf-ls asdf-demo asdf-demo-compression asdf-demo-external asdf-demo-large asdf-demo-nonstandard)
+  foreach(target asdf-cxx asdf-copy asdf-ls asdf-demo asdf-demo-compression asdf-demo-external asdf-demo-large asdf-demo-nonstandard asdf-read-check)
     # Add required flags (GCC & LLVM/Clang)
     target_compile_options(${target} INTERFACE
       -O0        # no optimization

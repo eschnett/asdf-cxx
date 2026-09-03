@@ -25,8 +25,6 @@ asdf::asdf(const shared_ptr<reader_state> &rs, const YAML::Node &node,
   // if (readers.count(tag))
   //   readers.at(tag)(rs, key, node);
 
-  // TODO: data, table
-
   // History entries are not supported and are ignored when reading. (Their
   // tagged extension metadata would otherwise be rejected as unknown tags.)
   ASDF_CHECK(node.IsMap(), "The ASDF tree must be a mapping");
@@ -40,12 +38,6 @@ asdf::asdf(const shared_ptr<reader_state> &rs, const YAML::Node &node,
 }
 
 asdf::asdf(const copy_state &cs, const asdf &project) {
-  // for (const auto &kv : project.data) {
-  //   const auto &key = kv.first;
-  //   data[key] = make_shared<ndarray>(cs, *kv.second);
-  // }
-  // if (project.tab)
-  //   tab = make_shared<table>(cs, *project.tab);
   if (project.grp)
     grp = make_shared<group>(cs, *project.grp);
 }
@@ -56,12 +48,6 @@ writer &asdf::to_yaml(writer &w) const {
   w << YAML::Key << "asdf_library" << YAML::Value
     << software(ASDF_CXX_NAME, ASDF_CXX_AUTHOR, ASDF_CXX_HOMEPAGE,
                 ASDF_CXX_VERSION);
-  // for (const auto &kv : data)
-  //   w << YAML::Key << kv.first << YAML::Value << *kv.second;
-  // // if (tab)
-  // //   node["table"] = tab->to_yaml(w);
-  // if (grp)
-  //   w << YAML::Key << "group" << YAML::Value << *grp;
   if (grp)
     for (const auto &[key, value] : *grp->get_group())
       if (key != "asdf_library")
