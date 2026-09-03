@@ -1096,9 +1096,11 @@ void collect_datatype_requirements(content_requirements &req,
 void ndarray::collect_requirements(content_requirements &req,
                                    const string &path) const {
   collect_datatype_requirements(req, path, *datatype);
-  // An inline rank-0 array has no representation: `data` must be a list
-  if (shape.empty())
-    req.nonstandard.push_back(path + ": rank-0 array");
+  // A rank-0 array is fine as a block -- the schema puts no lower bound on
+  // `shape`, and Python asdf writes `np.array(5.0)` that way -- but it has no
+  // inline representation, because `data` has to be a list
+  if (shape.empty() && block_format == block_format_t::inline_array)
+    req.nonstandard.push_back(path + ": inline rank-0 array");
 }
 
 writer &ndarray::to_yaml(writer &w) const {

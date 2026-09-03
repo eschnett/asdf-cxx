@@ -527,9 +527,11 @@ an `ofstream` (binary, truncate) and calls `write(ostream&, options)`:
 0. `prepare_write`:
    - `requirements()` walks the root group (`entry::collect_requirements`,
      `ndarray::collect_requirements`), touching only metadata, and
-     records `needs_float16` plus a list of nonstandard items. `nodes`
-     and `writers` cannot be walked, so `ndarray::to_yaml` repeats the
-     check while emitting.
+     records `needs_float16` plus a list of nonstandard items
+     (`int128`, `uint128`, `complex32`, and a rank-0 array in inline
+     form — as a block a rank-0 array is standard, and Python asdf
+     writes them). `nodes` and `writers` cannot be walked, so
+     `ndarray::to_yaml` repeats the check while emitting.
    - `resolve_standard_version` turns the `write_options` into a
      `version_t`: `minimal` → `max(1.2.0, req.minimum_version())`,
      `latest` → 1.6.0, `input` → the version the file was read from
@@ -790,8 +792,10 @@ literal `{…}` directory; harmless.
    string) files are unsupported.
 6. **YAML head is read line-by-line until `...`** and buffered as text.
    A file whose YAML lacks the `...` terminator throws.
-7. `asdf-copy` parses `--compression-level=N` with a range check on the
-   single digit; anything else prints the usage and exits.
+7. **Compression levels are not validated against the compressor.**
+   `asdf-copy` range-checks `--compression-level=N` against 0 to 9, but
+   what a level means is codec-specific and nothing checks that a codec
+   accepts it.
 8. The `asdf(readers=...)` hook for custom tags throws if non-empty.
 9. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).

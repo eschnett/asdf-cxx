@@ -94,33 +94,29 @@ YAML::Node asdf::from_yaml(istream &is, file_header &header) {
   for (auto ch : magic)
     doc << ch;
 
-  // Record, but never reject, the declared format and standard versions
-  const auto record = [&header](const string &line) {
-    const auto value = [&line](size_t prefix) {
-      size_t begin = line.find_first_not_of(" \t", prefix);
-      if (begin == string::npos)
-        return string();
-      size_t end = line.find_last_not_of(" \t\r");
-      return line.substr(begin, end + 1 - begin);
-    };
-    if (line.compare(0, 5, "#ASDF") == 0 && header.asdf_version.empty() &&
-        (line.size() == 5 || line[5] == ' ' || line[5] == '\t'))
-      header.asdf_version = value(5);
-    else if (line.compare(0, 15, "#ASDF_STANDARD ") == 0)
-      header.standard_version = value(15);
+  // Record, but never reject, the declared format and standard versions. The
+  // standard puts them on the first two lines; a `#ASDF_STANDARD` that looks
+  // like one but appears later is an ordinary YAML comment inside the tree
+  // and must not override the header.
+  const auto value = [](const string &line, size_t prefix) {
+    const size_t begin = line.find_first_not_of(" \t", prefix);
+    if (begin == string::npos)
+      return string();
+    const size_t end = line.find_last_not_of(" \t\r");
+    return line.substr(begin, end + 1 - begin);
   };
 
   // TODO: stream the file instead
-  bool first_line = true;
+  int lineno = 0;
   while (is) {
     string line;
     getline(is, line);
-    if (first_line) {
-      // The magic has already been consumed; put it back for the parser
-      record("#ASDF" + line);
-      first_line = false;
-    } else {
-      record(line);
+    ++lineno;
+    if (lineno == 1) {
+      // The magic has already been consumed; the rest of the line follows it
+      header.asdf_version = value(line, 0);
+    } else if (lineno == 2 && line.compare(0, 15, "#ASDF_STANDARD ") == 0) {
+      header.standard_version = value(line, 15);
     }
     doc << line << "\n";
     if (line == "...")
@@ -205,19 +201,23 @@ const standard_info_t &asdf::prepare_write(const write_options &options) const {
   return standard;
 }
 
-void asdf::write(ostream &os, const write_options &options) const {
-  const standard_info_t &standard = prepare_write(options);
+void asdf::write_prepared(ostream &os, const standard_info_t &standard,
+                          const write_options &options) const {
   writer w(os, tags, standard, options.allow_nonstandard);
   w << *this;
   w.flush();
 }
 
+void asdf::write(ostream &os, const write_options &options) const {
+  write_prepared(os, prepare_write(options), options);
+}
+
 void asdf::write(const string &filename, const write_options &options) const {
-  // Check before opening the output file, so that a refused write does not
-  // truncate it
-  prepare_write(options);
+  // Resolve and check before opening the output file, so that a refused write
+  // does not truncate it
+  const standard_info_t &standard = prepare_write(options);
   ofstream os(filename, ios::binary | ios::trunc | ios::out);
-  write(os, options);
+  write_prepared(os, standard, options);
 }
 
 } // namespace ASDF

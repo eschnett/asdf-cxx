@@ -86,6 +86,9 @@ public:
 private:
   // Resolve the standard version and reject content the options do not allow
   const standard_info_t &prepare_write(const write_options &options) const;
+  // Emit the tree; `standard` is what `prepare_write` returned
+  void write_prepared(ostream &os, const standard_info_t &standard,
+                      const write_options &options) const;
 
 public:
   shared_ptr<group> get_group() const { return grp; }

@@ -85,9 +85,14 @@ int run(int argc, char **argv) {
       compression = compression_t::zlib;
     } else if (opt.rfind("--compression-level=", 0) == 0) {
       const string value = opt.substr(strlen("--compression-level="));
-      check(value.size() == 1 && value[0] >= '0' && value[0] <= '9',
-            "Compression level \"" + value + "\" is not a digit 0-9\n");
-      compression_level = value[0] - '0';
+      const bool is_number =
+          !value.empty() && value.size() <= 3 &&
+          value.find_first_not_of("0123456789") == string::npos;
+      const int level = is_number ? stoi(value) : -1;
+      check(is_number && level >= 0 && level <= 9,
+            "Compression level \"" + value +
+                "\" is not a number from 0 to 9\n");
+      compression_level = level;
     } else if (opt.rfind("--standard-version=", 0) == 0) {
       check(!standard_version_set, "Standard version already set\n");
       standard_version_set = true;

@@ -357,6 +357,37 @@ asdf_add_python_test(py-compare-strings-inline
   compare "${ASDF_TESTS_DIR}/strings.asdf" strings-inline.asdf)
 asdf_test_depends(py-compare-strings-inline strings-inline-copy)
 
+# rank0.asdf: rank-0 arrays (`shape: []`) as blocks, which the core/ndarray
+# schema allows and Python asdf writes. Reading, copying and reading the values
+# back must work; only the inline form is unrepresentable, because `data` has
+# to be a list, so `--array=inline` is refused as nonstandard content.
+add_test(NAME rank0-ls COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/rank0.asdf")
+add_test(NAME rank0-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/rank0.asdf" rank0-2.asdf)
+add_test(NAME rank0-ls2 COMMAND ./asdf-ls rank0-2.asdf)
+asdf_test_depends(rank0-ls2 rank0-copy)
+asdf_add_values_test(values-rank0 rank0.txt "${ASDF_TESTS_DIR}/rank0.asdf")
+asdf_add_values_test(values-rank0-2 rank0.txt rank0-2.asdf)
+asdf_test_depends(values-rank0-2 rank0-copy)
+asdf_add_version_test(header-rank0 rank0-2.asdf 1.6.0)
+asdf_test_depends(header-rank0 rank0-copy)
+asdf_add_python_test(py-validate-rank0
+  validate ${ASDF_WRITTEN_TAGS_1_6_0} rank0-2.asdf)
+asdf_test_depends(py-validate-rank0 rank0-copy)
+asdf_add_python_test(py-compare-rank0
+  compare "${ASDF_TESTS_DIR}/rank0.asdf" rank0-2.asdf)
+asdf_test_depends(py-compare-rank0 rank0-copy)
+add_test(NAME error-rank0-inline
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m nonstandard
+  -m "inline rank-0 array"
+  ./asdf-copy --array=inline "${ASDF_TESTS_DIR}/rank0.asdf"
+  rank0-inline-refused.asdf)
+add_test(NAME rank0-inline-allowed-copy
+  COMMAND ./asdf-copy --array=inline --allow-nonstandard
+  "${ASDF_TESTS_DIR}/rank0.asdf" rank0-inline.asdf)
+asdf_add_values_test(values-rank0-inline rank0.txt rank0-inline.asdf)
+asdf_test_depends(values-rank0-inline rank0-inline-allowed-copy)
+
 # structured.asdf: a record array with per-field byte order, a sub-array field
 # and a [ucs4, 16] field, as in Roman skycell reference files. Python asdf 5.3
 # with numpy 2 cannot read inline structured arrays, so there is no inline copy.
@@ -464,6 +495,21 @@ asdf_add_python_test(py-validate-python-default-minimal
   validate ${ASDF_WRITTEN_TAGS} python-default-minimal.asdf)
 asdf_test_depends(py-validate-python-default-minimal
   python-default-minimal-copy)
+
+# header-comment.asdf declares 1.6.0 on line 2 and carries a YAML comment
+# inside the tree that looks like a `#ASDF_STANDARD 1.0.0` header line. Only
+# the first two lines count, so the preserving copy stays 1.6.0 rather than
+# silently downgrading itself and its tags.
+add_test(NAME header-comment-ls
+  COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/header-comment.asdf")
+add_test(NAME header-comment-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/header-comment.asdf"
+  header-comment2.asdf)
+asdf_add_version_test(header-header-comment header-comment2.asdf 1.6.0)
+asdf_test_depends(header-header-comment header-comment-copy)
+asdf_add_python_test(py-compare-header-comment
+  compare "${ASDF_TESTS_DIR}/header-comment.asdf" header-comment2.asdf)
+asdf_test_depends(py-compare-header-comment header-comment-copy)
 
 # tests/padded.asdf declares 1.0.0, and so does its copy
 asdf_add_version_test(header-padded2 padded2.asdf 1.0.0)

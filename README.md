@@ -65,10 +65,11 @@ table (`include/asdf/version.hxx`).
   Asking for a version that cannot hold the content (for instance 1.0.0 for a
   `float16` array) is an error naming both versions.
 - Content that **no** version of the standard describes -- `int128`,
-  `uint128` and `complex32` datatypes and rank-0 arrays -- is refused unless
+  `uint128` and `complex32` datatypes, and a rank-0 array in *inline* form,
+  whose `data` would have to be a list -- is refused unless
   `--allow-nonstandard` (`write_options::allow_nonstandard`) is given. Note
   that `float16` is a legitimate 1.6.0 datatype and never counts as
-  nonstandard.
+  nonstandard, and neither does a rank-0 array stored as a block.
 
 Other minor limitations are:
 - Non-YAML Comments (using a `//` key) are ignored, and there is no

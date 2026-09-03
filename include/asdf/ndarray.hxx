@@ -210,8 +210,9 @@ public:
 
   // Add what this array needs of the standard version it will be written as:
   // `float16` data needs standard 1.6.0, and `complex32`, `int128`, `uint128`
-  // and rank-0 arrays are described by no version at all. Only the datatype
-  // and the shape are inspected; the block data is never loaded.
+  // and an inline rank-0 array are described by no version at all. Only the
+  // datatype, the shape and the block format are inspected; the block data is
+  // never loaded.
   void collect_requirements(content_requirements &req,
                             const std::string &path) const;
 
