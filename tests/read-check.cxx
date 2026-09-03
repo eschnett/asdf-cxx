@@ -99,6 +99,14 @@ string field_name(const field_t &field) {
 string datatype_name(const datatype_t &datatype) {
   ostringstream buf;
   if (datatype.is_scalar) {
+    // The string types carry their length; `[ascii, 5]` prints as `ascii(5)`
+    // so that the brackets stay reserved for shapes
+    if (datatype.scalar_type_id == id_ascii ||
+        datatype.scalar_type_id == id_ucs4) {
+      buf << (datatype.scalar_type_id == id_ascii ? "ascii" : "ucs4") << "("
+          << datatype.string_length << ")";
+      return buf.str();
+    }
     buf << yaml_encode(datatype.scalar_type_id);
     return buf.str();
   }
@@ -111,14 +119,10 @@ string datatype_name(const datatype_t &datatype) {
 
 // Byte-level access -----------------------------------------------------
 
-string format_ucs4(const unsigned char *data, size_t length,
-                   byteorder_t byteorder) {
-  // Trailing null code units are padding, as in numpy's U dtype
-  while (length > 0 && xtoh<uint32_t>(data + 4 * (length - 1), byteorder) == 0)
-    --length;
+string utf8_encode(const u32string &codes) {
   string result;
-  for (size_t i = 0; i < length; ++i) {
-    const uint32_t code = xtoh<uint32_t>(data + 4 * i, byteorder);
+  for (const auto ch : codes) {
+    const uint32_t code = ch;
     if (code < 0x80) {
       result += char(code);
     } else if (code < 0x800) {
@@ -136,6 +140,17 @@ string format_ucs4(const unsigned char *data, size_t length,
     }
   }
   return result;
+}
+
+string format_ucs4(const unsigned char *data, size_t length,
+                   byteorder_t byteorder) {
+  // Trailing null code units are padding, as in numpy's U dtype
+  while (length > 0 && xtoh<uint32_t>(data + 4 * (length - 1), byteorder) == 0)
+    --length;
+  u32string codes;
+  for (size_t i = 0; i < length; ++i)
+    codes += char32_t(xtoh<uint32_t>(data + 4 * i, byteorder));
+  return utf8_encode(codes);
 }
 
 // One scalar element, decoded from `data`
@@ -195,9 +210,7 @@ string format_field(const unsigned char *data, const field_t &field,
   const size_t elemsize = datatype.type_size();
   if (field.shape.empty())
     return format_element(data, datatype.scalar_type_id, elemsize, byteorder);
-  int64_t count = 1;
-  for (const auto extent : field.shape)
-    count *= extent;
+  const int64_t count = field.num_elements();
   ostringstream buf;
   buf << "[";
   for (int64_t i = 0; i < count; ++i)
@@ -272,9 +285,18 @@ bool typed_accessor_values(const ndarray &arr, vector<string> &values) {
   case id_complex128:
     values = typed_values<complex128_t>(arr, format_complex128);
     return true;
+  case id_ascii:
+    values = typed_values<string>(
+        arr, [](const string &val) { return "\"" + val + "\""; });
+    return true;
+  case id_ucs4:
+    values = typed_values<u32string>(arr, [](const u32string &val) {
+      return "\"" + utf8_encode(val) + "\"";
+    });
+    return true;
   default:
-    // float16, complex32, int128, uint128, ascii and ucs4 have no accessor
-    // that every build provides
+    // float16, complex32, int128 and uint128 have no accessor that every
+    // build provides
     return false;
   }
 }

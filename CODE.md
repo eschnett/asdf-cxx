@@ -255,7 +255,10 @@ Data extraction:
 - `get_data_vector<T>()` — the same, as a `vector<T>`; `T` must match the
   array's scalar datatype. `T = bool` has its own overload because
   `vector<bool>` has no `data()` pointer and `bool8` stores one byte per
-  element (any nonzero byte is true).
+  element (any nonzero byte is true). `T = std::string` reads an `ascii`
+  array and `T = std::u32string` a `ucs4` one; both drop the trailing null
+  padding, so a `[ucs4, 16]` element holding `"one"` comes back as three
+  code points.
 
 Both loaders bounds-check first, and both forget a block they had to load,
 so reading one array of a large file does not keep it in memory.
@@ -285,8 +288,18 @@ and returns `{memoized<block_t>, block_info_t}` (§5.2).
   a float16 block, as Roman WFI level-2 products contain. Only inline data
   needs the C++ type, so `parse_scalar`/`emit_scalar` are the only places
   that report "this build has no …" for them.
-- `ascii` and `ucs4` are declared but have no size, parse or emit
-  support (all switch statements comment them out).
+- `ascii` and `ucs4` carry their length in the datatype rather than in the
+  type id, so `get_scalar_type_size()` throws for them and
+  `datatype_t::string_length` holds the `N` of the standard's two-element
+  form `[ascii, N]` / `[ucs4, N]`. `datatype_t::type_size()` returns `N`
+  and `4 * N`. `datatype_t(rs, node)` recognises that form before treating
+  a sequence as a field list: a field list's items are mappings or scalar
+  type names, and neither `ascii` nor `ucs4` is a type name on its own.
+  Only the `datatype_t` overloads of `parse_scalar` / `emit_scalar` handle
+  strings; the `scalar_type_id_t` overloads throw, because they do not know
+  the length. Inline `ascii` data must be 7-bit and is null-padded to `N`
+  bytes; inline `ucs4` data is decoded from (and encoded back to) UTF-8,
+  which is how YAML stores it.
 - Per-type `yaml_decode(node, T&)` / `yaml_encode(T)` overloads.
   Complex numbers are encoded as the string `re±imi` (e.g. `-4.4-5.5i`)
   with tag `!core/complex-1.0.0`; decoding uses a regex.
@@ -304,8 +317,18 @@ and returns `{memoized<block_t>, block_info_t}` (§5.2).
   datatype that may itself be structured, optional byteorder, optional
   sub-array shape). Structured types are packed with no alignment
   padding; `type_size()` sums `field_t::type_size()`, which multiplies by
-  the sub-array shape. In inline data a structured element is a YAML
-  sequence with one entry per field.
+  the sub-array shape. That multiplication is checked: a file can claim any
+  field shape, so `field_t::num_elements()` rejects extents whose product
+  does not fit into an `int64_t` (unchecked, a shape multiplying to 2^64
+  gives an element size of zero, which passes every later bounds check).
+  `convert_field_to_host` uses the same checked count. In inline data a
+  structured element is a YAML sequence with one entry per field.
+- A datatype of **zero size** — an empty field list, or `[ascii, 0]` —
+  cannot describe an array that has elements: every element would occupy no
+  bytes, so the array bounds check would hold against any block and the
+  extraction loop would index past the end of its own result.
+  `ndarray::check_bounds` rejects it (an array with no elements at all is
+  still fine). Guard any new element-size arithmetic the same way.
 
 ### 4.5 `reader_state`, `writer`, `copy_state` (`io.hxx`, `src/io.cxx`)
 
@@ -602,7 +625,9 @@ that files written by earlier versions stay readable.
   committed expected outputs in `tests/expected/` are a regression test
   for the library's data access; structured arrays, float16 and the
   types no build is guaranteed to have are decoded from the array's
-  bytes. The output is platform-independent by construction: `%.9g` for
+  bytes. Strings print quoted and `ucs4` as UTF-8, and a string datatype
+  prints as `ascii(5)` / `ucs4(16)` so that brackets stay reserved for
+  shapes. The output is platform-independent by construction: `%.9g` for
   float32 and `%.17g` for float64, NaN always prints unsigned, and
   float16 is converted to float in software.
 
@@ -705,30 +730,28 @@ literal `{…}` directory; harmless.
    string) files are unsupported.
 6. **YAML head is read line-by-line until `...`** and buffered as text.
    A file whose YAML lacks the `...` terminator throws.
-7. `ascii`/`ucs4` scalar types are declared but unimplemented, including
-   the standard's two-element `[ascii, N]` form.
-8. `asdf-copy` accepts `--compression-level` only as ten literal
+7. `asdf-copy` accepts `--compression-level` only as ten literal
    strings (`--compression-level=0` … `=9`); anything else prints the
    usage and exits.
-9. The `asdf(readers=...)` hook for custom tags throws if non-empty.
-10. yaml-cpp emits YAML 1.2 syntax while the header declares
+8. The `asdf(readers=...)` hook for custom tags throws if non-empty.
+9. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).
-11. Blosc and blosc2 code paths compile only where those libraries are
+10. Blosc and blosc2 code paths compile only where those libraries are
     found. CI requires them (`ASDF_REQUIRE_ALL_DEPENDENCIES`), but a
     development machine without them silently skips those paths, so guard
     demo usage with `have_compression_blosc()` and test with both. blosc2
     needs `blosc2_init()` before its schunk API; `ndarray.cxx` does this
     once per process.
-12. **External:** Python asdf 5.3 with numpy 2 cannot read inline
+11. **External:** Python asdf 5.3 with numpy 2 cannot read inline
     structured arrays, its own included. Block-format structured arrays
     round-trip fine. Keep `demo.asdf` free of inline structured arrays.
-13. **A block shared by two arrays is duplicated on copy.** Two
+12. **A block shared by two arrays is duplicated on copy.** Two
     `ndarray`s can describe different views of one block
     (asdf-standard's `shared.asdf` does), and both read correctly, but
     each registers its own write task, so the copy holds two independent
     blocks with the same content. Deduplicating would mean keying
     `writer::add_task` on the memoized state pointer.
-14. **External:** Python asdf cannot read an inline complex array that
+13. **External:** Python asdf cannot read an inline complex array that
     contains NaN or infinity. yaml-cpp emits the YAML 1.1 spellings
     `.nan` / `.inf`, which Python's `core/complex-1.0.0` parser rejects,
     so the tagged scalars come back as plain strings and validation

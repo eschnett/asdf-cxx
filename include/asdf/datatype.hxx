@@ -284,6 +284,11 @@ public:
   YAML::Node to_yaml() const;
   YAML::Node to_yaml(writer &w) const { return to_yaml(); }
 
+  // The number of elements this field's sub-array `shape` describes. A file
+  // can claim any shape, so this also rejects negative extents and extents
+  // whose product does not fit into an `int64_t`.
+  int64_t num_elements() const;
+
   // Number of bytes occupied by this field, including its `shape`
   size_t type_size() const;
 };
@@ -294,6 +299,11 @@ class datatype_t {
 public:
   bool is_scalar;
   scalar_type_id_t scalar_type_id;
+  // The length of an `ascii` or `ucs4` string in code units, i.e. the `N` of
+  // the standard's two-element form `[ascii, N]` / `[ucs4, N]`. An `ascii`
+  // element occupies `N` bytes, a `ucs4` element `4 * N`. Meaningless (and
+  // zero) for every other datatype.
+  size_t string_length;
   vector<shared_ptr<field_t>> fields;
 
 public:
@@ -304,6 +314,9 @@ public:
   datatype_t &operator=(datatype_t &&) = default;
 
   datatype_t(scalar_type_id_t scalar_type_id);
+  // `id_ascii` and `id_ucs4` need a length; the other scalar types do not
+  // accept one
+  datatype_t(scalar_type_id_t scalar_type_id, size_t string_length);
   datatype_t(vector<shared_ptr<field_t>> fields);
 
   datatype_t(const shared_ptr<reader_state> &rs, const YAML::Node &node);

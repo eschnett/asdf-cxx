@@ -136,7 +136,11 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
     return 8;
   case id_complex128:
     return 16;
-    // `ascii` and `ucs4` carry their length in the datatype (Phase 1b)
+  case id_ascii:
+  case id_ucs4:
+    // These carry their length in the datatype
+    ASDF_ERROR("The ascii and ucs4 datatypes have no fixed size; use "
+               "datatype_t::type_size()");
   default:
     ASDF_ERROR("Invalid scalar_type_id_t value " +
                std::to_string(int(scalar_type_id)));
@@ -145,6 +149,13 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
 
 void yaml_decode(const YAML::Node &node,
                  ASDF::scalar_type_id_t &scalar_type_id) {
+  // Only the plain type names live here. The string types are written as the
+  // two-element sequence `[ascii, N]` and a structured type as a list of
+  // fields; both are handled by `datatype_t(rs, node)`.
+  ASDF_CHECK(node.IsScalar(),
+             "A scalar datatype must be a type name; the string form "
+             "[ascii, N] / [ucs4, N] and structured field lists are decoded "
+             "by datatype_t");
   string str = node.Scalar();
   if (str == "bool8")
     scalar_type_id = id_bool8;
@@ -180,11 +191,12 @@ void yaml_decode(const YAML::Node &node,
     scalar_type_id = id_complex64;
   else if (str == "complex128")
     scalar_type_id = id_complex128;
-  else {
-    // case id_ascii
-    // case id_ucs4
+  else if (str == "ascii" || str == "ucs4")
+    ASDF_ERROR("The " + str +
+               " datatype must be written as the two-element form [" + str +
+               ", N], not as a bare type name");
+  else
     ASDF_ERROR("Unknown datatype \"" + str + "\"");
-  }
 }
 
 YAML::Node yaml_encode(scalar_type_id_t scalar_type_id) {
@@ -241,8 +253,11 @@ YAML::Node yaml_encode(scalar_type_id_t scalar_type_id) {
   case id_complex128:
     node = "complex128";
     break;
-    // case id_ascii
-    // case id_ucs4
+  case id_ascii:
+  case id_ucs4:
+    // These need their length, which only `datatype_t` knows
+    ASDF_ERROR("Encoding the ascii or ucs4 datatype requires its length; use "
+               "datatype_t::to_yaml()");
   default:
     ASDF_ERROR("Cannot encode invalid scalar type id " +
                std::to_string(int(scalar_type_id)));
@@ -548,11 +563,14 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
     htox<sizeof(complex128_t) / 2>(data, byteorder);
     htox<sizeof(complex128_t) / 2>(data + sizeof(complex128_t) / 2, byteorder);
     break;
-  // case id_ascii
-  // case id_ucs4
+  case id_ascii:
+  case id_ucs4:
+    // These need their length, which only `datatype_t` knows
+    ASDF_ERROR("Parsing ascii or ucs4 values requires their length; use the "
+               "datatype_t overload of parse_scalar");
   default:
-    ASDF_ERROR("Parsing scalars of this datatype is not supported (ascii and "
-               "ucs4 are not implemented)");
+    ASDF_ERROR("Cannot parse values of invalid scalar type id " +
+               std::to_string(int(scalar_type_id)));
   }
 }
 
@@ -635,11 +653,14 @@ YAML::Node emit_scalar(const unsigned char *data,
   case id_complex128:
     node = yaml_encode(xtoh<complex128_t>(data, byteorder));
     break;
-  // case id_ascii
-  // case id_ucs4
+  case id_ascii:
+  case id_ucs4:
+    // These need their length, which only `datatype_t` knows
+    ASDF_ERROR("Emitting ascii or ucs4 values requires their length; use the "
+               "datatype_t overload of emit_scalar");
   default:
-    ASDF_ERROR("Emitting scalars of this datatype is not supported (ascii and "
-               "ucs4 are not implemented)");
+    ASDF_ERROR("Cannot emit values of invalid scalar type id " +
+               std::to_string(int(scalar_type_id)));
   }
   return node;
 }
@@ -647,6 +668,19 @@ YAML::Node emit_scalar(const unsigned char *data,
 ////////////////////////////////////////////////////////////////////////////////
 
 // Datatypes
+
+namespace {
+
+string describe_extents(const vector<int64_t> &values) {
+  ostringstream buf;
+  buf << "[";
+  for (size_t d = 0; d < values.size(); ++d)
+    buf << (d == 0 ? "" : ", ") << values.at(d);
+  buf << "]";
+  return buf.str();
+}
+
+} // namespace
 
 field_t::field_t(string name, shared_ptr<datatype_t> datatype,
                  bool have_byteorder, byteorder_t byteorder,
@@ -686,13 +720,36 @@ field_t::field_t(const copy_state &cs, const field_t &field)
       have_byteorder(field.have_byteorder), byteorder(field.byteorder),
       shape(field.shape) {}
 
-size_t field_t::type_size() const {
-  size_t size = datatype->type_size();
-  for (const auto &s : shape) {
-    ASDF_CHECK(s >= 0, "Field shape must not have negative extents");
-    size *= s;
+int64_t field_t::num_elements() const {
+  int64_t count = 1;
+  for (const auto extent : shape) {
+    ASDF_CHECK(extent >= 0, "Field shape must not have negative extents");
+    ASDF_CHECK(extent == 0 || count <= numeric_limits<int64_t>::max() / extent,
+               "Field shape " + describe_extents(shape) +
+                   " is too large: the number of elements does not fit into a "
+                   "64-bit integer");
+    count *= extent;
   }
-  return size;
+  return count;
+}
+
+size_t field_t::type_size() const {
+  const int64_t count = num_elements();
+  const size_t elemsize_bytes = datatype->type_size();
+  ASDF_CHECK(elemsize_bytes <= uint64_t(numeric_limits<int64_t>::max()),
+             "Field element size " + std::to_string(elemsize_bytes) +
+                 " does not fit into a 64-bit integer");
+  const int64_t elemsize = int64_t(elemsize_bytes);
+  ASDF_CHECK(count == 0 || elemsize <= numeric_limits<int64_t>::max() / count,
+             "Field shape " + describe_extents(shape) +
+                 " is too large: the field's size in bytes does not fit into "
+                 "a 64-bit integer");
+  const int64_t size = count * elemsize;
+  ASDF_CHECK(uint64_t(size) <= numeric_limits<size_t>::max(),
+             "Field shape " + describe_extents(shape) +
+                 " is too large: the field's size in bytes does not fit into "
+                 "a size_t");
+  return size_t(size);
 }
 
 YAML::Node field_t::to_yaml() const {
@@ -708,18 +765,46 @@ YAML::Node field_t::to_yaml() const {
 }
 
 datatype_t::datatype_t(scalar_type_id_t scalar_type_id)
-    : is_scalar(true), scalar_type_id(scalar_type_id) {}
+    : is_scalar(true), scalar_type_id(scalar_type_id), string_length(0) {
+  ASDF_CHECK(scalar_type_id != id_ascii && scalar_type_id != id_ucs4,
+             "The ascii and ucs4 datatypes require a string length");
+}
+
+datatype_t::datatype_t(scalar_type_id_t scalar_type_id, size_t string_length)
+    : is_scalar(true), scalar_type_id(scalar_type_id),
+      string_length(string_length) {
+  ASDF_CHECK(scalar_type_id == id_ascii || scalar_type_id == id_ucs4,
+             "Only the ascii and ucs4 datatypes have a string length");
+}
 
 datatype_t::datatype_t(vector<shared_ptr<field_t>> fields)
-    : is_scalar(false), scalar_type_id(id_error), fields(std::move(fields)) {}
+    : is_scalar(false), scalar_type_id(id_error), string_length(0),
+      fields(std::move(fields)) {}
 
 size_t datatype_t::type_size() const {
-  if (is_scalar)
+  if (is_scalar) {
+    // The string types carry their length in the datatype: an `ascii`
+    // element is one byte per character, a `ucs4` element a 4-byte code unit
+    // per character
+    if (scalar_type_id == id_ascii)
+      return string_length;
+    if (scalar_type_id == id_ucs4) {
+      ASDF_CHECK(string_length <= numeric_limits<size_t>::max() / 4,
+                 "String length " + std::to_string(string_length) +
+                     " is too large for a ucs4 datatype");
+      return 4 * string_length;
+    }
     return get_scalar_type_size(scalar_type_id);
+  }
   // Structured types are packed, without any alignment padding
   size_t size = 0;
-  for (const auto &field : fields)
-    size += field->type_size();
+  for (const auto &field : fields) {
+    const size_t field_size = field->type_size();
+    ASDF_CHECK(field_size <= numeric_limits<size_t>::max() - size,
+               "Structured datatype is too large: its size in bytes does not "
+               "fit into a size_t");
+    size += field_size;
+  }
   return size;
 }
 
@@ -727,20 +812,49 @@ datatype_t::datatype_t(const shared_ptr<reader_state> &rs,
                        const YAML::Node &node) {
   if (node.IsScalar()) {
     is_scalar = true;
+    string_length = 0;
     yaml_decode(node, scalar_type_id);
     return;
   }
   ASDF_CHECK(node.IsSequence(),
              "A datatype must be a scalar type name or a list of fields");
+  // The string types are written as the two-element sequence `[ascii, N]` or
+  // `[ucs4, N]`. A field list is told apart by its items: they are either
+  // mappings or scalar type names, and neither `ascii` nor `ucs4` is a valid
+  // type name on its own.
+  if (node.size() == 2 && node[0].IsScalar() && node[1].IsScalar() &&
+      (node[0].Scalar() == "ascii" || node[0].Scalar() == "ucs4")) {
+    is_scalar = true;
+    const string &name = node[0].Scalar();
+    scalar_type_id = name == "ascii" ? id_ascii : id_ucs4;
+    // yaml-cpp would report its own "bad conversion" for a length that is
+    // not a number, which says nothing about the datatype
+    int64_t length;
+    try {
+      length = node[1].as<int64_t>();
+    } catch (const YAML::Exception &) {
+      length = -1;
+    }
+    ASDF_CHECK(length >= 0, "The length of the " + name +
+                                " datatype must be a non-negative integer, "
+                                "not \"" +
+                                node[1].Scalar() + "\"");
+    string_length = size_t(length);
+    // Reject a length whose element size does not fit
+    type_size();
+    return;
+  }
   is_scalar = false;
   scalar_type_id = id_error;
+  string_length = 0;
   fields.reserve(node.size());
   for (YAML::const_iterator ni = node.begin(); ni != node.end(); ++ni)
     fields.push_back(make_shared<field_t>(rs, *ni));
 }
 
 datatype_t::datatype_t(const copy_state &cs, const datatype_t &datatype)
-    : is_scalar(datatype.is_scalar), scalar_type_id(datatype.scalar_type_id) {
+    : is_scalar(datatype.is_scalar), scalar_type_id(datatype.scalar_type_id),
+      string_length(datatype.string_length) {
   if (is_scalar)
     return;
   fields.reserve(datatype.fields.size());
@@ -749,8 +863,16 @@ datatype_t::datatype_t(const copy_state &cs, const datatype_t &datatype)
 }
 
 YAML::Node datatype_t::to_yaml() const {
-  if (is_scalar)
+  if (is_scalar) {
+    if (scalar_type_id == id_ascii || scalar_type_id == id_ucs4) {
+      YAML::Node node(YAML::NodeType::Sequence);
+      node.SetStyle(YAML::EmitterStyle::Flow);
+      node.push_back(scalar_type_id == id_ascii ? "ascii" : "ucs4");
+      node.push_back(uint64_t(string_length));
+      return node;
+    }
     return yaml_encode(scalar_type_id);
+  }
   YAML::Node node;
   for (const auto &field : fields)
     node.push_back(field->to_yaml());
@@ -758,6 +880,142 @@ YAML::Node datatype_t::to_yaml() const {
 }
 
 namespace {
+
+// Strings ---------------------------------------------------------------
+
+// Is `code` a Unicode scalar value, i.e. neither out of range nor half of a
+// surrogate pair?
+bool is_valid_code_point(char32_t code) {
+  return uint32_t(code) <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff);
+}
+
+// Decode a UTF-8 string into code points. Inline `ucs4` data arrives as
+// UTF-8, which is what YAML stores.
+vector<char32_t> utf8_decode(const string &str) {
+  static const char32_t lowest[4] = {0, 0x80, 0x800, 0x10000};
+  vector<char32_t> codes;
+  size_t i = 0;
+  while (i < str.size()) {
+    const unsigned char lead = str[i];
+    int extra;
+    char32_t code;
+    if (lead < 0x80) {
+      extra = 0, code = lead;
+    } else if ((lead & 0xe0) == 0xc0) {
+      extra = 1, code = lead & 0x1f;
+    } else if ((lead & 0xf0) == 0xe0) {
+      extra = 2, code = lead & 0x0f;
+    } else if ((lead & 0xf8) == 0xf0) {
+      extra = 3, code = lead & 0x07;
+    } else {
+      ASDF_ERROR("Malformed UTF-8 string: invalid leading byte");
+    }
+    ASDF_CHECK(i + size_t(extra) < str.size(),
+               "Malformed UTF-8 string: truncated multi-byte sequence");
+    for (int k = 1; k <= extra; ++k) {
+      const unsigned char cont = str[i + size_t(k)];
+      ASDF_CHECK((cont & 0xc0) == 0x80,
+                 "Malformed UTF-8 string: invalid continuation byte");
+      code = (code << 6) | (cont & 0x3f);
+    }
+    ASDF_CHECK(code >= lowest[extra],
+               "Malformed UTF-8 string: overlong encoding");
+    ASDF_CHECK(is_valid_code_point(code),
+               "Malformed UTF-8 string: invalid code point");
+    codes.push_back(code);
+    i += size_t(extra) + 1;
+  }
+  return codes;
+}
+
+string utf8_encode(const vector<char32_t> &codes) {
+  string str;
+  for (const auto code : codes) {
+    ASDF_CHECK(is_valid_code_point(code), "Cannot encode the ucs4 code point " +
+                                              std::to_string(uint32_t(code)) +
+                                              " as UTF-8");
+    const uint32_t c = code;
+    if (c < 0x80) {
+      str += char(c);
+    } else if (c < 0x800) {
+      str += char(0xc0 | (c >> 6));
+      str += char(0x80 | (c & 0x3f));
+    } else if (c < 0x10000) {
+      str += char(0xe0 | (c >> 12));
+      str += char(0x80 | ((c >> 6) & 0x3f));
+      str += char(0x80 | (c & 0x3f));
+    } else {
+      str += char(0xf0 | (c >> 18));
+      str += char(0x80 | ((c >> 12) & 0x3f));
+      str += char(0x80 | ((c >> 6) & 0x3f));
+      str += char(0x80 | (c & 0x3f));
+    }
+  }
+  return str;
+}
+
+// One `ascii` or `ucs4` element. Both are fixed-length and padded with null
+// code units, as in numpy's `S` and `U` dtypes.
+void parse_string(const YAML::Node &node, unsigned char *data,
+                  scalar_type_id_t scalar_type_id, size_t string_length,
+                  byteorder_t byteorder) {
+  ASDF_CHECK(node.IsScalar(),
+             "An ascii or ucs4 array element must be a YAML scalar");
+  const string &str = node.Scalar();
+  if (scalar_type_id == id_ascii) {
+    ASDF_CHECK(str.size() <= string_length,
+               "String \"" + str +
+                   "\" is longer than the ascii datatype's "
+                   "length " +
+                   std::to_string(string_length));
+    for (const auto ch : str)
+      ASDF_CHECK(static_cast<unsigned char>(ch) < 0x80,
+                 "String \"" + str +
+                     "\" is not ASCII: the ascii datatype holds 7-bit "
+                     "characters only");
+    std::memcpy(data, str.data(), str.size());
+    std::memset(data + str.size(), 0, string_length - str.size());
+    return;
+  }
+  const vector<char32_t> codes = utf8_decode(str);
+  ASDF_CHECK(codes.size() <= string_length,
+             "String \"" + str +
+                 "\" is longer than the ucs4 datatype's "
+                 "length " +
+                 std::to_string(string_length));
+  for (size_t i = 0; i < string_length; ++i) {
+    const uint32_t code = i < codes.size() ? uint32_t(codes.at(i)) : 0;
+    std::memcpy(data + 4 * i, &code, 4);
+    htox<4>(data + 4 * i, byteorder);
+  }
+}
+
+YAML::Node emit_string(const unsigned char *data,
+                       scalar_type_id_t scalar_type_id, size_t string_length,
+                       byteorder_t byteorder) {
+  YAML::Node node;
+  if (scalar_type_id == id_ascii) {
+    // Trailing null bytes are padding
+    size_t length = string_length;
+    while (length > 0 && data[length - 1] == 0)
+      --length;
+    for (size_t i = 0; i < length; ++i)
+      ASDF_CHECK(data[i] < 0x80,
+                 "Cannot emit this ascii value: the ascii datatype holds "
+                 "7-bit characters only");
+    node = string(reinterpret_cast<const char *>(data), length);
+    return node;
+  }
+  vector<char32_t> codes(string_length);
+  for (size_t i = 0; i < string_length; ++i)
+    codes.at(i) = char32_t(xtoh<uint32_t>(data + 4 * i, byteorder));
+  while (!codes.empty() && codes.back() == 0)
+    codes.pop_back();
+  node = utf8_encode(codes);
+  return node;
+}
+
+// Structured elements ---------------------------------------------------
 
 // Parse a field that may be a sub-array, i.e. that may have a `shape`. The
 // elements are stored contiguously in C order, and `ptr` is advanced past
@@ -799,8 +1057,13 @@ YAML::Node emit_field(const unsigned char *&ptr,
 void parse_scalar(const YAML::Node &node, unsigned char *data,
                   const shared_ptr<datatype_t> &datatype,
                   byteorder_t byteorder) {
-  if (datatype->is_scalar)
+  if (datatype->is_scalar) {
+    if (datatype->scalar_type_id == id_ascii ||
+        datatype->scalar_type_id == id_ucs4)
+      return parse_string(node, data, datatype->scalar_type_id,
+                          datatype->string_length, byteorder);
     return parse_scalar(node, data, datatype->scalar_type_id, byteorder);
+  }
   // A structured element is a sequence with one entry per field
   ASDF_CHECK(
       node.IsSequence() && node.size() == datatype->fields.size(),
@@ -816,8 +1079,13 @@ void parse_scalar(const YAML::Node &node, unsigned char *data,
 YAML::Node emit_scalar(const unsigned char *data,
                        const shared_ptr<datatype_t> &datatype,
                        byteorder_t byteorder) {
-  if (datatype->is_scalar)
+  if (datatype->is_scalar) {
+    if (datatype->scalar_type_id == id_ascii ||
+        datatype->scalar_type_id == id_ucs4)
+      return emit_string(data, datatype->scalar_type_id,
+                         datatype->string_length, byteorder);
     return emit_scalar(data, datatype->scalar_type_id, byteorder);
+  }
   YAML::Node node(YAML::NodeType::Sequence);
   node.SetStyle(YAML::EmitterStyle::Flow);
   const unsigned char *ptr = data;
@@ -868,11 +1136,7 @@ void convert_field_to_host(const unsigned char *src, unsigned char *dst,
   const byteorder_t field_byteorder =
       field.have_byteorder ? field.byteorder : byteorder;
   const size_t elemsize = field.datatype->type_size();
-  int64_t count = 1;
-  for (const auto extent : field.shape) {
-    ASDF_CHECK(extent >= 0, "Field shape must not have negative extents");
-    count *= extent;
-  }
+  const int64_t count = field.num_elements();
   for (int64_t i = 0; i < count; ++i)
     convert_element_to_host(src + size_t(i) * elemsize,
                             dst + size_t(i) * elemsize, *field.datatype,

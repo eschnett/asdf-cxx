@@ -1142,6 +1142,13 @@ void ndarray::check_bounds(uint64_t nbytes) const {
     return;
   const int rank = shape.size();
   const int64_t elemsize = datatype->type_size();
+  // A datatype of zero size -- an empty field list, or `[ascii, 0]` -- would
+  // make every element occupy no bytes, so the bounds below hold for any
+  // block and the extraction loop would index past the end of its own result.
+  // An array with no elements is fine and has already returned above.
+  ASDF_CHECK(elemsize > 0,
+             "Array datatype has zero size: an array with elements needs a "
+             "datatype of at least one byte");
   // The lowest and the highest byte offset any element occupies. A negative
   // stride runs downwards from `offset`, a positive one upwards.
   int64_t lo = offset, hi = offset;

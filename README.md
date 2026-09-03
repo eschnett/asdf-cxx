@@ -37,10 +37,16 @@ are:
 - Simple ndarray references to other files (e.g. "exploded files") are
   not supported. (Full URI references are supported.)
 - Streaming writes and reading streamed datasets is not supported.
-- String types (i.e. arrays of fixed length strings) are not supported.
 - Errors (malformed files, unsupported features, failing compression
   libraries) are reported by throwing `ASDF::error`. The command line
   tools print the message and exit with status 1.
+
+String datatypes are supported: the standard's `[ascii, N]` (N bytes per
+element) and `[ucs4, N]` (N four-byte code units in the array's byte order)
+are read, written, copied and converted between block and inline form, both
+as whole arrays and as fields of a structured array. `ndarray` exposes them
+as `get_data_vector<std::string>()` and `get_data_vector<std::u32string>()`,
+with the trailing null padding removed.
 
 Other minor limitations are:
 - Non-YAML Comments (using a `//` key) are ignored, and there is no

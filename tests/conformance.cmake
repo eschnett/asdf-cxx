@@ -63,11 +63,9 @@ endfunction()
 
 # The asdf-standard reference files ############################################
 
-# Readable today. `ascii`, `unicode_bmp`, `unicode_spp` and `structured` need
-# string datatypes and move here in Phase 1b.
 set(ASDF_REF_SUPPORTED
-  anchor basic complex compressed endian float int scalars shared)
-set(ASDF_REF_STRINGS ascii unicode_bmp unicode_spp structured)
+  anchor ascii basic complex compressed endian float int scalars shared
+  structured unicode_bmp unicode_spp)
 # Recognised but deliberately refused
 set(ASDF_REF_UNSUPPORTED exploded stream)
 # Those of ASDF_REF_SUPPORTED whose values asdf-read-check prints against a
@@ -75,7 +73,9 @@ set(ASDF_REF_UNSUPPORTED exploded stream)
 # `complex.asdf` holds 400 complex numbers whose expected output would be
 # 9 kB -- larger than the whole rest of tests/expected/ -- so it is covered
 # by `-py-compare` and by the complex arrays in `asdf-demo-strided` instead.
-set(ASDF_REF_VALUES basic compressed endian float int shared)
+set(ASDF_REF_VALUES
+  ascii basic compressed endian float int shared structured unicode_bmp
+  unicode_spp)
 
 if(ASDF_REFERENCE_FILES_DIR)
   foreach(version ${ASDF_REFERENCE_VERSIONS})
@@ -116,9 +116,7 @@ if(ASDF_REFERENCE_FILES_DIR)
       # Phase 2 adds ${prefix}-header (the copy's declared version and tags).
     endforeach()
 
-    # Phase 1b moves ASDF_REF_STRINGS to ASDF_REF_SUPPORTED; until then they
-    # have to fail cleanly like the genuinely unsupported files.
-    foreach(name ${ASDF_REF_UNSUPPORTED} ${ASDF_REF_STRINGS})
+    foreach(name ${ASDF_REF_UNSUPPORTED})
       # Phase 3 adds the error-message contract substrings (-m ...) here.
       add_test(NAME ref-${version}-${name}-unsupported
         COMMAND "${ASDF_TESTS_DIR}/expect-error.sh"
@@ -283,9 +281,68 @@ asdf_add_python_test(py-compare-strided
   compare strided.asdf strided2.asdf)
 asdf_test_depends(py-compare-strided strided-copy)
 
+# strings.asdf: `ascii` and `ucs4` arrays as blocks (little-endian, and
+# big-endian so that the 4-byte code units have to be swapped) and inline,
+# including a non-BMP code point. The inline copy must hold the same values.
+add_test(NAME strings-ls COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/strings.asdf")
+add_test(NAME strings-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/strings.asdf" strings2.asdf)
+add_test(NAME strings-ls2 COMMAND ./asdf-ls strings2.asdf)
+asdf_test_depends(strings-ls2 strings-copy)
+add_test(NAME strings-inline-copy
+  COMMAND ./asdf-copy --array=inline "${ASDF_TESTS_DIR}/strings.asdf"
+  strings-inline.asdf)
+asdf_add_values_test(values-strings fixture-strings.txt
+  "${ASDF_TESTS_DIR}/strings.asdf")
+asdf_add_values_test(values-strings2 fixture-strings.txt strings2.asdf)
+asdf_test_depends(values-strings2 strings-copy)
+asdf_add_values_test(values-strings-inline fixture-strings.txt
+  strings-inline.asdf)
+asdf_test_depends(values-strings-inline strings-inline-copy)
+asdf_add_python_test(py-compare-strings
+  compare "${ASDF_TESTS_DIR}/strings.asdf" strings2.asdf)
+asdf_test_depends(py-compare-strings strings-copy)
+asdf_add_python_test(py-compare-strings-inline
+  compare "${ASDF_TESTS_DIR}/strings.asdf" strings-inline.asdf)
+asdf_test_depends(py-compare-strings-inline strings-inline-copy)
+
+# structured.asdf: a record array with per-field byte order, a sub-array field
+# and a [ucs4, 16] field, as in Roman skycell reference files. Python asdf 5.3
+# with numpy 2 cannot read inline structured arrays, so there is no inline copy.
+add_test(NAME structured-ls
+  COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/structured.asdf")
+add_test(NAME structured-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/structured.asdf" structured2.asdf)
+add_test(NAME structured-ls2 COMMAND ./asdf-ls structured2.asdf)
+asdf_test_depends(structured-ls2 structured-copy)
+asdf_add_values_test(values-structured fixture-structured.txt
+  "${ASDF_TESTS_DIR}/structured.asdf")
+asdf_add_values_test(values-structured2 fixture-structured.txt structured2.asdf)
+asdf_test_depends(values-structured2 structured-copy)
+asdf_add_python_test(py-compare-structured
+  compare "${ASDF_TESTS_DIR}/structured.asdf" structured2.asdf)
+asdf_test_depends(py-compare-structured structured-copy)
+
+# Datatypes that a file may claim but that no writer produces. Each has to be
+# refused with an ASDF::error naming the problem, not with a yaml-cpp message
+# or a bounds-checked container throwing `vector`.
+#
+#   bad-field-shape    a structured field whose sub-array shape multiplies to
+#                      2**64; unchecked, that gives an element size of zero
+#   zero-size-datatype `[ascii, 0]`, the other route to a zero element size
+#   bad-string-length  `[ucs4, abc]`, a length that is not a number
+add_test(NAME error-bad-field-shape
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m shape
+  ./asdf-ls "${ASDF_TESTS_DIR}/bad-field-shape.asdf")
+add_test(NAME error-zero-size-datatype
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m "zero size"
+  ./asdf-ls "${ASDF_TESTS_DIR}/zero-size-datatype.asdf")
+add_test(NAME error-bad-string-length
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m "ucs4 datatype must be"
+  ./asdf-ls "${ASDF_TESTS_DIR}/bad-string-length.asdf")
+
 # The remaining fixtures are switched on by the phase that makes them work:
 #
-#   Phase 1b  structured.asdf, strings.asdf
 #   Phase 2   py-compare-float16
 #   Phase 3   masked.asdf (must become an error; it is silently read today),
 #             unknown-tags.asdf, untagged-root.asdf, roman-like.asdf

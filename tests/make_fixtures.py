@@ -92,6 +92,19 @@ write("corrupt-checksum.asdf", bytes(corrupt))
 index = default.index(b"#ASDF BLOCK INDEX")
 write("corrupt-truncated.asdf", default[: index - 100])
 
+# A structured datatype whose sub-array shape multiplies to 2**64, so that an
+# unchecked element size would come out as zero. Dropping the block index (the
+# replacement changes every block offset) leaves the last block ending exactly
+# at the end of the file, which the reader accepts.
+bad_shape = default.replace(
+    b"  datatype: int64\n",
+    b"  datatype: [{name: f, datatype: uint8,"
+    b" shape: [4294967296, 4294967296]}]\n",
+    1,
+)
+assert bad_shape != default
+write("bad-field-shape.asdf", bad_shape[: bad_shape.index(b"#ASDF BLOCK INDEX")])
+
 # Not an ASDF file at all
 write("not-asdf.asdf", b"This is not an ASDF file.\n")
 
@@ -140,18 +153,29 @@ records = np.array(
 write_asdf("structured.asdf", {"records": records})
 
 # strings.asdf: ascii and ucs4 arrays, as blocks and inline, including a
-# non-BMP code point
-ascii_array = np.array(["ab", "cde"], dtype="S3")
-ucs4_array = np.array(["αβ", "\U0001f600x"], dtype="<U2")
+# non-BMP code point, an empty element (which the inline form has to quote)
+# and a big-endian ucs4 block (whose 4-byte code units have to be swapped one
+# at a time). The inline entries are copies, since Python
+# asdf would otherwise write the same array once and refer to it by a YAML
+# alias.
+ascii_array = np.array(["ab", "cde", ""], dtype="S3")
+ucs4_array = np.array(["αβ", "\U0001f600x", ""], dtype="<U2")
 write_asdf(
     "strings.asdf",
     {
         "ascii": ascii_array,
         "ucs4": ucs4_array,
-        "ascii_inline": ascii_array,
-        "ucs4_inline": ucs4_array,
+        "ucs4_be": ucs4_array.astype(">U2"),
+        "ascii_inline": ascii_array.copy(),
+        "ucs4_inline": ucs4_array.copy(),
     },
-    storage={"ascii_inline": "inline", "ucs4_inline": "inline"},
+    storage={
+        "ascii": "internal",
+        "ucs4": "internal",
+        "ucs4_be": "internal",
+        "ascii_inline": "inline",
+        "ucs4_inline": "inline",
+    },
 )
 
 # masked.asdf: ndarray `mask`, which asdf-cxx refuses
@@ -280,6 +304,34 @@ counts: !core/ndarray-1.0.0
 a: &f {name: x, k: [1, 2]}
 b: *f
 c: [*f]
+...
+""",
+    # A datatype of zero size. Every element then occupies no bytes, so the
+    # array bounds check holds for any block; numpy normalises `S0` to `S1`,
+    # so only a hand-written file can say this.
+    "zero-size-datatype.asdf": """\
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+empty: !core/ndarray-1.0.0
+  data: ["", ""]
+  datatype: [ascii, 0]
+  shape: [2]
+...
+""",
+    # A string datatype whose length is not a number
+    "bad-string-length.asdf": """\
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+bad: !core/ndarray-1.0.0
+  data: [x]
+  datatype: [ucs4, abc]
+  shape: [1]
 ...
 """,
     # An untagged root, which the standard allows

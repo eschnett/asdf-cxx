@@ -1,0 +1,2 @@
+datatype<U: ucs4(2) [2] "" "Æʩ"
+datatype>U: ucs4(2) [2] "" "Æʩ"
