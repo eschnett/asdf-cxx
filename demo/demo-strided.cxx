@@ -255,6 +255,21 @@ int run(int argc, char **argv) {
   check_scalar_roundtrip<float64_t>("float64", 1.5, foreign);
   check_scalar_roundtrip<int32_t>("int32", -123456, foreign);
 
+  // Only the densely packed arrays are C-contiguous
+  const auto check_contiguous = [&](const string &name, bool expected) {
+    const auto arr = get_array(copied, name);
+    ASDF_CHECK(arr->is_c_contiguous() == expected,
+               name + ": is_c_contiguous() should be " +
+                   (expected ? "true" : "false"));
+  };
+  check_contiguous("foreign_ints", true);
+  check_contiguous("flags", true);
+  check_contiguous("records", true);
+  check_contiguous("offset_view", false);   // column stride is two elements
+  check_contiguous("reversed_view", false); // negative row stride
+  check_contiguous("fortran", false);       // column-major
+  cout << "  is_c_contiguous ok\n";
+
   // The bounds check must reject an array that reaches past its block
   bool rejected = false;
   try {
