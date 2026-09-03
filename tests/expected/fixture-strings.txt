@@ -1,0 +1,5 @@
+ascii: ascii(3) [3] "ab" "cde" ""
+ascii_inline: ascii(3) [3] "ab" "cde" ""
+ucs4: ucs4(2) [3] "αβ" "😀x" ""
+ucs4_be: ucs4(2) [3] "αβ" "😀x" ""
+ucs4_inline: ucs4(2) [3] "αβ" "😀x" ""

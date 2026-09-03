@@ -99,7 +99,7 @@ zlib/lz4), `c` (int32, 200 values, bzip2/lz4).
 | `float16.asdf` | a float16 block, as in Roman WFI level-2 products: readable and copyable even where the compiler has no `_Float16` |
 | `float16-inline.asdf` | the same array inline, so that parsing its values does need `_Float16` |
 | `structured.asdf` | a record array with per-field byte order, a sub-array field and a `[ucs4, 16]` field, as in Roman skycell reference files |
-| `strings.asdf` | `ascii` and `ucs4` arrays as blocks and inline, including a non-BMP code point |
+| `strings.asdf` | `ascii` and `ucs4` arrays as blocks and inline, including a non-BMP code point and a big-endian `ucs4` block whose 4-byte code units are swapped one at a time |
 | `masked.asdf` | an ndarray `mask`, which asdf-cxx does not support |
 | `bigendian.asdf` | one block shared by two views, negative and non-contiguous strides, Fortran order, big-endian data, and bool8. Note that the two views share one block on read but are written as two blocks by a copy |
 | `roman-like.asdf` | the Roman WFI feature set in one file: foreign tags around nested ndarrays, tagged time/unit scalars, a float16 block, a `[ucs4, 16]` structured field, an astropy table with `core/column` entries, a YAML alias, `history.extensions`, standard 1.6.0 |
@@ -117,9 +117,12 @@ that also pins the exact spelling that a copy has to preserve.
 
 ### Deliberately broken files
 
-`corrupt-tag.asdf`, `corrupt-checksum.asdf`, `corrupt-truncated.asdf`
-and `not-asdf.asdf` are derived from `python-default.asdf` by the
-fixture script. The `error-*` tests run `asdf-ls` or `asdf-copy` on them
+`corrupt-tag.asdf`, `corrupt-checksum.asdf`, `corrupt-truncated.asdf`,
+`bad-field-shape.asdf` and `not-asdf.asdf` are derived from
+`python-default.asdf` by the fixture script. `bad-field-shape.asdf` gives
+one array a structured field whose sub-array `shape` multiplies to 2^64,
+which an unchecked element-size computation would turn into zero; it has no
+block index, because the longer datatype moves every block. The `error-*` tests run `asdf-ls` or `asdf-copy` on them
 through `expect-error.sh`, which requires exit status 1 and an `error:`
 message on stderr, so a crash does not count as passing.
 `error-checksum` only runs when asdf-cxx was built with OpenSSL.

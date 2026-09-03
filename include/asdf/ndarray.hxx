@@ -14,6 +14,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -331,6 +332,53 @@ template <> inline vector<bool> ndarray::get_data_vector<bool>() const {
   vector<bool> data(bytes.size());
   for (size_t i = 0; i < bytes.size(); ++i)
     data[i] = bytes[i] != 0;
+  return data;
+}
+
+// An `ascii` array: one `std::string` of at most `string_length` bytes per
+// element, with the trailing null padding removed
+template <> inline vector<string> ndarray::get_data_vector<string>() const {
+  check_scalar_type(id_ascii);
+  const size_t length = get_datatype()->string_length;
+  const vector<unsigned char> bytes = get_data_bytes();
+  const size_t npoints = size_t(num_elements());
+  ASDF_CHECK(bytes.size() == npoints * length,
+             "Block size does not match the array shape");
+  vector<string> data(npoints);
+  for (size_t n = 0; n < npoints; ++n) {
+    const unsigned char *const element = bytes.data() + n * length;
+    size_t len = length;
+    while (len > 0 && element[len - 1] == 0)
+      --len;
+    data[n].assign(reinterpret_cast<const char *>(element), len);
+  }
+  return data;
+}
+
+// A `ucs4` array: one `std::u32string` of at most `string_length` code
+// points per element, with the trailing null padding removed.
+// `get_data_bytes()` has already converted the code units to host order.
+template <>
+inline vector<u32string> ndarray::get_data_vector<u32string>() const {
+  check_scalar_type(id_ucs4);
+  const size_t length = get_datatype()->string_length;
+  const vector<unsigned char> bytes = get_data_bytes();
+  const size_t npoints = size_t(num_elements());
+  ASDF_CHECK(bytes.size() == npoints * 4 * length,
+             "Block size does not match the array shape");
+  vector<u32string> data(npoints);
+  for (size_t n = 0; n < npoints; ++n) {
+    const unsigned char *const element = bytes.data() + n * 4 * length;
+    u32string str(length, U'\0');
+    for (size_t i = 0; i < length; ++i) {
+      uint32_t code;
+      std::memcpy(&code, element + 4 * i, 4);
+      str[i] = char32_t(code);
+    }
+    while (!str.empty() && str.back() == U'\0')
+      str.pop_back();
+    data[n] = std::move(str);
+  }
   return data;
 }
 

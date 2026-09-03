@@ -10,7 +10,7 @@ the end is what the reviewer will run. Repository: `/Users/eschnett/src/asdf-cxx
 |---|---|---|
 | 0 — test harness, CI, small cleanups | done | [#20](https://github.com/eschnett/asdf-cxx/pull/20) |
 | 1 — data access correctness | done | [#21](https://github.com/eschnett/asdf-cxx/pull/21) |
-| 1b — string datatypes | not started | |
+| 1b — string datatypes | done | [#23](https://github.com/eschnett/asdf-cxx/pull/23) |
 | 2 — version table, write options, CLI | not started | |
 | 3 — lossless reader | not started | |
 | 4 — local complex tags | not started | |
@@ -68,6 +68,62 @@ done), gating `copy-compression-*` on `ASDF_PYTHON`, a second bug in
   and `py-validate-strided` / `strided-copy` / `strided-ls2` /
   `py-compare-strided`, which prove that Python asdf reads what
   `asdf-demo-strided` writes.
+
+**Review of Phase 1** (2026-09-03) found two pre-existing gaps that the new
+tests made visible. Neither blocked the merge; they are assigned to the
+phases below and repeated in those sections.
+
+- Structured field sizes are not overflow-checked. `field_t::type_size()`
+  multiplies the sub-array extents in unchecked `size_t` arithmetic and the
+  field-count loop in `convert_field_to_host` in unchecked `int64_t`. A file
+  whose field shape multiplies to 2^64 gets an element size of 0, passes
+  `check_bounds`, and is only stopped by a bounds-checked `vector` access
+  (exit status 1, message `vector`). **Fixed in Phase 1b** (PR #23):
+  `field_t::num_elements()` is the one checked count, and
+  `tests/bad-field-shape.asdf` covers it.
+- Complex NaN and infinity do not round-trip through inline form.
+  `yaml_encode_complex` spells them the yaml-cpp way (`.nan+.nani`), which
+  the `complex-1.0.0` schema does not allow (`nan`, `inf`, `-inf`, no
+  leading dot) and which asdf-cxx's own `yaml_decode_complex` rejects with
+  "Cannot parse complex number". `asdf-copy --array=inline` of the reference
+  `complex.asdf` therefore produces a file neither asdf-cxx nor Python can
+  read. Fix in Phase 4, which reworks complex emission; the reader should
+  accept both spellings.
+
+**Phase 1b** (PR #23) deviations:
+
+- `roman-like-values` is not registered. `roman-like.asdf` is wrapped in
+  foreign tags, which the reader still refuses (Phase 3); its `[ucs4, 16]`
+  field is covered by `tests/structured.asdf` instead. The test moves to
+  Phase 3 together with the rest of that fixture.
+- `bad-field-shape.asdf` is derived from `python-default.asdf` as the plan
+  asks, but with the block index dropped: the longer `datatype:` line moves
+  every block, and the reader scans sequentially anyway, so without an index
+  the last block still ends exactly at the end of the file.
+- `structured.asdf` gets no `--array=inline` copy, because Python asdf 5.3
+  with numpy 2 cannot read inline structured arrays (CODE.md §11), so
+  `py-compare` could not check it.
+- `ref-*-{ascii,unicode_bmp,unicode_spp,structured}-header` is not switched
+  on: `check-header.sh` is registered by Phase 2 for every reference name at
+  once.
+- Added beyond the plan: a big-endian `ucs4` block (`ucs4_be`) in
+  `strings.asdf`, so that a little-endian host has to swap the 4-byte code
+  units; `values-strings2` and `values-structured2` on the copies;
+  `py-compare-strings-inline`; and `ascii`/`ucs4` cases in
+  `asdf-read-check`'s typed-accessor path, so the expected outputs exercise
+  the two new accessors rather than a reimplementation.
+- `get_data_vector<std::u32string>()` also strips trailing null code units,
+  which the plan only asks for on the `ascii` side; that is what numpy's `U`
+  dtype means and what `asdf-read-check` already printed.
+- `emit_scalar` refuses to emit an `ascii` element with a byte >= 0x80
+  instead of writing invalid UTF-8 into the YAML. Such a block is malformed
+  input, and `asdf-copy` without `--array=inline` still copies it verbatim.
+- `datatype_t(scalar_type_id_t)` now rejects `id_ascii`/`id_ucs4`; string
+  datatypes go through the new two-argument constructor. `field_t` gained a
+  public `num_elements()`, and structured `datatype_t::type_size()` also
+  checks the sum of the field sizes.
+- Nothing was removed from the error-message contract: it never had
+  `ascii`/`ucs4` rows.
 
 ---
 
@@ -519,6 +575,16 @@ Files: `include/asdf/datatype.hxx`, `src/datatype.cxx`, `src/ndarray.cxx`.
   `get_data_bytes()`.
 - Remove the `ascii`/`ucs4` rows from the error contract; update README's
   "String types are not supported" bullet.
+- **Checked arithmetic for structured field sizes** (Phase 1 review
+  finding). `field_t::type_size()` must reject a sub-array shape whose
+  product, or whose product with the field's element size, does not fit
+  (mirroring `num_elements()`/`packed_nbytes()`), and the field-count loop
+  in `convert_field_to_host` must use the same checked count. Test: a
+  fixture derived from `python-default.asdf` whose array `a` has
+  `datatype: [{name: f, datatype: uint8, shape: [4294967296, 4294967296]}]`
+  must be refused by `asdf-ls` with a message naming the field shape
+  (`expect-error.sh -m shape`), not accepted and later tripped up in
+  `asdf-read-check`.
 
 **Tests switched on / added.** Reference files `ascii`, `unicode_bmp`,
 `unicode_spp`, `structured` move from unsupported to supported for all
@@ -759,6 +825,20 @@ instead of `- !<tag:stsci.edu:asdf/core/complex-1.0.0> 1+0i`. Verify
 flow-style propagation and `.inf`/`.nan` scalars; `compare-demo` must still
 pass; `check-header.sh demo.asdf --present "!core/complex-1.0.0 1+0i" --absent
 "!<tag:"`.
+
+**Complex NaN and infinity** (Phase 1 review finding). `yaml_encode_complex`
+and the writer's `operator<<` for `std::complex` must spell non-finite
+components as the `complex-1.0.0` schema requires: `nan`, `inf`, `-inf`
+(no leading dot; the schema's pattern accepts `inf|INF|nan|NAN`), giving
+for example `nan+infi` and `1.5-infi`. `yaml_decode_complex` must accept
+both that spelling and yaml-cpp's `.nan`/`.inf`/`-.inf`, so files written by
+earlier asdf-cxx versions stay readable. Tests: add a NaN and an infinite
+element to the complex arrays in `asdf-demo-strided` (block and inline);
+register `ref-<v>-complex-inline-copy` (`asdf-copy --array=inline`) followed
+by `ref-<v>-complex-inline-ls` and `ref-<v>-complex-inline-py-compare` (the
+reference `complex.asdf` contains nan/inf/-0.0 combinations); the Python
+comparison is the proof that the spelling is what the reference
+implementation parses.
 
 ---
 
