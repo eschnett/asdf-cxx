@@ -52,9 +52,32 @@ default).
 - `read-check.cxx` builds `asdf-read-check`, which prints one line per
   array (`<path>: <datatype> [<shape>] <values>`). It is the oracle for
   the library's data access: the `values-*` tests diff its output
-  against `expected/*.txt`. Its output is platform-independent by
+  against `expected/*.txt`. Values come from the library's
+  `get_data_vector<T>()` where that accessor exists and from
+  `get_data_bytes()` otherwise, so the expected outputs test the
+  library's byte-order, offset and stride handling rather than a
+  reimplementation of it. The output is platform-independent by
   construction (fixed float precision, NaN always unsigned, float16
   converted in software).
+
+## Expected outputs
+
+`expected/*.txt` are `asdf-read-check` outputs, one per file whose values
+a `values-*` test pins: the reference files `basic`, `compressed`,
+`endian`, `float`, `int` and `shared` (their content is the same in every
+standard version, so one file covers all seven), `fixture-abc.txt` for
+the three Python-written fixtures that share the same three arrays,
+`demo.txt`, `bigendian.txt` and `float16.txt`. Regenerate one with
+
+```bash
+build/asdf-read-check <file> > tests/expected/<name>.txt
+```
+
+and check the values by eye before committing. `complex.asdf` has no
+expected file on purpose: 400 complex numbers printed to full precision
+would be 9 kB, more than all the other expected outputs together, and
+`ref-*-complex-py-compare` plus the complex arrays in `asdf-demo-strided`
+cover the same ground.
 
 ## Fixtures
 
@@ -78,7 +101,7 @@ zlib/lz4), `c` (int32, 200 values, bzip2/lz4).
 | `structured.asdf` | a record array with per-field byte order, a sub-array field and a `[ucs4, 16]` field, as in Roman skycell reference files |
 | `strings.asdf` | `ascii` and `ucs4` arrays as blocks and inline, including a non-BMP code point |
 | `masked.asdf` | an ndarray `mask`, which asdf-cxx does not support |
-| `bigendian.asdf` | one block shared by two views, negative and non-contiguous strides, Fortran order, big-endian data, and bool8 |
+| `bigendian.asdf` | one block shared by two views, negative and non-contiguous strides, Fortran order, big-endian data, and bool8. Note that the two views share one block on read but are written as two blocks by a copy |
 | `roman-like.asdf` | the Roman WFI feature set in one file: foreign tags around nested ndarrays, tagged time/unit scalars, a float16 block, a `[ucs4, 16]` structured field, an astropy table with `core/column` entries, a YAML alias, `history.extensions`, standard 1.6.0 |
 
 ### Written as literal text

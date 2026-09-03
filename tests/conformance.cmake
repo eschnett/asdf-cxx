@@ -70,13 +70,12 @@ set(ASDF_REF_SUPPORTED
 set(ASDF_REF_STRINGS ascii unicode_bmp unicode_spp structured)
 # Recognised but deliberately refused
 set(ASDF_REF_UNSUPPORTED exploded stream)
-# Those of ASDF_REF_SUPPORTED whose values asdf-read-check prints; `anchor` and
-# `scalars` hold no arrays
-set(ASDF_REF_VALUES basic complex compressed endian float int shared)
-# Of those, the ones whose values the library reads correctly today. `endian`
-# needs byte-order handling and `shared` needs offset/strides (Phase 1);
-# `complex`, `float` and `int` have big-endian variants (Phase 1).
-set(ASDF_REF_VALUES_NOW basic compressed)
+# Those of ASDF_REF_SUPPORTED whose values asdf-read-check prints against a
+# committed expected output. `anchor` and `scalars` hold no arrays, and
+# `complex.asdf` holds 400 complex numbers whose expected output would be
+# 9 kB -- larger than the whole rest of tests/expected/ -- so it is covered
+# by `-py-compare` and by the complex arrays in `asdf-demo-strided` instead.
+set(ASDF_REF_VALUES basic compressed endian float int shared)
 
 if(ASDF_REFERENCE_FILES_DIR)
   foreach(version ${ASDF_REFERENCE_VERSIONS})
@@ -107,14 +106,13 @@ if(ASDF_REFERENCE_FILES_DIR)
         compare ${compare_options} "${dir}/${name}.asdf" "${copy}")
       asdf_test_depends(${prefix}-py-compare ${prefix}-copy)
 
-      list(FIND ASDF_REF_VALUES_NOW ${name} values_now)
-      if(NOT values_now EQUAL -1)
+      list(FIND ASDF_REF_VALUES ${name} has_values)
+      if(NOT has_values EQUAL -1)
         asdf_add_values_test(${prefix}-values "${name}.txt"
           "${dir}/${name}.asdf")
         asdf_add_values_test(${prefix}-values2 "${name}.txt" "${copy}")
         asdf_test_depends(${prefix}-values2 ${prefix}-copy)
       endif()
-      # Phase 1 switches on -values/-values2 for the rest of ASDF_REF_VALUES.
       # Phase 2 adds ${prefix}-header (the copy's declared version and tags).
     endforeach()
 
@@ -219,10 +217,76 @@ asdf_add_python_test(fixture-alias-py-compare
   compare "${ASDF_TESTS_DIR}/alias.asdf" alias2.asdf)
 asdf_test_depends(fixture-alias-py-compare fixture-alias-copy)
 
+# bigendian.asdf: one block shared by two views, negative and non-contiguous
+# strides, big-endian data, Fortran order, and bool8. The copy and the inline
+# copy must hold the same values as the original.
+add_test(NAME bigendian-ls
+  COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/bigendian.asdf")
+add_test(NAME bigendian-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/bigendian.asdf" bigendian2.asdf)
+add_test(NAME bigendian-ls2 COMMAND ./asdf-ls bigendian2.asdf)
+asdf_test_depends(bigendian-ls2 bigendian-copy)
+add_test(NAME bigendian-inline-copy
+  COMMAND ./asdf-copy --array=inline "${ASDF_TESTS_DIR}/bigendian.asdf"
+  bigendian-inline.asdf)
+asdf_add_values_test(values-bigendian bigendian.txt
+  "${ASDF_TESTS_DIR}/bigendian.asdf")
+asdf_add_values_test(values-bigendian2 bigendian.txt bigendian2.asdf)
+asdf_test_depends(values-bigendian2 bigendian-copy)
+asdf_add_values_test(values-bigendian-inline bigendian.txt
+  bigendian-inline.asdf)
+asdf_test_depends(values-bigendian-inline bigendian-inline-copy)
+asdf_add_python_test(py-compare-bigendian
+  compare "${ASDF_TESTS_DIR}/bigendian.asdf" bigendian2.asdf)
+asdf_test_depends(py-compare-bigendian bigendian-copy)
+asdf_add_python_test(py-compare-bigendian-inline
+  compare "${ASDF_TESTS_DIR}/bigendian.asdf" bigendian-inline.asdf)
+asdf_test_depends(py-compare-bigendian-inline bigendian-inline-copy)
+
+# float16.asdf: Roman WFI level-2 products store float16 arrays. Reading,
+# copying and extracting the values of a float16 block must work on every
+# build, including one without `_Float16`.
+add_test(NAME float16-ls COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/float16.asdf")
+add_test(NAME float16-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/float16.asdf" float16-2.asdf)
+add_test(NAME float16-ls2 COMMAND ./asdf-ls float16-2.asdf)
+asdf_test_depends(float16-ls2 float16-copy)
+asdf_add_values_test(values-float16 float16.txt
+  "${ASDF_TESTS_DIR}/float16.asdf")
+asdf_add_values_test(values-float16-2 float16.txt float16-2.asdf)
+asdf_test_depends(values-float16-2 float16-copy)
+# py-compare-float16 waits for Phase 2: the copy declares standard 1.2.0 but
+# needs core/ndarray-1.1.0 tags for its float16 datatype, so Python rejects
+# it against the 1.0.0 ndarray schema.
+
+# float16-inline.asdf holds the same array inline, which needs the C++ type
+# to parse the values
+if(ASDF_HAVE_FLOAT16)
+  add_test(NAME float16-inline-ls
+    COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/float16-inline.asdf")
+  asdf_add_values_test(values-float16-inline float16.txt
+    "${ASDF_TESTS_DIR}/float16-inline.asdf")
+endif()
+
+# Python must be able to read what asdf-demo-strided writes: arrays with an
+# offset, with negative strides, in Fortran order and in the other byte order
+asdf_add_python_test(py-validate-strided validate ${ASDF_WRITTEN_TAGS}
+  strided.asdf)
+asdf_test_depends(py-validate-strided demo-strided)
+# (the test names avoid a leading "copy-", whose "py-" would show up in the
+# `ctest -N | grep -c 'ref-\|py-'` check for a plain configure)
+add_test(NAME strided-copy COMMAND ./asdf-copy strided.asdf strided2.asdf)
+set_tests_properties(strided-copy PROPERTIES DEPENDS demo-strided)
+add_test(NAME strided-ls2 COMMAND ./asdf-ls strided2.asdf)
+asdf_test_depends(strided-ls2 strided-copy)
+asdf_add_python_test(py-compare-strided
+  compare strided.asdf strided2.asdf)
+asdf_test_depends(py-compare-strided strided-copy)
+
 # The remaining fixtures are switched on by the phase that makes them work:
 #
-#   Phase 1   float16.asdf, float16-inline.asdf, bigendian.asdf
 #   Phase 1b  structured.asdf, strings.asdf
+#   Phase 2   py-compare-float16
 #   Phase 3   masked.asdf (must become an error; it is silently read today),
 #             unknown-tags.asdf, untagged-root.asdf, roman-like.asdf
 #

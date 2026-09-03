@@ -118,6 +118,25 @@ int run(int argc, char **argv) {
       vector<int64_t>{nrecords});
   grp->emplace("thetab", record_arrayb);
 
+  // The same records as a compressed block. blosc and blosc2 need an item
+  // size for their shuffle filter, and a structured datatype has no scalar
+  // type id, so this is the case that used to throw while writing. Repeat
+  // the records often enough that compression actually pays off, otherwise
+  // `write_block` falls back to storing them uncompressed.
+  const int64_t nrepeat = 32;
+  vector<unsigned char> record_data_many;
+  record_data_many.reserve(nrepeat * record_data.size());
+  for (int64_t r = 0; r < nrepeat; ++r)
+    record_data_many.insert(record_data_many.end(), record_data.begin(),
+                            record_data.end());
+  auto record_array_compressed = make_shared<ndarray>(
+      make_constant_memoized(shared_ptr<block_t>(
+          make_shared<typed_block_t<unsigned char>>(record_data_many))),
+      optional<block_info_t>(), block_format_t::block, blosc_or_zlib, 9,
+      vector<bool>(), record_datatype, host_byteorder(),
+      vector<int64_t>{nrepeat * nrecords});
+  grp->emplace("thetac", record_array_compressed);
+
   auto seq = make_shared<sequence>();
   seq->emplace_back(array0d);
   seq->emplace_back(array1d);
