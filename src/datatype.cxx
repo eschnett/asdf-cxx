@@ -149,6 +149,13 @@ size_t get_scalar_type_size(scalar_type_id_t scalar_type_id) {
 
 void yaml_decode(const YAML::Node &node,
                  ASDF::scalar_type_id_t &scalar_type_id) {
+  // Only the plain type names live here. The string types are written as the
+  // two-element sequence `[ascii, N]` and a structured type as a list of
+  // fields; both are handled by `datatype_t(rs, node)`.
+  ASDF_CHECK(node.IsScalar(),
+             "A scalar datatype must be a type name; the string form "
+             "[ascii, N] / [ucs4, N] and structured field lists are decoded "
+             "by datatype_t");
   string str = node.Scalar();
   if (str == "bool8")
     scalar_type_id = id_bool8;
@@ -184,11 +191,12 @@ void yaml_decode(const YAML::Node &node,
     scalar_type_id = id_complex64;
   else if (str == "complex128")
     scalar_type_id = id_complex128;
-  else {
-    // case id_ascii
-    // case id_ucs4
+  else if (str == "ascii" || str == "ucs4")
+    ASDF_ERROR("The " + str +
+               " datatype must be written as the two-element form [" + str +
+               ", N], not as a bare type name");
+  else
     ASDF_ERROR("Unknown datatype \"" + str + "\"");
-  }
 }
 
 YAML::Node yaml_encode(scalar_type_id_t scalar_type_id) {
@@ -245,8 +253,11 @@ YAML::Node yaml_encode(scalar_type_id_t scalar_type_id) {
   case id_complex128:
     node = "complex128";
     break;
-    // case id_ascii
-    // case id_ucs4
+  case id_ascii:
+  case id_ucs4:
+    // These need their length, which only `datatype_t` knows
+    ASDF_ERROR("Encoding the ascii or ucs4 datatype requires its length; use "
+               "datatype_t::to_yaml()");
   default:
     ASDF_ERROR("Cannot encode invalid scalar type id " +
                std::to_string(int(scalar_type_id)));
@@ -814,10 +825,20 @@ datatype_t::datatype_t(const shared_ptr<reader_state> &rs,
   if (node.size() == 2 && node[0].IsScalar() && node[1].IsScalar() &&
       (node[0].Scalar() == "ascii" || node[0].Scalar() == "ucs4")) {
     is_scalar = true;
-    scalar_type_id = node[0].Scalar() == "ascii" ? id_ascii : id_ucs4;
+    const string &name = node[0].Scalar();
+    scalar_type_id = name == "ascii" ? id_ascii : id_ucs4;
+    // yaml-cpp would report its own "bad conversion" for a length that is
+    // not a number, which says nothing about the datatype
     int64_t length;
-    yaml_decode(node[1], length);
-    ASDF_CHECK(length >= 0, "String length must not be negative");
+    try {
+      length = node[1].as<int64_t>();
+    } catch (const YAML::Exception &) {
+      length = -1;
+    }
+    ASDF_CHECK(length >= 0, "The length of the " + name +
+                                " datatype must be a non-negative integer, "
+                                "not \"" +
+                                node[1].Scalar() + "\"");
     string_length = size_t(length);
     // Reject a length whose element size does not fit
     type_size();

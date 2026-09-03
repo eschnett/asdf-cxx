@@ -323,12 +323,23 @@ asdf_add_python_test(py-compare-structured
   compare "${ASDF_TESTS_DIR}/structured.asdf" structured2.asdf)
 asdf_test_depends(py-compare-structured structured-copy)
 
-# bad-field-shape.asdf: a structured field whose sub-array shape multiplies to
-# 2**64. Unchecked, that gives an element size of zero, which passes the array
-# bounds check and only trips up much later.
+# Datatypes that a file may claim but that no writer produces. Each has to be
+# refused with an ASDF::error naming the problem, not with a yaml-cpp message
+# or a bounds-checked container throwing `vector`.
+#
+#   bad-field-shape    a structured field whose sub-array shape multiplies to
+#                      2**64; unchecked, that gives an element size of zero
+#   zero-size-datatype `[ascii, 0]`, the other route to a zero element size
+#   bad-string-length  `[ucs4, abc]`, a length that is not a number
 add_test(NAME error-bad-field-shape
   COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m shape
   ./asdf-ls "${ASDF_TESTS_DIR}/bad-field-shape.asdf")
+add_test(NAME error-zero-size-datatype
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m "zero size"
+  ./asdf-ls "${ASDF_TESTS_DIR}/zero-size-datatype.asdf")
+add_test(NAME error-bad-string-length
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m "ucs4 datatype must be"
+  ./asdf-ls "${ASDF_TESTS_DIR}/bad-string-length.asdf")
 
 # The remaining fixtures are switched on by the phase that makes them work:
 #

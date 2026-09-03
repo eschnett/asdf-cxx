@@ -125,6 +125,25 @@ phases below and repeated in those sections.
 - Nothing was removed from the error-message contract: it never had
   `ascii`/`ucs4` rows.
 
+Review of Phase 1b found four non-blocking issues, all fixed in the same PR:
+
+- A **zero-size datatype** was the second route to the `vector` failure the
+  Phase 1 review described: `[ascii, 0]` or `[ucs4, 0]` (and, already on
+  `main`, an empty field list `datatype: []`) gives `type_size() == 0`, so
+  every element occupies no bytes, `check_bounds` holds against any block,
+  and `get_data_bytes` threw `std::out_of_range("vector")` from its own
+  result. `ndarray::check_bounds` now rejects a zero-size datatype for an
+  array that has elements; `tests/zero-size-datatype.asdf` covers it.
+- `yaml_decode(scalar_type_id_t)` gained the `ASDF_CHECK(node.IsScalar())`
+  the plan asked for, and names the two-element form when it sees a bare
+  `ascii` / `ucs4` type name.
+- `yaml_encode(scalar_type_id_t)` gained the explicit `id_ascii`/`id_ucs4`
+  cases its three siblings had, pointing the caller at
+  `datatype_t::to_yaml()`.
+- `[ucs4, abc]` reported yaml-cpp's `bad conversion`; the length is now
+  parsed defensively and reported at datatype level
+  (`tests/bad-string-length.asdf`).
+
 ---
 
 ## Context

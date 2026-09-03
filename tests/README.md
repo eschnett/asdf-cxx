@@ -122,7 +122,12 @@ that also pins the exact spelling that a copy has to preserve.
 `python-default.asdf` by the fixture script. `bad-field-shape.asdf` gives
 one array a structured field whose sub-array `shape` multiplies to 2^64,
 which an unchecked element-size computation would turn into zero; it has no
-block index, because the longer datatype moves every block. The `error-*` tests run `asdf-ls` or `asdf-copy` on them
+block index, because the longer datatype moves every block.
+`zero-size-datatype.asdf` (`[ascii, 0]`) and `bad-string-length.asdf`
+(`[ucs4, abc]`) are written as literal text; they are datatypes a file may
+claim but no writer produces, and each must be refused with an
+`ASDF::error` naming the problem rather than with a yaml-cpp message or a
+bounds-checked container throwing `vector`. The `error-*` tests run `asdf-ls` or `asdf-copy` on them
 through `expect-error.sh`, which requires exit status 1 and an `error:`
 message on stderr, so a crash does not count as passing.
 `error-checksum` only runs when asdf-cxx was built with OpenSSL.

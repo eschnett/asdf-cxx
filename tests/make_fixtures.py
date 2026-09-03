@@ -306,6 +306,34 @@ b: *f
 c: [*f]
 ...
 """,
+    # A datatype of zero size. Every element then occupies no bytes, so the
+    # array bounds check holds for any block; numpy normalises `S0` to `S1`,
+    # so only a hand-written file can say this.
+    "zero-size-datatype.asdf": """\
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+empty: !core/ndarray-1.0.0
+  data: ["", ""]
+  datatype: [ascii, 0]
+  shape: [2]
+...
+""",
+    # A string datatype whose length is not a number
+    "bad-string-length.asdf": """\
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+bad: !core/ndarray-1.0.0
+  data: [x]
+  datatype: [ucs4, abc]
+  shape: [1]
+...
+""",
     # An untagged root, which the standard allows
     "untagged-root.asdf": """\
 #ASDF 1.0.0

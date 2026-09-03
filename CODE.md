@@ -323,6 +323,12 @@ and returns `{memoized<block_t>, block_info_t}` (§5.2).
   gives an element size of zero, which passes every later bounds check).
   `convert_field_to_host` uses the same checked count. In inline data a
   structured element is a YAML sequence with one entry per field.
+- A datatype of **zero size** — an empty field list, or `[ascii, 0]` —
+  cannot describe an array that has elements: every element would occupy no
+  bytes, so the array bounds check would hold against any block and the
+  extraction loop would index past the end of its own result.
+  `ndarray::check_bounds` rejects it (an array with no elements at all is
+  still fine). Guard any new element-size arithmetic the same way.
 
 ### 4.5 `reader_state`, `writer`, `copy_state` (`io.hxx`, `src/io.cxx`)
 
