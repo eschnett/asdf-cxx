@@ -69,6 +69,26 @@ done), gating `copy-compression-*` on `ASDF_PYTHON`, a second bug in
   `py-compare-strided`, which prove that Python asdf reads what
   `asdf-demo-strided` writes.
 
+**Review of Phase 1** (2026-09-03) found two pre-existing gaps that the new
+tests made visible. Neither blocked the merge; they are assigned to the
+phases below and repeated in those sections.
+
+- Structured field sizes are not overflow-checked. `field_t::type_size()`
+  multiplies the sub-array extents in unchecked `size_t` arithmetic and the
+  field-count loop in `convert_field_to_host` in unchecked `int64_t`. A file
+  whose field shape multiplies to 2^64 gets an element size of 0, passes
+  `check_bounds`, and is only stopped by a bounds-checked `vector` access
+  (exit status 1, message `vector`). Fix in Phase 1b, which touches this
+  code anyway.
+- Complex NaN and infinity do not round-trip through inline form.
+  `yaml_encode_complex` spells them the yaml-cpp way (`.nan+.nani`), which
+  the `complex-1.0.0` schema does not allow (`nan`, `inf`, `-inf`, no
+  leading dot) and which asdf-cxx's own `yaml_decode_complex` rejects with
+  "Cannot parse complex number". `asdf-copy --array=inline` of the reference
+  `complex.asdf` therefore produces a file neither asdf-cxx nor Python can
+  read. Fix in Phase 4, which reworks complex emission; the reader should
+  accept both spellings.
+
 ---
 
 ## Context
@@ -519,6 +539,16 @@ Files: `include/asdf/datatype.hxx`, `src/datatype.cxx`, `src/ndarray.cxx`.
   `get_data_bytes()`.
 - Remove the `ascii`/`ucs4` rows from the error contract; update README's
   "String types are not supported" bullet.
+- **Checked arithmetic for structured field sizes** (Phase 1 review
+  finding). `field_t::type_size()` must reject a sub-array shape whose
+  product, or whose product with the field's element size, does not fit
+  (mirroring `num_elements()`/`packed_nbytes()`), and the field-count loop
+  in `convert_field_to_host` must use the same checked count. Test: a
+  fixture derived from `python-default.asdf` whose array `a` has
+  `datatype: [{name: f, datatype: uint8, shape: [4294967296, 4294967296]}]`
+  must be refused by `asdf-ls` with a message naming the field shape
+  (`expect-error.sh -m shape`), not accepted and later tripped up in
+  `asdf-read-check`.
 
 **Tests switched on / added.** Reference files `ascii`, `unicode_bmp`,
 `unicode_spp`, `structured` move from unsupported to supported for all
@@ -759,6 +789,20 @@ instead of `- !<tag:stsci.edu:asdf/core/complex-1.0.0> 1+0i`. Verify
 flow-style propagation and `.inf`/`.nan` scalars; `compare-demo` must still
 pass; `check-header.sh demo.asdf --present "!core/complex-1.0.0 1+0i" --absent
 "!<tag:"`.
+
+**Complex NaN and infinity** (Phase 1 review finding). `yaml_encode_complex`
+and the writer's `operator<<` for `std::complex` must spell non-finite
+components as the `complex-1.0.0` schema requires: `nan`, `inf`, `-inf`
+(no leading dot; the schema's pattern accepts `inf|INF|nan|NAN`), giving
+for example `nan+infi` and `1.5-infi`. `yaml_decode_complex` must accept
+both that spelling and yaml-cpp's `.nan`/`.inf`/`-.inf`, so files written by
+earlier asdf-cxx versions stay readable. Tests: add a NaN and an infinite
+element to the complex arrays in `asdf-demo-strided` (block and inline);
+register `ref-<v>-complex-inline-copy` (`asdf-copy --array=inline`) followed
+by `ref-<v>-complex-inline-ls` and `ref-<v>-complex-inline-py-compare` (the
+reference `complex.asdf` contains nan/inf/-0.0 combinations); the Python
+comparison is the proof that the spelling is what the reference
+implementation parses.
 
 ---
 
