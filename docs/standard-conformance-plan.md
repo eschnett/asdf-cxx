@@ -337,6 +337,23 @@ known gap 9 in CODE.md. **Fixed in Phase 4** (PR #26).
   `check_float_spelling`, which assert the exact emitted text and that both
   complex spellings parse.
 
+Review of Phase 4 found one issue, fixed in the same PR:
+
+- **A float whose shortest spelling carries an exponent was still retyped**,
+  to a *string* rather than to an integer. The first `format_float` appended
+  `.0` only when every character after the sign was a digit, so `1e+17` and
+  `3e-10` were left as yaml-cpp wrote them -- and YAML 1.1 resolves a scalar
+  to a float only if its mantissa carries a decimal point, so Python asdf
+  read them back as `str`. This is the same defect the phase set out to
+  close, in a different spelling, and equally pre-existing on `main`. The
+  `.0` now goes before the exponent (`1.0e+17`), which is what Python asdf
+  writes itself. Inline float array elements were unaffected in practice,
+  because the array's declared `datatype` governs parsing; the impact was on
+  tree and metadata scalars. `tests/scalar-types.asdf` gained `bigfloat`
+  and `smallfloat`, asserted in `header-scalar-types-copy` and caught by
+  `py-compare-scalar-types`, and `check_float_spelling` gained six exponent
+  cases.
+
 ---
 
 ## Context

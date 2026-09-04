@@ -383,10 +383,15 @@ complex array — has to take this path. `ndarray::to_yaml` uses it for the
 Two spelling helpers in `io.hxx` decide how a floating-point value is
 written; both are templates, so the `writer` overloads and
 `src/datatype.cxx` share them:
-- `format_float(v)` is yaml-cpp's spelling plus a trailing `.0` when the
-  value has no fractional part. Without it a metadata scalar written
-  `1.0` copies out as `1` and is read back as an integer, and so is every
-  element of an inline float array.
+- `format_float(v)` is yaml-cpp's spelling with a `.0` added when the
+  mantissa is digits only, before an exponent if there is one: `1` becomes
+  `1.0`, `1e+17` becomes `1.0e+17`. YAML 1.1 resolves a scalar to a float
+  only if its mantissa carries a decimal point, so without this a metadata
+  scalar written `1.0` copies out as `1` and is read back as an integer,
+  and one written `3.0e-10` copies out as `3e-10` and is read back as a
+  string. Inline float array elements go through the same spelling
+  (there the array's `datatype` governs parsing, so only the tree scalars
+  actually depend on it).
 - `format_complex(v)` is `<real><sign><imag>i`, with the non-finite
   components written `inf`, `-inf` and `nan`. That is what the
   `core/complex-1.0.0` grammar's pattern accepts; YAML's own `.inf` /

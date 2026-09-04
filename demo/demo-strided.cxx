@@ -168,8 +168,20 @@ void check_float_spelling() {
     const auto bytes = htox(value, host_byteorder());
     return emit_scalar(bytes.data(), id_float64, host_byteorder()).Scalar();
   };
+  // A mantissa of digits only is not a float to a YAML 1.1 reader, with or
+  // without an exponent: `1` is an integer and `1e+17` is a string
   const vector<pair<float64_t, string>> spellings{
-      {1.0, "1.0"}, {-2.0, "-2.0"}, {0.0, "0.0"}, {-0.0, "-0.0"}, {1.5, "1.5"}};
+      {1.0, "1.0"},
+      {-2.0, "-2.0"},
+      {0.0, "0.0"},
+      {-0.0, "-0.0"},
+      {1.5, "1.5"},
+      {1e17, "1.0e+17"},
+      {-1e17, "-1.0e+17"},
+      {3e-10, "3.0e-10"},
+      {1e308, "1.0e+308"},
+      {1e5, "100000.0"},
+      {1e-5, "1.0000000000000001e-05"}};
   for (const auto &[value, text] : spellings) {
     const string emitted = emit(value);
     ASDF_CHECK(emitted == text, "float spelling: emitted \"" + emitted +

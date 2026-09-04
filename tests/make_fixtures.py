@@ -389,8 +389,10 @@ tool: !core/software-1.0.0 {name: foo}
     # Scalars whose YAML spelling decides their type. A quoted scalar is a
     # string however it looks; a plain `y` or `n` is a string too, because
     # that is what the reference implementation's parser resolves it to; a
-    # plain `1.0` is a float and must not come back as an int. An inline
-    # array may omit `shape`, which is inferred from the data.
+    # plain `1.0` is a float and must not come back as an int, and neither
+    # may `1.0e+17` come back as a string (YAML 1.1 resolves a float only
+    # with a decimal point in the mantissa). An inline array may omit
+    # `shape`, which is inferred from the data.
     "scalar-types.asdf": """\
 #ASDF 1.0.0
 #ASDF_STANDARD 1.5.0
@@ -409,6 +411,8 @@ plain:
   bool: true
   float: 1.0
   negfloat: -2.0
+  bigfloat: 1.0e+17
+  smallfloat: 3.0e-10
   axes: [x, y, n]
 noshape: !core/ndarray-1.0.0
   data: [1, 2, 3]

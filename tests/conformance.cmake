@@ -757,8 +757,10 @@ asdf_test_depends(py-compare-roman-like roman-like-copy)
 # scalar-types.asdf: the YAML spelling of a scalar decides its type, and a
 # copy must not retype it. A quoted scalar is a string however it looks; a
 # plain `y` or `n` is a string too, because that is what PyYAML resolves it to
-# (yaml-cpp follows the YAML 1.1 type repository and would say `true`). The
-# fixture also has an inline array with no `shape`, which is inferred.
+# (yaml-cpp follows the YAML 1.1 type repository and would say `true`). A
+# float needs a decimal point in its mantissa to stay a float, with an
+# exponent as much as without one. The fixture also has an inline array with
+# no `shape`, which is inferred.
 add_test(NAME scalar-types-ls
   COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/scalar-types.asdf")
 add_test(NAME scalar-types-copy
@@ -771,6 +773,7 @@ asdf_add_header_test(header-scalar-types-copy scalar-types2.asdf
   --present "exponent: \"1e3\"" --present "no: \"no\""
   --present "- \"y\"" --present "- \"n\""
   --present "float: 1.0" --present "negfloat: -2.0"
+  --present "bigfloat: 1.0e+17" --present "smallfloat: 3.0e-10"
   --present "shape: [3]")
 asdf_test_depends(header-scalar-types-copy scalar-types-copy)
 asdf_add_python_test(py-compare-scalar-types

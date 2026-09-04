@@ -113,17 +113,24 @@ template <typename T> string emit_float(T value) {
 }
 } // namespace detail
 
-// The YAML spelling of a floating-point value. An integral value keeps a
-// trailing `.0`, so that a metadata scalar written `1.0`, and the elements of
-// an inline float array, are read back as floats and not as integers.
+// The YAML spelling of a floating-point value. YAML 1.1 resolves a scalar to
+// a float only if its mantissa carries a decimal point, so a mantissa of
+// digits only gains a `.0`: `1` becomes `1.0` and `1e+17` becomes `1.0e+17`.
+// Without it a metadata scalar written `1.0` copies out as `1` and is read
+// back as an integer, and one written `3.0e-10` copies out as `3e-10` and is
+// read back as a string.
 template <typename T> string format_float(T value) {
   string str = detail::emit_float(value);
-  const size_t start = !str.empty() && (str[0] == '-' || str[0] == '+') ? 1 : 0;
-  bool integral = start < str.size();
-  for (size_t i = start; i < str.size(); ++i)
+  // Everything before an `e`/`E` exponent; the whole string when there is
+  // none. `.inf` and `.nan` have a dot and are left alone.
+  const size_t mantissa = str.find_first_of("eE");
+  const size_t end = mantissa == string::npos ? str.size() : mantissa;
+  const size_t start = end > 0 && (str[0] == '-' || str[0] == '+') ? 1 : 0;
+  bool integral = start < end;
+  for (size_t i = start; i < end; ++i)
     integral = integral && str[i] >= '0' && str[i] <= '9';
   if (integral)
-    str += ".0";
+    str.insert(end, ".0");
   return str;
 }
 
