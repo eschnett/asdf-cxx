@@ -351,8 +351,13 @@ Review of Phase 4 found one issue, fixed in the same PR:
   because the array's declared `datatype` governs parsing; the impact was on
   tree and metadata scalars. `tests/scalar-types.asdf` gained `bigfloat`
   and `smallfloat`, asserted in `header-scalar-types-copy` and caught by
-  `py-compare-scalar-types`, and `check_float_spelling` gained six exponent
-  cases.
+  `py-compare-scalar-types`, and `check_float_spelling` gained exponent
+  cases. How many digits yaml-cpp prints is its own business and differs
+  between its versions (the CI machines' yaml-cpp spells `1e-5` with 16
+  significant digits, the maintainer's with 17), so `check_float_spelling`
+  asserts an exact text only for values whose shortest decimal is the same
+  at every precision, and checks the others for the property this library
+  owes: a decimal point in the mantissa.
 
 ---
 

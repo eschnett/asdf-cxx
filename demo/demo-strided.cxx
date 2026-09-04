@@ -161,31 +161,41 @@ void check_complex_spelling() {
   cout << "  complex spelling ok\n";
 }
 
-// A plain float keeps its fractional part, so that a reader does not turn it
-// into an integer
+// A plain float keeps a decimal point in its mantissa, so that a reader does
+// not turn it into an integer or a string
 void check_float_spelling() {
   const auto emit = [](float64_t value) {
     const auto bytes = htox(value, host_byteorder());
     return emit_scalar(bytes.data(), id_float64, host_byteorder()).Scalar();
   };
+
   // A mantissa of digits only is not a float to a YAML 1.1 reader, with or
-  // without an exponent: `1` is an integer and `1e+17` is a string
+  // without an exponent: `1` is an integer and `1e+17` is a string. These
+  // values have the same shortest decimal spelling at every precision a
+  // yaml-cpp build might print with.
   const vector<pair<float64_t, string>> spellings{
-      {1.0, "1.0"},
-      {-2.0, "-2.0"},
-      {0.0, "0.0"},
-      {-0.0, "-0.0"},
-      {1.5, "1.5"},
-      {1e17, "1.0e+17"},
-      {-1e17, "-1.0e+17"},
-      {3e-10, "3.0e-10"},
-      {1e308, "1.0e+308"},
-      {1e5, "100000.0"},
-      {1e-5, "1.0000000000000001e-05"}};
+      {1.0, "1.0"},        {-2.0, "-2.0"},     {0.0, "0.0"},
+      {-0.0, "-0.0"},      {1.5, "1.5"},       {1e17, "1.0e+17"},
+      {-1e17, "-1.0e+17"}, {3e-10, "3.0e-10"}, {1e308, "1.0e+308"},
+      {1e5, "100000.0"},   {1e-4, "0.0001"}};
   for (const auto &[value, text] : spellings) {
     const string emitted = emit(value);
     ASDF_CHECK(emitted == text, "float spelling: emitted \"" + emitted +
                                     "\", expected \"" + text + "\"");
+  }
+
+  // How many digits yaml-cpp prints is its own business and differs between
+  // its versions, so these values are checked for the property this library
+  // owes instead of for an exact text
+  for (const float64_t value :
+       {1e-5, 1.5e-30, 1e-308, 0.1, std::numeric_limits<float64_t>::max(),
+        std::numeric_limits<float64_t>::min()}) {
+    const string text = emit(value);
+    const size_t exponent = text.find_first_of("eE");
+    ASDF_CHECK(text.substr(0, exponent).find('.') != string::npos,
+               "float spelling: \"" + text +
+                   "\" has no decimal point in its mantissa, so YAML 1.1 "
+                   "does not resolve it as a float");
   }
   cout << "  float spelling ok\n";
 }
