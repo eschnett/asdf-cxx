@@ -486,8 +486,11 @@ mapping becomes an entry, `history` included. Each value goes through
 2. **Null** node → `null_entry`.
 3. **Scalar**: a node carrying a tag this library does not interpret
    becomes a `string_entry` holding the scalar text verbatim, with the
-   `plain` flag set (see below). An untagged scalar is typed: try
-   `as<bool>`, then `as<int64_t>`, then `as<double>`, else `string_entry`.
+   `plain` flag set (see below). A *quoted* scalar, which yaml-cpp reports
+   under the non-specific tag `!`, becomes a `string_entry` whatever it
+   looks like, so `"42"` is not read back as an integer. A plain scalar is
+   typed: try `as<bool>`, then `as<int64_t>`, then `as<double>`, else
+   `string_entry`.
 4. **Sequence** → `sequence`.
 5. **Map** with a `$ref` key → `reference_entry`, otherwise `group`.
 
@@ -517,10 +520,15 @@ gains no quotes.
 flavour this library does not know, its block is not copied, and the
 `source` index in the copy would point at an unrelated block.
 
-Untagged scalars are read with yaml-cpp's own conversions, with one
+Plain scalars are read with yaml-cpp's own conversions, with one
 exception: a bare `y` or `n` is *not* a boolean. yaml-cpp follows the
 YAML 1.1 type repository here, PyYAML does not, and the difference would
 turn an axis name `y` into `true` on a copy.
+
+yaml-cpp's const `operator[]` returns an *invalid* node for a missing
+key, and every type query on it except `IsDefined()` throws
+`invalid node; first invalid key: "…"`. Always ask `IsDefined()` first,
+or the intended `ASDF_CHECK` never gets to run.
 
 ### 5.4 `ndarray(rs, node)`
 
@@ -842,26 +850,35 @@ literal `{…}` directory; harmless.
    accepts it.
 8. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).
-9. **A tagged scalar spelled `~` comes back quoted.** Its text is stored
+9. **A plain float scalar in the tree loses its type on a copy.** A
+    metadata value written `1.0` is emitted as `1`, because
+    `yaml_encode(float64_t)` hands yaml-cpp a double and yaml-cpp drops
+    the fractional part. The value is unchanged, but Python asdf reads
+    the copy's `1` as an `int`. The same `yaml_encode` overloads spell
+    the elements of inline float arrays, so the fix belongs with Phase 4,
+    which reworks scalar emission (`emit_node`, the complex spelling)
+    rather than splitting the decision across two phases. Quoted strings
+    and plain `y`/`n` scalars are unaffected (§5.3).
+10. **A tagged scalar spelled `~` comes back quoted.** Its text is stored
     and re-emitted, and yaml-cpp quotes `~` so that it stays a string.
     The file is stable under further copies, but the null-ness of a
     tagged null is not preserved. No ASDF schema uses one.
-10. Blosc and blosc2 code paths compile only where those libraries are
+11. Blosc and blosc2 code paths compile only where those libraries are
     found. CI requires them (`ASDF_REQUIRE_ALL_DEPENDENCIES`), but a
     development machine without them silently skips those paths, so guard
     demo usage with `have_compression_blosc()` and test with both. blosc2
     needs `blosc2_init()` before its schunk API; `ndarray.cxx` does this
     once per process.
-11. **External:** Python asdf 5.3 with numpy 2 cannot read inline
+12. **External:** Python asdf 5.3 with numpy 2 cannot read inline
     structured arrays, its own included. Block-format structured arrays
     round-trip fine. Keep `demo.asdf` free of inline structured arrays.
-12. **A block shared by two arrays is duplicated on copy.** Two
+13. **A block shared by two arrays is duplicated on copy.** Two
     `ndarray`s can describe different views of one block
     (asdf-standard's `shared.asdf` does), and both read correctly, but
     each registers its own write task, so the copy holds two independent
     blocks with the same content. Deduplicating would mean keying
     `writer::add_task` on the memoized state pointer.
-13. **External:** Python asdf cannot read an inline complex array that
+14. **External:** Python asdf cannot read an inline complex array that
     contains NaN or infinity. yaml-cpp emits the YAML 1.1 spellings
     `.nan` / `.inf`, which Python's `core/complex-1.0.0` parser rejects,
     so the tagged scalars come back as plain strings and validation

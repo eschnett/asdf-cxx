@@ -98,9 +98,11 @@ software::software(const std::shared_ptr<reader_state> &rs,
   ASDF_CHECK(node.IsMap(), "A core/software entry must be a mapping");
   ASDF_CHECK(classify_core_tag(node.Tag()) == core_tag_t::software,
              "Expected tag core/software-1.0.0, found \"" + node.Tag() + "\"");
-  ASDF_CHECK(node["name"].IsScalar(),
+  // `IsDefined()` first: a type query on the invalid node yaml-cpp returns
+  // for a missing key throws before the check can report anything
+  ASDF_CHECK(node["name"].IsDefined() && node["name"].IsScalar(),
              "A core/software entry must have a \"name\"");
-  ASDF_CHECK(node["version"].IsScalar(),
+  ASDF_CHECK(node["version"].IsDefined() && node["version"].IsScalar(),
              "A core/software entry must have a \"version\"");
   name = node["name"].Scalar();
   author = node["author"] ? node["author"].Scalar() : "";
@@ -247,6 +249,10 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
   // node under it: the standard requires an unknown extension to survive a
   // round trip undeserialised.
   const bool have_tag = !is_trivial_tag(tag);
+  // yaml-cpp reports the non-specific tag `!` for a quoted scalar and `?` for
+  // a plain one. A quoted scalar is a string by construction, whatever it
+  // looks like, so `"42"` must not be read back as an integer.
+  const bool quoted_scalar = tag == "!";
 
   // Next look at the node type.
   const auto make_untagged = [&]() -> std::shared_ptr<entry> {
@@ -260,8 +266,11 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
       if (have_tag)
         return std::make_shared<string_entry>(node.Scalar(), true);
 
-      // An untagged scalar can be a bool, an int, a float, or a string. Try
-      // in this order.
+      if (quoted_scalar)
+        return std::make_shared<string_entry>(node.Scalar());
+
+      // A plain scalar can be a bool, an int, a float, or a string. Try in
+      // this order.
       if (is_bool_spelling(node.Scalar())) {
         const auto bool8 = try_parse_yaml<bool>(node);
         if (bool8)

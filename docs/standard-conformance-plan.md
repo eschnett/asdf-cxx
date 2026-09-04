@@ -268,6 +268,36 @@ Review of Phase 2 found four issues, all fixed in the same PR:
   3c asks. Nothing else in 3c changed the accepted root tags beyond what is
   written there.
 
+Review of Phase 3 found three issues, all fixed in the same PR:
+
+- **An inline array without `shape` was refused.** The new streamed-array
+  check called `node["shape"].IsSequence()` on a const node, and yaml-cpp's
+  const `operator[]` returns an invalid node for a missing key whose type
+  queries throw. `shape` is optional for an inline array (it is inferred from
+  the data), so a legal file failed with exactly the kind of yaml-cpp message
+  this phase set out to eliminate. `IsDefined()` is now asked first.
+- **The two new `software` checks never fired for a missing key**, for the
+  same reason: the invalid node threw before the `ASDF_CHECK` could report
+  anything. This matters more now that `history` is preserved, because every
+  `core/software` inside `history.extensions` goes through this constructor.
+  `tests/bad-software.asdf` covers it.
+- **Quoted strings were retyped on a copy** (`"42"` to `42`, `"1.0"` to `1`,
+  `"true"` to `true`, `"no"` to `false`). This is pre-existing on `main`, but
+  it is the same losslessness problem as the `y`/`n` case above and the
+  information was available: yaml-cpp reports the non-specific tag `!` for a
+  quoted scalar and `?` for a plain one, and `is_trivial_tag` lumped them
+  together. `make_entry` now reads a `!`-tagged scalar as a string, which
+  closes the whole class. `tests/scalar-types.asdf` covers it.
+
+One neighbouring case is **deliberately left for Phase 4**: a plain float
+scalar written `1.0` is emitted as `1`, so Python asdf reads the copy's value
+as an `int`. The `yaml_encode(float32_t/float64_t)` overloads that spell it
+also spell the elements of inline float arrays, so changing them here would
+change the bytes of every file this library writes and would split a spelling
+decision across two phases. Phase 4 already reworks scalar emission
+(`emit_node`, the `nan`/`inf` spelling); this belongs with it. Recorded as
+known gap 9 in CODE.md.
+
 ---
 
 ## Context
@@ -976,6 +1006,15 @@ instead of `- !<tag:stsci.edu:asdf/core/complex-1.0.0> 1+0i`. Verify
 flow-style propagation and `.inf`/`.nan` scalars; `compare-demo` must still
 pass; `check-header.sh demo.asdf --present "!core/complex-1.0.0 1+0i" --absent
 "!<tag:"`.
+
+**Plain float scalars** (Phase 3 review finding). `yaml_encode(float32_t)`
+and `yaml_encode(float64_t)` hand yaml-cpp a C++ floating-point value, which
+it emits without a fractional part when there is none: a metadata scalar
+written `1.0` copies out as `1`, and Python asdf reads it back as an `int`.
+Emit a float that is integral with a trailing `.0` (or route it through the
+same spelling logic as the complex components), so that both tree scalars and
+inline float array elements keep their type. Test: add the case to
+`tests/scalar-types.asdf` and assert it in `header-scalar-types-copy`.
 
 **Complex NaN and infinity** (Phase 1 review finding). `yaml_encode_complex`
 and the writer's `operator<<` for `std::complex` must spell non-finite

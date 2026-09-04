@@ -1,0 +1,20 @@
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+quoted:
+  int: "42"
+  float: "1.0"
+  bool: "true"
+  hex: "0x10"
+  exponent: "1e3"
+  no: "no"
+plain:
+  int: 42
+  bool: true
+  axes: [x, y, n]
+noshape: !core/ndarray-1.0.0
+  data: [1, 2, 3]
+  datatype: int64
+...

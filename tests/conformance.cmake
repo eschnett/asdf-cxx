@@ -683,6 +683,34 @@ asdf_add_python_test(py-compare-roman-like compare --allow-unknown-tags
   "${ASDF_TESTS_DIR}/roman-like.asdf" roman-like2.asdf)
 asdf_test_depends(py-compare-roman-like roman-like-copy)
 
+# scalar-types.asdf: the YAML spelling of a scalar decides its type, and a
+# copy must not retype it. A quoted scalar is a string however it looks; a
+# plain `y` or `n` is a string too, because that is what PyYAML resolves it to
+# (yaml-cpp follows the YAML 1.1 type repository and would say `true`). The
+# fixture also has an inline array with no `shape`, which is inferred.
+add_test(NAME scalar-types-ls
+  COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/scalar-types.asdf")
+add_test(NAME scalar-types-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/scalar-types.asdf" scalar-types2.asdf)
+add_test(NAME scalar-types-ls2 COMMAND ./asdf-ls scalar-types2.asdf)
+asdf_test_depends(scalar-types-ls2 scalar-types-copy)
+asdf_add_header_test(header-scalar-types-copy scalar-types2.asdf
+  --present "int: \"42\"" --present "float: \"1.0\""
+  --present "bool: \"true\"" --present "hex: \"0x10\""
+  --present "exponent: \"1e3\"" --present "no: \"no\""
+  --present "- \"y\"" --present "- \"n\""
+  --present "shape: [3]")
+asdf_test_depends(header-scalar-types-copy scalar-types-copy)
+asdf_add_python_test(py-compare-scalar-types
+  compare "${ASDF_TESTS_DIR}/scalar-types.asdf" scalar-types2.asdf)
+asdf_test_depends(py-compare-scalar-types scalar-types-copy)
+
+# A `core/software` node without the keys the schema requires must be named
+# as such, not tripped up by a yaml-cpp "invalid node" message
+add_test(NAME error-software-incomplete
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m "core/software" -m version
+  ./asdf-ls "${ASDF_TESTS_DIR}/bad-software.asdf")
+
 # Features that are recognised but not supported, and a file that is not there
 add_test(NAME error-masked
   COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m mask -m "not supported"

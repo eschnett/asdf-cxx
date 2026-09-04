@@ -44,6 +44,12 @@ are:
   libraries) are reported by throwing `ASDF::error`. The command line
   tools print the message and exit with status 1.
 
+A scalar's YAML spelling decides its type and survives a copy: a quoted
+scalar stays a string however it looks (`"42"` does not become an
+integer), and a plain `y` or `n` stays a string too, matching what the
+reference implementation's parser resolves it to. A plain float written
+`1.0` is currently emitted as `1`, which Python asdf reads as an integer.
+
 Tags that asdf-cxx does not interpret — an extension's, another
 project's, or a future version of a core tag — are read and written back
 unchanged, with the node under them, so a copy round-trips them

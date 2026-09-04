@@ -976,7 +976,10 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
              "This array has a \"mask\"; masked arrays are not supported");
   // A `*` in the shape marks a streamed array, whose block grows to the end
   // of the file
-  if (node["shape"].IsSequence())
+  // `IsDefined()` first: yaml-cpp's const `operator[]` returns an invalid
+  // node for a missing key, whose other type queries throw. An inline array
+  // may legitimately omit `shape`, which is then inferred from the data.
+  if (node["shape"].IsDefined() && node["shape"].IsSequence())
     for (const auto &extent : node["shape"])
       ASDF_CHECK(!(extent.IsScalar() && extent.Scalar() == "*"),
                  "This array has \"*\" in its shape; streamed arrays are not "

@@ -374,6 +374,44 @@ counts: !core/ndarray-1.0.0
   shape: [3]
 ...
 """,
+    # A core/software node missing the keys its schema requires. Now that
+    # `history` is preserved, every core/software inside history.extensions
+    # goes through the same constructor.
+    "bad-software.asdf": """\
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+tool: !core/software-1.0.0 {name: foo}
+...
+""",
+    # Scalars whose YAML spelling decides their type. A quoted scalar is a
+    # string however it looks; a plain `y` or `n` is a string too, because
+    # that is what the reference implementation's parser resolves it to. An
+    # inline array may omit `shape`, which is inferred from the data.
+    "scalar-types.asdf": """\
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+quoted:
+  int: "42"
+  float: "1.0"
+  bool: "true"
+  hex: "0x10"
+  exponent: "1e3"
+  no: "no"
+plain:
+  int: 42
+  bool: true
+  axes: [x, y, n]
+noshape: !core/ndarray-1.0.0
+  data: [1, 2, 3]
+  datatype: int64
+...
+""",
 }
 
 for name, text in TEXT_FIXTURES.items():
