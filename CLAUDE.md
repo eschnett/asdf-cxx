@@ -49,8 +49,13 @@ columns, 2 spaces).
   `(copy_state, const T&)` for copying, plus `to_yaml(writer&)`. Follow
   this pattern when adding types.
 - Reading dispatches on YAML tag first, then node type, in
-  `make_entry(rs, node)` (`src/entry.cxx`). Tags are compared as exact
-  strings.
+  `make_entry(rs, node)` (`src/entry.cxx`), through
+  `classify_core_tag()`.
+- All core tags come from `include/asdf/version.hxx`. Never write a
+  `core/...` tag anywhere else; `src/version.cxx` is the one table that
+  maps an ASDF standard version to its tags. The version a file is
+  written as comes from `write_options`; `asdf-copy` preserves the
+  input's version by default.
 - Blocks are written lazily: `ndarray::to_yaml` only registers a task
   with `writer::add_task`; the bytes go out in `writer::flush()`, which
   must be called (the destructor asserts on it).

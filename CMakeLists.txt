@@ -149,6 +149,7 @@ set(ASDF_HEADERS
   include/asdf/ndarray.hxx
   include/asdf/reference.hxx
   include/asdf/stl.hxx
+  include/asdf/version.hxx
 )
 set(ASDF_SOURCES
   src/asdf.cxx
@@ -160,6 +161,7 @@ set(ASDF_SOURCES
   src/io.cxx
   src/ndarray.cxx
   src/reference.cxx
+  src/version.cxx
 )
 
 add_library(asdf-cxx ${ASDF_HEADERS} ${ASDF_SOURCES})

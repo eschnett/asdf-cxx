@@ -63,7 +63,9 @@ writer &float_entry::to_yaml(writer &w) const {
 }
 
 writer &complex_entry::to_yaml(writer &w) const {
-  return w << yaml_encode(value);
+  // The writer's `complex` overload emits a local tag from the version table;
+  // `yaml_encode` would go through a `YAML::Node` and emit it verbatim
+  return w << value;
 }
 
 writer &string_entry::to_yaml(writer &w) const {
@@ -73,7 +75,7 @@ writer &string_entry::to_yaml(writer &w) const {
 software::software(const std::shared_ptr<reader_state> &rs,
                    const YAML::Node node) {
   ASDF_CHECK(node.IsMap(), "A core/software entry must be a mapping");
-  ASDF_CHECK(node.Tag() == "tag:stsci.edu:asdf/core/software-1.0.0",
+  ASDF_CHECK(classify_core_tag(node.Tag()) == core_tag_t::software,
              "Expected tag core/software-1.0.0, found \"" + node.Tag() + "\"");
   name = node["name"].Scalar();
   author = node["author"] ? node["author"].Scalar() : "";
@@ -86,7 +88,7 @@ software::software(const copy_state &cs, const software &soft)
       version(soft.version) {}
 
 writer &software::to_yaml(writer &w) const {
-  w << YAML::LocalTag("core/software-1.0.0") << YAML::BeginMap;
+  w << YAML::LocalTag(w.standard().software_tag) << YAML::BeginMap;
   w << YAML::Key << "name" << YAML::Value << name;
   if (!author.empty())
     w << YAML::Key << "author" << YAML::Value << author;
@@ -126,6 +128,12 @@ sequence::sequence(const copy_state &cs, const sequence &from) : sequence() {
     push_back(value->copy(cs));
 }
 
+void sequence::collect_requirements(content_requirements &req,
+                                    const std::string &path) const {
+  for (size_t n = 0; n < entries->size(); ++n)
+    entries->at(n)->collect_requirements(req, path + "/" + std::to_string(n));
+}
+
 writer &sequence::to_yaml(writer &w) const {
   w << YAML::BeginSeq;
   for (const auto &value : *entries)
@@ -146,6 +154,12 @@ group::group(const copy_state &cs, const group &from) : group() {
     insert({key, value->copy(cs)});
 }
 
+void group::collect_requirements(content_requirements &req,
+                                 const std::string &path) const {
+  for (const auto &[key, value] : *entries)
+    value->collect_requirements(req, path + "/" + key);
+}
+
 writer &group::to_yaml(writer &w) const {
   w << YAML::BeginMap;
   for (const auto &[key, value] : *entries)
@@ -161,21 +175,20 @@ std::shared_ptr<entry> make_entry(const std::shared_ptr<reader_state> &rs,
   // First look at the tag. If there is a tag we know what to do.
   const auto tag = node.Tag();
 
-  if (tag == "tag:stsci.edu:asdf/core/complex-1.0.0") {
+  switch (classify_core_tag(tag)) {
+  case core_tag_t::complex_: {
     std::complex<float64_t> value;
     yaml_decode(node, value);
     return std::make_shared<complex_entry>(value);
   }
-
-  if (tag == "tag:stsci.edu:asdf/core/software-1.0.0")
+  case core_tag_t::software:
     return std::make_shared<software>(rs, node);
-
-  // if (tag == "tag:stsci.edu:asdf/core/history_entry-1.0.0")
-  //   return std::make_shared<history_entry>(rs, node);
-
-  if (tag == "tag:stsci.edu:asdf/core/ndarray-1.0.0" ||
-      tag == "tag:stsci.edu:asdf/core/ndarray-1.1.0")
+  case core_tag_t::ndarray:
     return std::make_shared<ndarray_entry>(std::make_shared<ndarray>(rs, node));
+  case core_tag_t::asdf:
+  case core_tag_t::none:
+    break;
+  }
 
   ASDF_CHECK(tag.empty() || tag == "?" || tag == "!",
              "Unknown YAML tag \"" + tag + "\"");

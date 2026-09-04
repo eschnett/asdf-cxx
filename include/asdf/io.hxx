@@ -3,6 +3,7 @@
 
 #include <asdf/error.hxx>
 #include <asdf/memoized.hxx>
+#include <asdf/version.hxx>
 
 #include <yaml-cpp/yaml.h>
 
@@ -49,6 +50,48 @@ bool have_compression_zlib();
 std::ostream &operator<<(std::ostream &os, block_format_t block_format);
 std::ostream &operator<<(std::ostream &os, compression_t compression);
 
+// The two comment lines a file begins with. They are recorded while reading
+// and never rejected: a file may declare a format or standard version this
+// library does not know.
+struct file_header {
+  string asdf_version;
+  string standard_version;
+};
+
+// What the content of a tree requires of the standard version it is written
+// as. Collected by a pre-pass over the tree (`asdf::requirements()`) that
+// touches only metadata, never block data.
+struct content_requirements {
+  // The tree holds `float16` data, which needs standard 1.6.0. This is a
+  // legitimate feature of that version, not a nonstandard extension.
+  bool needs_float16 = false;
+  // Content no version of the standard describes, as "<path>: <what>"
+  vector<string> nonstandard;
+
+  // The lowest standard version that can represent this content. This is
+  // the floor the requested version has to clear; the version a new file is
+  // written as is `max(default_standard_version(), minimum_version())`.
+  version_t minimum_version() const;
+};
+
+// How `asdf::write` chooses the standard version, and whether it accepts
+// content no version of the standard describes
+struct write_options {
+  enum class version_mode_t {
+    minimal,         // the lowest version that fits the content
+    latest,          // the most recent version this library knows
+    input,           // the version the file was read from declared
+    explicit_version // `explicit_version`
+  };
+  version_mode_t version_mode = version_mode_t::minimal;
+  version_t explicit_version{};
+  bool allow_nonstandard = false;
+};
+
+// Set `version_mode` and `explicit_version` from a
+// "minimal"|"latest"|"input"|"X.Y.Z" specification
+void set_standard_version(write_options &options, const string &spec);
+
 class block_t;
 struct block_info_t;
 
@@ -56,6 +99,7 @@ class reader_state {
   YAML::Node tree;
   // TODO: Share "other_files" with other reader_state objects
   string filename;
+  file_header header;
   map<string, shared_ptr<reader_state>> other_files;
 
   // TODO: Store only the file position
@@ -70,7 +114,9 @@ public:
   reader_state &operator=(reader_state &&) = default;
 
   reader_state(const YAML::Node &tree, const shared_ptr<istream> &pis,
-               const string &filename = {});
+               const string &filename = {}, const file_header &header = {});
+
+  const file_header &get_input_header() const { return header; }
 
   memoized<block_t> get_block(int64_t index) const {
     ASDF_CHECK(index >= 0 && size_t(index) < blocks.size(),
@@ -102,6 +148,8 @@ class writer {
 
   ostream &os;
   YAML::Emitter emitter;
+  const standard_info_t *standard_;
+  bool allow_nonstandard_;
 
   // Tasks that write the blocks
   // TODO: rename this variable
@@ -113,8 +161,13 @@ public:
   writer &operator=(const writer &) = delete;
   writer &operator=(writer &&) = delete;
 
-  writer(ostream &os, const map<string, string> &tags);
+  writer(ostream &os, const map<string, string> &tags,
+         const standard_info_t &standard, bool allow_nonstandard = false);
   ~writer();
+
+  // The standard version being written. Every core tag comes from here.
+  const standard_info_t &standard() const { return *standard_; }
+  bool allow_nonstandard() const { return allow_nonstandard_; }
 
   template <typename T> friend writer &operator<<(writer &w, const T &value) {
     w.emitter << value;
@@ -134,7 +187,7 @@ public:
       buf << "+";
     buf << im.c_str() << "i";
 
-    w << YAML::LocalTag("core/complex-1.0.0") << buf.str();
+    w << YAML::LocalTag(w.standard().complex_tag) << buf.str();
     return w;
   }
 

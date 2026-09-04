@@ -170,7 +170,12 @@ int run(int argc, char **argv) {
 
   auto project = make_shared<asdf>(map<string, string>(), grp);
 
-  project->write("nonstandard.asdf");
+  // This file deliberately holds content no version of the standard
+  // describes: a rank-0 array, and int128/uint128 and complex32 datatypes
+  // where the build has them
+  write_options options;
+  options.allow_nonstandard = true;
+  project->write("nonstandard.asdf", options);
 
   cout << "Done.\n";
   return 0;

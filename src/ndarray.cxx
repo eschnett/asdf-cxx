@@ -965,8 +965,7 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
     : block_format(block_format_t::undefined),
       compression(compression_t::undefined), compression_level(-1),
       byteorder(byteorder_t::undefined), offset(-1) {
-  ASDF_CHECK(node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.0.0" ||
-                 node.Tag() == "tag:stsci.edu:asdf/core/ndarray-1.1.0",
+  ASDF_CHECK(classify_core_tag(node.Tag()) == core_tag_t::ndarray,
              "Expected tag core/ndarray-1.0.0 or -1.1.0, found \"" +
                  node.Tag() + "\"");
   if (node["source"].IsDefined())
@@ -1057,8 +1056,68 @@ ndarray::ndarray(const copy_state &cs, const ndarray &arr) : ndarray(arr) {
     compression_level = cs.compression_level;
 }
 
+namespace {
+
+// Walk a datatype, including the fields of a structured one, and record what
+// the standard versions have to say about the scalar types it uses
+void collect_datatype_requirements(content_requirements &req,
+                                   const string &path,
+                                   const datatype_t &datatype) {
+  if (!datatype.is_scalar) {
+    for (const auto &field : datatype.fields)
+      collect_datatype_requirements(req, path + "/" + field->name,
+                                    *field->datatype);
+    return;
+  }
+  switch (datatype.scalar_type_id) {
+  case id_float16:
+    // A legitimate feature of standard 1.6.0, never nonstandard
+    req.needs_float16 = true;
+    break;
+  case id_complex32:
+    // No version of the standard has `complex32`, but it consists of
+    // `float16` components, so writing it also needs 1.6.0
+    req.needs_float16 = true;
+    req.nonstandard.push_back(path + ": complex32 datatype");
+    break;
+  case id_int128:
+    req.nonstandard.push_back(path + ": int128 datatype");
+    break;
+  case id_uint128:
+    req.nonstandard.push_back(path + ": uint128 datatype");
+    break;
+  default:
+    break;
+  }
+}
+
+} // namespace
+
+void ndarray::collect_requirements(content_requirements &req,
+                                   const string &path) const {
+  collect_datatype_requirements(req, path, *datatype);
+  // A rank-0 array is fine as a block -- the schema puts no lower bound on
+  // `shape`, and Python asdf writes `np.array(5.0)` that way -- but it has no
+  // inline representation, because `data` has to be a list
+  if (shape.empty() && block_format == block_format_t::inline_array)
+    req.nonstandard.push_back(path + ": inline rank-0 array");
+}
+
 writer &ndarray::to_yaml(writer &w) const {
-  w << YAML::LocalTag("core/ndarray-1.0.0");
+  // `asdf::write` has already checked the whole tree, but an `asdf` built
+  // from raw `nodes` or `writers` cannot be walked, so repeat the check here
+  if (!w.allow_nonstandard()) {
+    content_requirements req;
+    collect_requirements(req, "");
+    ASDF_CHECK(req.nonstandard.empty(),
+               "Cannot write an array with nonstandard content (" +
+                   req.nonstandard.front() + ")");
+    ASDF_CHECK(!req.needs_float16 || w.standard().has_float16,
+               "This array requires ASDF standard version " +
+                   req.minimum_version().str() + ", but standard version " +
+                   w.standard().version.str() + " is being written");
+  }
+  w << YAML::LocalTag(w.standard().ndarray_tag);
   w << YAML::BeginMap;
   if (block_format == block_format_t::block) {
     // source
@@ -1083,10 +1142,12 @@ writer &ndarray::to_yaml(writer &w) const {
   // shape
   w << YAML::Key << "shape" << YAML::Value << YAML::Flow << shape;
   if (block_format == block_format_t::block) {
-    // offset
-    w << YAML::Key << "offset" << YAML::Value << offset;
-    // strides
-    w << YAML::Key << "strides" << YAML::Value << YAML::Flow << strides;
+    // offset and strides: both have defaults, and the standard's examples
+    // leave them out where they hold
+    if (offset != 0)
+      w << YAML::Key << "offset" << YAML::Value << offset;
+    if (!is_c_contiguous())
+      w << YAML::Key << "strides" << YAML::Value << YAML::Flow << strides;
   }
   w << YAML::EndMap;
   return w;

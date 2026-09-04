@@ -178,6 +178,16 @@ write_asdf(
     },
 )
 
+# rank0.asdf: a rank-0 array (`shape: []`). The core/ndarray schema puts no
+# lower bound on `shape` and Python asdf writes `np.array(5.0)` as a block, so
+# reading and copying it must work; only the inline form is unrepresentable,
+# because `data` has to be a list.
+write_asdf(
+    "rank0.asdf",
+    {"scalar": np.array(5.0), "int": np.array(-7, dtype="<i4")},
+    storage={"scalar": "internal", "int": "internal"},
+)
+
 # masked.asdf: ndarray `mask`, which asdf-cxx refuses
 write_asdf(
     "masked.asdf",
@@ -289,6 +299,23 @@ when: !time/time-1.1.0 2027-01-01T00:00:00.000
 unit: !unit/unit-1.0.0 DN
 ratio: !<asdf://example.org/scalar-1.0.0> 1.0
 counts: !core/ndarray-1.0.0
+  data: [1, 2, 3]
+  datatype: int64
+  shape: [3]
+...
+""",
+    # A YAML comment inside the tree that looks like the header's
+    # `#ASDF_STANDARD` line. Only the first two lines carry the declared
+    # versions; this file declares 1.6.0 and a copy has to keep 1.6.0.
+    "header-comment.asdf": """\
+#ASDF 1.0.0
+#ASDF_STANDARD 1.6.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+#ASDF 9.9.9
+#ASDF_STANDARD 1.0.0
+counts: !core/ndarray-1.1.0
   data: [1, 2, 3]
   datatype: int64
   shape: [3]

@@ -11,7 +11,7 @@ the end is what the reviewer will run. Repository: `/Users/eschnett/src/asdf-cxx
 | 0 — test harness, CI, small cleanups | done | [#20](https://github.com/eschnett/asdf-cxx/pull/20) |
 | 1 — data access correctness | done | [#21](https://github.com/eschnett/asdf-cxx/pull/21) |
 | 1b — string datatypes | done | [#23](https://github.com/eschnett/asdf-cxx/pull/23) |
-| 2 — version table, write options, CLI | not started | |
+| 2 — version table, write options, CLI | done | [#24](https://github.com/eschnett/asdf-cxx/pull/24) |
 | 3 — lossless reader | not started | |
 | 4 — local complex tags | not started | |
 | 5 — documentation | not started | |
@@ -144,6 +144,83 @@ Review of Phase 1b found four non-blocking issues, all fixed in the same PR:
   parsed defensively and reported at datatype level
   (`tests/bad-string-length.asdf`).
 
+**Phase 2** (PR #24) deviations:
+
+- `content_requirements::minimum_version()` returns the **lowest** known
+  standard version (1.0.0) when the tree needs no `float16`, not
+  `default_standard_version()` as the sketch's comment says. Folding the
+  default floor into the content minimum would make the "requires" check
+  reject every legitimate write below 1.2.0, including `asdf-copy` of the
+  1.0.0 and 1.1.0 reference files. `minimal` is still
+  `max(default_standard_version(), minimum_version())`, exactly as specified.
+- `--standard-version=input` on a file whose declared version this library
+  does not know falls back to `minimal` rather than raising an error naming
+  the supported range. The two behaviours the plan asks for are not
+  distinguishable: `asdf-copy`'s default *is* `input`, so an explicit
+  `--standard-version=input` and the default reach `asdf::write` identically.
+- Test names: the plan's `copy-X` become `X-copy` (`demo-1.6.0-copy`,
+  `demo-1.0.0-copy`, `demo-latest-copy`, `python-default-minimal-copy`,
+  `nonstandard-allowed-copy`, `float16-minimal-copy`,
+  `float16-1.0.0-allowed-copy`), and `error-copy-nonstandard` becomes
+  `error-nonstandard-copy`. `copy-` contains `py-`, and these tests are
+  registered unconditionally, so a leading `copy-` would break the
+  `ctest -N | grep -c 'ref-\|py-'` check for a plain configure. Phase 1b
+  named `strided-copy` for the same reason.
+- The Verification line `grep -c '^---' demo.asdf` is **2**, not 1: the block
+  index is a second YAML document and starts with `---`, exactly as the files
+  Python asdf writes do. Inside the YAML head (everything up to `...`) the
+  count is 1 and the line is `--- !core/asdf-1.1.0`; that is what
+  `check-header.sh --root-tag` enforces, and it is the rule the plan means.
+- `roman-like-copy` is still not registered: `roman-like.asdf` is wrapped in
+  foreign tags, which the reader refuses until Phase 3.
+  `ref-1.5.0/1.6.0-basic-history` likewise waits for Phase 3.
+- `ref-<version>-shared-strides` is registered here (for 1.6.0, as written).
+  The plan lists it under Phase 0 "Extra", but it never was registered, and
+  it belongs with the other header assertions: it proves that `offset` and
+  `strides` are still written where they are *not* the defaults.
+- `version_t`'s members are named `major`/`minor`/`patch` as specified;
+  `version.hxx` `#undef`s the `major`/`minor` function-like macros that
+  `<sys/sysmacros.h>` defines on some systems and that would otherwise
+  mangle them.
+- `asdf(rs, node)` no longer accepts a `core/asdf-1.2.0` root tag. No version
+  of the standard defines that tag; the accepted set is now exactly what the
+  version table holds (`core/asdf-1.0.0` and `-1.1.0`).
+- `asdf::write(filename, options)` resolves the version and checks the
+  content *before* opening the output file, so a refused write no longer
+  truncates an existing file.
+- `standard_info_t::history_entry_tag` and `extension_metadata_tag` are in
+  the table but not used yet; Phase 3 is what writes `history`.
+- `yaml_encode(const complex<T> &)` still emits the tag verbatim, so inline
+  complex *arrays* keep their `!<tag:...>` spelling. Only
+  `complex_entry::to_yaml` moved to `w << value` and the local tag, which is
+  what 2a asks for; the array path is Phase 4's `emit_scalar` rework.
+- `asdf-ls` prints `standard version: <x>` (or `unknown`) under `Project:`.
+- Added beyond the plan: `header-python-default2`, `header-padded2`,
+  `header-python-default-minimal`, `py-validate-python-default-minimal`,
+  `header-float16-minimal`, `py-validate-float16`, and
+  `error-compression-level` (the `--compression-level=10` range check).
+
+Review of Phase 2 found four issues, all fixed in the same PR:
+
+- **A rank-0 *block* array is not nonstandard.** The first version followed
+  the plan's "empty shape → nonstandard" literally, so `asdf-copy` refused
+  files Python asdf writes (`np.array(5.0)` is a block array with
+  `shape: []`, and `core/ndarray` puts no lower bound on `shape`). Only the
+  inline form is unrepresentable. The rule now tests
+  `block_format == inline_array` as well, the plan's 2b wording and decision 3
+  above are corrected, and `tests/rank0.asdf` covers both sides.
+- **`#ASDF_STANDARD` was picked up from any line of the YAML head**, so a
+  YAML comment inside the tree overrode the real header and the preserving
+  copy silently downgraded the file and its tags. Only the first two lines
+  count now, which is where the standard puts them.
+  `tests/header-comment.asdf` covers it.
+- `asdf::write(filename)` ran the requirements pre-pass twice. A private
+  `write_prepared(os, standard, options)` now takes the resolved
+  `standard_info_t`, so each `write` walks the tree once.
+- `--compression-level=N` accepted only a single digit, rejecting an in-range
+  `05`; it now parses the number and range-checks it. CODE.md's known gap 7
+  described the fixed behaviour and was reworded.
+
 ---
 
 ## Context
@@ -183,8 +260,9 @@ Decisions confirmed by the maintainer on 2026-09-02:
 2. **`asdf-copy` preserves the input file's declared version** by default
    (the standard's "preserve" mode) when the library knows that version,
    falling back to lowest-that-fits otherwise; explicit flags override.
-3. Nonstandard content (int128, uint128, complex32, rank-0 arrays): **refuse
-   unless opted in** via `allow_nonstandard`.
+3. Nonstandard content (int128, uint128, complex32, inline rank-0 arrays):
+   **refuse unless opted in** via `allow_nonstandard`. A rank-0 array stored
+   as a block is standard and must keep copying.
 4. **Remove** the table/column code.
 5. Unknown tags: **preserve silently** and round-trip. No warnings, no callback
    (one can be added later as a member of a read-options struct).
@@ -444,6 +522,8 @@ is added by the phase that makes it pass (listed there).
 | `float16-inline.asdf` | same array, `set_array_storage(arr, "inline")` | value parsing needs `_Float16`: `ls` succeeds where available, fails with the "this build" message elsewhere |
 | `structured.asdf` | dtype `[('a','>u1'),('b','<f4'),('c','>i2',(2,)),('name','<U16')]`, 3 records, block storage | structured read with per-field byte order, sub-array field, and a `[ucs4, 16]` field as in Roman skycells |
 | `strings.asdf` | `np.array(['ab','cde'], dtype='S3')` and `np.array(['αβ','😀x'], dtype='<U2')` as blocks, plus the same two inline | ascii/ucs4 blocks and inline, non-BMP code point |
+| `rank0.asdf` | `{scalar: np.array(5.0), int: np.array(-7, dtype='<i4')}`, block storage | rank-0 blocks are standard: `ls`, `copy`, `values` and `py-compare` must work; only `--array=inline` is refused (Phase 2) |
+| `header-comment.asdf` | literal text, `#ASDF_STANDARD 1.6.0` on line 2 and a `#ASDF_STANDARD 1.0.0` YAML comment inside the tree | only the first two lines declare the versions (Phase 2) |
 | `masked.asdf` | `np.ma.array(np.arange(6), mask=[0,1,0,0,1,0])` | `error-masked` |
 | `bigendian.asdf` | `base = np.arange(24, dtype='>i4').reshape(4,6)`; tree `{base, view: base[::-1, ::2], fortran: np.asfortranarray(np.arange(6, dtype='>f8').reshape(2,3)), flags: np.array([True, False, True])}` | shared block + negative strides + big-endian + Fortran order + bool8 (Phase 1) |
 | `unknown-tags.asdf` | literal text, no blocks, `#ASDF_STANDARD 1.5.0`, root `!core/asdf-1.1.0`: `answer: !core/constant-1.0.0 42`, `custom: !<asdf://example.org/foo-1.0.0> {x: 1, y: [1, 2], nested: !<asdf://example.org/bar-1.0.0> {z: 3}}`, `when: !time/time-1.1.0 2027-01-01T00:00:00.000`, `unit: !unit/unit-1.0.0 DN`, `ratio: !<asdf://example.org/scalar-1.0.0> 1.0`, one inline int64 array | unknown-tag round trip, tagged-scalar text preservation (Phase 3) |
@@ -668,7 +748,12 @@ virtual void entry::collect_requirements(content_requirements &, const std::stri
 to `ndarray::collect_requirements`, which walks the datatype including record
 fields: float16 → `needs_float16` (a legitimate 1.6.0 feature, **never**
 nonstandard); complex32 → `needs_float16` and nonstandard; int128/uint128 →
-nonstandard; empty shape → nonstandard ("rank-0 array"). `asdf::requirements()`
+nonstandard; empty shape **in inline form** → nonstandard ("inline rank-0
+array"). A rank-0 *block* array is standard — `core/ndarray` puts no lower
+bound on `shape` and Python asdf writes `np.array(5.0)` that way — so
+refusing it would make files the reference implementation produces
+uncopyable; only the inline form is unrepresentable, because `data` has to be
+a list. `asdf::requirements()`
 walks the root group. `nodes` and `writers` cannot be inspected;
 `ndarray::to_yaml` keeps an emission-time check as a safety net.
 

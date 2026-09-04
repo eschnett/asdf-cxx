@@ -10,6 +10,7 @@
 #include <asdf/ndarray.hxx>
 #include <asdf/reference.hxx>
 #include <asdf/stl.hxx>
+#include <asdf/version.hxx>
 
 #include <yaml-cpp/yaml.h>
 
@@ -30,6 +31,10 @@ class asdf {
 
   map<string, YAML::Node> nodes;
   map<string, function<void(writer &w)>> writers;
+
+  // The `#ASDF` / `#ASDF_STANDARD` lines of the file this was read from;
+  // empty for a tree built in memory
+  file_header input_header;
 
 public:
   asdf() = delete;
@@ -60,14 +65,34 @@ public:
   }
 
   static YAML::Node from_yaml(istream &is);
+  // Also records the `#ASDF` and `#ASDF_STANDARD` lines
+  static YAML::Node from_yaml(istream &is, file_header &header);
   asdf(const shared_ptr<istream> &pis, const string &filename = {},
        const map<string, reader_t> &readers = {});
   asdf(const string &filename, const map<string, reader_t> &readers = {});
   asdf copy(const copy_state &cs) const;
-  void write(ostream &os) const;
-  void write(const string &filename) const;
 
+  // What the content needs of the standard version it is written as. Walks
+  // the metadata of the root group only; `nodes` and `writers` cannot be
+  // inspected, so `ndarray::to_yaml` repeats the check while emitting.
+  content_requirements requirements() const;
+  // The standard version `write` would use for these options
+  version_t resolve_standard_version(const write_options &options,
+                                     const content_requirements &req) const;
+
+  void write(ostream &os, const write_options &options = {}) const;
+  void write(const string &filename, const write_options &options = {}) const;
+
+private:
+  // Resolve the standard version and reject content the options do not allow
+  const standard_info_t &prepare_write(const write_options &options) const;
+  // Emit the tree; `standard` is what `prepare_write` returned
+  void write_prepared(ostream &os, const standard_info_t &standard,
+                      const write_options &options) const;
+
+public:
   shared_ptr<group> get_group() const { return grp; }
+  const file_header &get_input_header() const { return input_header; }
 };
 
 } // namespace ASDF

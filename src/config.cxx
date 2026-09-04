@@ -7,12 +7,6 @@
 
 namespace ASDF {
 
-int asdf_standard_version_major() { return ASDF_STANDARD_VERSION_MAJOR; }
-int asdf_standard_version_minor() { return ASDF_STANDARD_VERSION_MINOR; }
-int asdf_standard_version_patch() { return ASDF_STANDARD_VERSION_PATCH; }
-
-std::string asdf_standard_version() { return ASDF_STANDARD_VERSION; }
-
 int asdf_cxx_version_major() { return ASDF_CXX_VERSION_MAJOR; }
 int asdf_cxx_version_minor() { return ASDF_CXX_VERSION_MINOR; }
 int asdf_cxx_version_patch() { return ASDF_CXX_VERSION_PATCH; }

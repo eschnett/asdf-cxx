@@ -48,6 +48,29 @@ as whole arrays and as fields of a structured array. `ndarray` exposes them
 as `get_data_vector<std::string>()` and `get_data_vector<std::u32string>()`,
 with the trailing null padding removed.
 
+### Standard versions
+
+ASDF standard versions 1.0.0 to 1.6.0 are read and written. The declared
+version and the tags in the tree always agree, because both come from one
+table (`include/asdf/version.hxx`).
+
+- A file written from scratch declares the **lowest version that fits its
+  content**: 1.2.0 normally, and 1.6.0 when the tree holds `float16` arrays,
+  which no earlier version describes.
+- `asdf-copy` **preserves the input file's declared version** by default. An
+  input that declares no version, or one this library does not know, falls
+  back to the lowest version that fits.
+- `--standard-version=minimal|latest|input|X.Y.Z` overrides this;
+  `write_options` and `set_standard_version()` do the same for the library.
+  Asking for a version that cannot hold the content (for instance 1.0.0 for a
+  `float16` array) is an error naming both versions.
+- Content that **no** version of the standard describes -- `int128`,
+  `uint128` and `complex32` datatypes, and a rank-0 array in *inline* form,
+  whose `data` would have to be a list -- is refused unless
+  `--allow-nonstandard` (`write_options::allow_nonstandard`) is given. Note
+  that `float16` is a legitimate 1.6.0 datatype and never counts as
+  nonstandard, and neither does a rank-0 array stored as a block.
+
 Other minor limitations are:
 - Non-YAML Comments (using a `//` key) are ignored, and there is no
   way to generate such comments when writing ASDF files.

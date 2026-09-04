@@ -44,6 +44,10 @@ default).
 - `check-header.sh <file> [options]` — assertions about a file's YAML
   head: the `#ASDF`/`#ASDF_STANDARD` lines, the root tag, the
   `core/ndarray` tag version, and strings that must or must not occur.
+  `--root-tag` also insists that the root tag sits on the `---` line and
+  that the head holds no bare `---`. The `header-*` and `ref-*-header`
+  tests use it to pin down which standard version a written file
+  declares and that its tags belong to that version.
 - `python_check.py validate|compare` — opens files with the Python
   reference implementation. `validate` insists that the tree comes back
   fully deserialised (an `AsdfConversionWarning` is an error, so a file
@@ -67,7 +71,8 @@ a `values-*` test pins: the reference files `basic`, `compressed`,
 `endian`, `float`, `int` and `shared` (their content is the same in every
 standard version, so one file covers all seven), `fixture-abc.txt` for
 the three Python-written fixtures that share the same three arrays,
-`demo.txt`, `bigendian.txt` and `float16.txt`. Regenerate one with
+`demo.txt`, `bigendian.txt`, `float16.txt` and `rank0.txt`. Regenerate one
+with
 
 ```bash
 build/asdf-read-check <file> > tests/expected/<name>.txt
@@ -100,6 +105,7 @@ zlib/lz4), `c` (int32, 200 values, bzip2/lz4).
 | `float16-inline.asdf` | the same array inline, so that parsing its values does need `_Float16` |
 | `structured.asdf` | a record array with per-field byte order, a sub-array field and a `[ucs4, 16]` field, as in Roman skycell reference files |
 | `strings.asdf` | `ascii` and `ucs4` arrays as blocks and inline, including a non-BMP code point and a big-endian `ucs4` block whose 4-byte code units are swapped one at a time |
+| `rank0.asdf` | rank-0 arrays (`shape: []`) as blocks, which the schema allows and Python asdf writes; only the inline form is unrepresentable |
 | `masked.asdf` | an ndarray `mask`, which asdf-cxx does not support |
 | `bigendian.asdf` | one block shared by two views, negative and non-contiguous strides, Fortran order, big-endian data, and bool8. Note that the two views share one block on read but are written as two blocks by a copy |
 | `roman-like.asdf` | the Roman WFI feature set in one file: foreign tags around nested ndarrays, tagged time/unit scalars, a float16 block, a `[ucs4, 16]` structured field, an astropy table with `core/column` entries, a YAML alias, `history.extensions`, standard 1.6.0 |
@@ -114,6 +120,7 @@ that also pins the exact spelling that a copy has to preserve.
 | `unknown-tags.asdf` | unknown tags on maps, sequences and scalars, and tagged scalar text (`1.0`, a timestamp, a unit) that must survive a copy unchanged |
 | `alias.asdf` | YAML anchors and aliases; yaml-cpp resolves them on load and a copy expands them |
 | `untagged-root.asdf` | a bare `---` root, which the standard allows |
+| `header-comment.asdf` | a YAML comment inside the tree that looks like the `#ASDF_STANDARD` header line; only the first two lines declare the versions |
 
 ### Deliberately broken files
 
