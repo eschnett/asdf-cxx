@@ -12,7 +12,7 @@ the end is what the reviewer will run. Repository: `/Users/eschnett/src/asdf-cxx
 | 1 — data access correctness | done | [#21](https://github.com/eschnett/asdf-cxx/pull/21) |
 | 1b — string datatypes | done | [#23](https://github.com/eschnett/asdf-cxx/pull/23) |
 | 2 — version table, write options, CLI | done | [#24](https://github.com/eschnett/asdf-cxx/pull/24) |
-| 3 — lossless reader | not started | |
+| 3 — lossless reader | done | [#25](https://github.com/eschnett/asdf-cxx/pull/25) |
 | 4 — local complex tags | not started | |
 | 5 — documentation | not started | |
 
@@ -220,6 +220,83 @@ Review of Phase 2 found four issues, all fixed in the same PR:
 - `--compression-level=N` accepted only a single digit, rejecting an in-range
   `05`; it now parses the number and range-checks it. CODE.md's known gap 7
   described the fixed behaviour and was reworded.
+
+**Phase 3** (PR #25) deviations:
+
+- `header-untagged-root-copy` asserts standard **1.5.0**, not the 1.2.0 the
+  plan names. `untagged-root.asdf` declares 1.5.0 on line 2, and since Phase 2
+  `asdf-copy` preserves the input's version; the root tag is
+  `core/asdf-1.1.0` either way, which is what the item is about. The same
+  applies to `unknown-tags.asdf` (also 1.5.0).
+- `py-validate-unknown-tags2` and `py-validate-roman-like2` use a new
+  `--expect-unknown-tags` flag rather than `--allow-unknown-tags`. The plan
+  asks separately that "opening `unknown-tags2.asdf` with
+  `AsdfConversionWarning` as error must raise"; that is not a check a passing
+  test can express directly, because `--allow-unknown-tags` has to switch the
+  escalation off (every foreign tag raises the same warning, so
+  `py-compare-roman-like` could not open either file otherwise). The new flag
+  implies `--allow-unknown-tags` and additionally requires that Python asdf
+  hand back at least one undeserialised tagged node, which is the same proof
+  stated positively.
+- `python_check.py compare` gained `--allow-unknown-tags`, and
+  `compare_values` falls back to comparing `vars(a) == vars(b)` for two
+  objects of the same type that are unequal. Python asdf deserialises
+  `!core/constant-1.0.0` into an `asdf.tags.core.Constant`, which has no
+  `__eq__`, so `unknown-tags.asdf` would otherwise compare by identity and
+  never match.
+- **A bare `y` or `n` was read as a boolean.** yaml-cpp follows the YAML 1.1
+  type repository here and PyYAML does not, so `axes_names: [x, y]` in
+  `roman-like.asdf`'s gwcs frame came back as `["x", true]` and
+  `py-compare-roman-like` failed. `make_entry` now skips the boolean
+  conversion for a one-character `y`/`n` scalar. This is a reader bug the new
+  fixture exposed rather than something the plan lists.
+- **`copy`, `ls`, `ls2`, `ls3` and `compare-demo` had no `DEPENDS`.** They
+  read files the `demo` and `copy` tests write, and only ever passed because
+  ctest happened to schedule them in registration order; the phase's extra
+  tests changed that schedule and they failed under `-j8`. Fixed in
+  `CMakeLists.txt`.
+- `error-missing-file` is registered beyond the plan's list, for the
+  `Cannot open` row of the contract table. `asdf-ls` opens the file itself
+  before handing it to `asdf(filename)`, so the check exists in both places.
+- A tagged scalar spelled `~` round-trips as `!<tag> "~"`: the text is
+  preserved and the file is stable under further copies, but yaml-cpp quotes
+  `~` to keep it a string, so the null-ness of a tagged null is lost. No ASDF
+  schema uses one; recorded as known gap 9 in CODE.md.
+- `ref-1.5.0/1.6.0-basic-history` is registered here. The plan lists it under
+  Phase 0 "Extra", but `history` was dropped on read until this phase.
+- `software(rs, node)` now requires `name` and `version` to be present, as
+  3c asks. Nothing else in 3c changed the accepted root tags beyond what is
+  written there.
+
+Review of Phase 3 found three issues, all fixed in the same PR:
+
+- **An inline array without `shape` was refused.** The new streamed-array
+  check called `node["shape"].IsSequence()` on a const node, and yaml-cpp's
+  const `operator[]` returns an invalid node for a missing key whose type
+  queries throw. `shape` is optional for an inline array (it is inferred from
+  the data), so a legal file failed with exactly the kind of yaml-cpp message
+  this phase set out to eliminate. `IsDefined()` is now asked first.
+- **The two new `software` checks never fired for a missing key**, for the
+  same reason: the invalid node threw before the `ASDF_CHECK` could report
+  anything. This matters more now that `history` is preserved, because every
+  `core/software` inside `history.extensions` goes through this constructor.
+  `tests/bad-software.asdf` covers it.
+- **Quoted strings were retyped on a copy** (`"42"` to `42`, `"1.0"` to `1`,
+  `"true"` to `true`, `"no"` to `false`). This is pre-existing on `main`, but
+  it is the same losslessness problem as the `y`/`n` case above and the
+  information was available: yaml-cpp reports the non-specific tag `!` for a
+  quoted scalar and `?` for a plain one, and `is_trivial_tag` lumped them
+  together. `make_entry` now reads a `!`-tagged scalar as a string, which
+  closes the whole class. `tests/scalar-types.asdf` covers it.
+
+One neighbouring case is **deliberately left for Phase 4**: a plain float
+scalar written `1.0` is emitted as `1`, so Python asdf reads the copy's value
+as an `int`. The `yaml_encode(float32_t/float64_t)` overloads that spell it
+also spell the elements of inline float arrays, so changing them here would
+change the bytes of every file this library writes and would split a spelling
+decision across two phases. Phase 4 already reworks scalar emission
+(`emit_node`, the `nan`/`inf` spelling); this belongs with it. Recorded as
+known gap 9 in CODE.md.
 
 ---
 
@@ -929,6 +1006,15 @@ instead of `- !<tag:stsci.edu:asdf/core/complex-1.0.0> 1+0i`. Verify
 flow-style propagation and `.inf`/`.nan` scalars; `compare-demo` must still
 pass; `check-header.sh demo.asdf --present "!core/complex-1.0.0 1+0i" --absent
 "!<tag:"`.
+
+**Plain float scalars** (Phase 3 review finding). `yaml_encode(float32_t)`
+and `yaml_encode(float64_t)` hand yaml-cpp a C++ floating-point value, which
+it emits without a fractional part when there is none: a metadata scalar
+written `1.0` copies out as `1`, and Python asdf reads it back as an `int`.
+Emit a float that is integral with a trailing `.0` (or route it through the
+same spelling logic as the complex components), so that both tree scalars and
+inline float array elements keep their type. Test: add the case to
+`tests/scalar-types.asdf` and assert it in `header-scalar-types-copy`.
 
 **Complex NaN and infinity** (Phase 1 review finding). `yaml_encode_complex`
 and the writer's `operator<<` for `std::complex` must spell non-finite

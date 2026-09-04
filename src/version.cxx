@@ -135,6 +135,11 @@ version_t latest_standard_version() {
   return standard_versions().back().version;
 }
 
+bool is_core_asdf_tag(const string &full_tag) {
+  static const string prefix = string(asdf_tag_prefix) + "core/asdf-";
+  return full_tag.compare(0, prefix.size(), prefix) == 0;
+}
+
 core_tag_t classify_core_tag(const string &full_tag) {
   const size_t prefix_length = sizeof asdf_tag_prefix - 1;
   if (full_tag.compare(0, prefix_length, asdf_tag_prefix) != 0)

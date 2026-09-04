@@ -211,13 +211,18 @@ endif()
 enable_testing()
 add_test(NAME demo COMMAND ./asdf-demo)
 add_test(NAME ls COMMAND ./asdf-ls demo.asdf)
+set_tests_properties(ls PROPERTIES DEPENDS demo)
 add_test(NAME demo-nonstandard COMMAND ./asdf-demo-nonstandard)
 add_test(NAME ls2 COMMAND ./asdf-ls nonstandard.asdf)
+set_tests_properties(ls2 PROPERTIES DEPENDS demo-nonstandard)
 add_test(NAME copy COMMAND ./asdf-copy demo.asdf demo2.asdf)
+set_tests_properties(copy PROPERTIES DEPENDS demo)
 add_test(NAME ls3 COMMAND ./asdf-ls demo2.asdf)
+set_tests_properties(ls3 PROPERTIES DEPENDS copy)
 add_test(NAME compare-demo
   COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
   "./asdf-ls demo.asdf" "./asdf-ls demo2.asdf")
+set_tests_properties(compare-demo PROPERTIES DEPENDS "demo;copy")
 # Arrays with offsets, negative strides, Fortran order, foreign byte order
 # and structured elements: written, read back and checked against the values
 # the demo put in
@@ -253,9 +258,6 @@ endif()
 add_test(NAME error-not-asdf
   COMMAND ${CMAKE_SOURCE_DIR}/tests/expect-error.sh
   ./asdf-ls ${CMAKE_SOURCE_DIR}/tests/not-asdf.asdf)
-add_test(NAME error-unknown-tag
-  COMMAND ${CMAKE_SOURCE_DIR}/tests/expect-error.sh
-  ./asdf-ls ${CMAKE_SOURCE_DIR}/tests/corrupt-tag.asdf)
 add_test(NAME error-truncated
   COMMAND ${CMAKE_SOURCE_DIR}/tests/expect-error.sh
   ./asdf-copy ${CMAKE_SOURCE_DIR}/tests/corrupt-truncated.asdf

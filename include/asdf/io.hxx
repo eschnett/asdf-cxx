@@ -200,6 +200,18 @@ public:
   void flush();
 };
 
+// A tag that carries no information: absent, yaml-cpp's markers for an
+// untagged (`?`) or non-specifically tagged (`!`) node, or one of YAML's own
+// types. Such a tag is never stored and never emitted.
+bool is_trivial_tag(const string &full_tag);
+
+// Emit a tag that was read from a file, given as its full resolved URI.
+// Trivial tags emit nothing; a tag under `asdf_tag_prefix` becomes a local
+// tag (`!core/constant-1.0.0`), which needs the `%TAG !` directive every file
+// this library writes has; everything else becomes a verbatim tag
+// (`!<asdf://example.org/foo-1.0.0>`).
+writer &emit_tag(writer &w, const string &full_tag);
+
 } // namespace ASDF
 
 #define ASDF_IO_HXX_DONE

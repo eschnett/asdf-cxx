@@ -134,6 +134,7 @@ int run(int argc, char **argv) {
 
     // Read project
     ifstream is(filename, ios::binary | ios::in);
+    ASDF_CHECK(is.good(), "Cannot open file \"" + filename + "\"");
     auto node = asdf::from_yaml(is);
 
     // Output project

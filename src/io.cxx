@@ -5,7 +5,9 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <cctype>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 
 namespace ASDF {
@@ -111,6 +113,40 @@ std::ostream &operator<<(std::ostream &os, compression_t compression) {
   default:
     return os << "unknown";
   }
+}
+
+// Tags
+
+namespace {
+// The characters yaml-cpp accepts in the suffix of a local tag (`!suffix`).
+// Flow indicators and `!` would make the shorthand ambiguous, and yaml-cpp
+// puts the emitter into its error state when it sees one.
+bool is_tag_char(unsigned char ch) {
+  return isalnum(ch) || strchr("-;/?:@&=+$_.~*'()%", ch) != nullptr;
+}
+} // namespace
+
+bool is_trivial_tag(const string &full_tag) {
+  static const string yaml_prefix = "tag:yaml.org,2002:";
+  return full_tag.empty() || full_tag == "?" || full_tag == "!" ||
+         full_tag.compare(0, yaml_prefix.size(), yaml_prefix) == 0;
+}
+
+writer &emit_tag(writer &w, const string &full_tag) {
+  if (is_trivial_tag(full_tag))
+    return w;
+  const size_t prefix_length = sizeof asdf_tag_prefix - 1;
+  if (full_tag.compare(0, prefix_length, asdf_tag_prefix) == 0) {
+    const string suffix = full_tag.substr(prefix_length);
+    bool local = !suffix.empty();
+    for (const unsigned char ch : suffix)
+      local = local && is_tag_char(ch);
+    if (local)
+      return w << YAML::LocalTag(suffix);
+  }
+  // An unresolved shorthand arrives as `!foo` and becomes `!<!foo>`, which is
+  // a local tag in verbatim form and thus valid YAML
+  return w << YAML::VerbatimTag(full_tag);
 }
 
 // Standard version selection
@@ -228,6 +264,9 @@ reader_state::resolve_reference(const shared_ptr<reader_state> &rs,
     }
     if (!rs->other_files.count(ref_filename)) {
       auto pis = make_shared<ifstream>(ref_filename, ios::binary | ios::in);
+      ASDF_CHECK(pis->good(), "Cannot open the external file \"" +
+                                  ref_filename + "\" referenced from \"" +
+                                  rs->filename + "\"");
       file_header ref_header;
       auto doc = asdf::from_yaml((istream &)*pis, ref_header);
       rs->other_files[ref_filename] =

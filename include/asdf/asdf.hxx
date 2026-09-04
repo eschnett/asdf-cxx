@@ -53,11 +53,7 @@ public:
        map<string, function<void(writer &w)>> writers1)
       : tags(std::move(tags1)), writers(std::move(writers1)) {}
 
-  typedef function<void(const shared_ptr<reader_state> &rs, const string &name,
-                        const YAML::Node &node)>
-      reader_t;
-  asdf(const shared_ptr<reader_state> &rs, const YAML::Node &node,
-       const map<string, reader_t> &readers = {});
+  asdf(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   asdf(const copy_state &cs, const asdf &project);
   writer &to_yaml(writer &w) const;
   friend writer &operator<<(writer &w, const asdf &proj) {
@@ -67,9 +63,8 @@ public:
   static YAML::Node from_yaml(istream &is);
   // Also records the `#ASDF` and `#ASDF_STANDARD` lines
   static YAML::Node from_yaml(istream &is, file_header &header);
-  asdf(const shared_ptr<istream> &pis, const string &filename = {},
-       const map<string, reader_t> &readers = {});
-  asdf(const string &filename, const map<string, reader_t> &readers = {});
+  asdf(const shared_ptr<istream> &pis, const string &filename = {});
+  asdf(const string &filename);
   asdf copy(const copy_state &cs) const;
 
   // What the content needs of the standard version it is written as. Walks

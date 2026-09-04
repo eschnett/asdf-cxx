@@ -99,6 +99,11 @@ version_t latest_standard_version();
 enum class core_tag_t { none, asdf, ndarray, software, complex_ };
 core_tag_t classify_core_tag(const string &full_tag);
 
+// Whether a full tag URI is a `core/asdf` tag of *any* version, including one
+// this library does not know. The reader accepts such a root tag: a file
+// written against a newer standard is still worth reading.
+bool is_core_asdf_tag(const string &full_tag);
+
 } // namespace ASDF
 
 #define ASDF_VERSION_HXX_DONE

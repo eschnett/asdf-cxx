@@ -13,29 +13,20 @@ namespace ASDF {
 
 // ASDF
 
-asdf::asdf(const shared_ptr<reader_state> &rs, const YAML::Node &node,
-           const map<string, reader_t> &readers) {
+asdf::asdf(const shared_ptr<reader_state> &rs, const YAML::Node &node) {
+  // Accept an untagged root, any `core/asdf` tag from the version table, and
+  // any other `core/asdf-` version: a file written against a newer standard
+  // is still worth reading, and its content is preserved as it stands.
   const auto &tag = node.Tag();
-  ASDF_CHECK(classify_core_tag(tag) == core_tag_t::asdf,
-             "Unknown root tag \"" + tag +
-                 "\"; expected core/asdf-1.0.0 or core/asdf-1.1.0");
+  ASDF_CHECK(is_trivial_tag(tag) || is_core_asdf_tag(tag),
+             "Root tag \"" + tag + "\" is not a core/asdf tag");
 
   input_header = rs->get_input_header();
 
-  ASDF_CHECK(readers.empty(), "Custom readers are not supported");
-  // if (readers.count(tag))
-  //   readers.at(tag)(rs, key, node);
-
-  // History entries are not supported and are ignored when reading. (Their
-  // tagged extension metadata would otherwise be rejected as unknown tags.)
   ASDF_CHECK(node.IsMap(), "The ASDF tree must be a mapping");
   grp = std::make_shared<group>();
-  for (const auto &key_value : node) {
-    const auto key = key_value.first.Scalar();
-    if (key == "history")
-      continue;
-    grp->insert(key, make_entry(rs, key_value.second));
-  }
+  for (const auto &key_value : node)
+    grp->insert(key_value.first.Scalar(), make_entry(rs, key_value.second));
 }
 
 asdf::asdf(const copy_state &cs, const asdf &project)
@@ -51,9 +42,24 @@ writer &asdf::to_yaml(writer &w) const {
     << software(ASDF_CXX_NAME, ASDF_CXX_AUTHOR, ASDF_CXX_HOMEPAGE,
                 ASDF_CXX_VERSION);
   if (grp)
-    for (const auto &[key, value] : *grp->get_group())
-      if (key != "asdf_library")
-        w << YAML::Key << key << YAML::Value << *value;
+    for (const auto &[key, value] : *grp->get_group()) {
+      if (key == "asdf_library")
+        continue;
+      // Before standard 1.2.0 `history` is a list of `history_entry`, not a
+      // mapping with `extensions`. Keep what the older schema allows and drop
+      // the rest, rather than writing a tree the declared version forbids.
+      if (key == "history" && !w.standard().has_history_extensions &&
+          !w.allow_nonstandard()) {
+        const auto history = value->get_maybe_group();
+        if (history) {
+          const auto entries = history->find("entries");
+          if (entries != history->end())
+            w << YAML::Key << key << YAML::Value << *entries->second;
+          continue;
+        }
+      }
+      w << YAML::Key << key << YAML::Value << *value;
+    }
   for (const auto &kv : nodes)
     w << YAML::Key << kv.first << YAML::Value << kv.second;
   for (const auto &kv : writers) {
@@ -126,17 +132,22 @@ YAML::Node asdf::from_yaml(istream &is, file_header &header) {
              "\"...\" terminator)");
 }
 
-asdf::asdf(const shared_ptr<istream> &pis, const string &filename,
-           const map<string, reader_t> &readers) {
+asdf::asdf(const shared_ptr<istream> &pis, const string &filename) {
   file_header header;
   auto node = from_yaml(*pis, header);
   auto rs = make_shared<reader_state>(node, pis, filename, header);
-  *this = asdf(rs, node, readers);
+  *this = asdf(rs, node);
 }
 
-asdf::asdf(const string &filename, const map<string, reader_t> &readers)
-    : asdf(make_shared<ifstream>(filename, ios::binary | ios::in), filename,
-           readers) {}
+namespace {
+shared_ptr<istream> open_input(const string &filename) {
+  auto pis = make_shared<ifstream>(filename, ios::binary | ios::in);
+  ASDF_CHECK(pis->good(), "Cannot open file \"" + filename + "\"");
+  return pis;
+}
+} // namespace
+
+asdf::asdf(const string &filename) : asdf(open_input(filename), filename) {}
 
 asdf asdf::copy(const copy_state &cs) const { return asdf(cs, *this); }
 

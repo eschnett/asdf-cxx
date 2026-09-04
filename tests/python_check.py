@@ -96,11 +96,15 @@ def find_tagged(node, path=""):
             yield from find_tagged(value, f"{path}/{i}")
 
 
-def open_file(path, validate_checksums=True):
+def open_file(path, validate_checksums=True, allow_unknown_tags=False):
     with warnings.catch_warnings():
         # asdf reports a tree whose tag versions disagree with the file's
-        # declared standard version by falling back to raw dicts and warning
-        warnings.simplefilter("error", AsdfConversionWarning)
+        # declared standard version by falling back to raw dicts and warning.
+        # A file that carries foreign tags on purpose raises the same warning
+        # for each of them, so the escalation is off where those are expected.
+        warnings.simplefilter(
+            "ignore" if allow_unknown_tags else "error", AsdfConversionWarning
+        )
         af = asdf.open(
             path,
             lazy_load=False,
@@ -115,7 +119,10 @@ def do_validate(args):
     for path in args.files:
         try:
             check_header(path, args.standard, args.root_tag, args.ndarray_tag)
-            with open_file(path, not args.no_validate_checksums) as af:
+            allow_unknown = args.allow_unknown_tags or args.expect_unknown_tags
+            with open_file(
+                path, not args.no_validate_checksums, allow_unknown
+            ) as af:
                 narrays = 0
                 for node_path, value in walk(af.tree):
                     if isinstance(value, NDArrayType):
@@ -125,12 +132,16 @@ def do_validate(args):
                         )
                     if isinstance(value, np.ndarray):
                         narrays += 1
-                if not args.allow_unknown_tags:
-                    tagged = [p for p, _ in find_tagged(af.tree)]
-                    if tagged:
-                        raise CheckFailed(
-                            f"undeserialised tagged nodes: {tagged[:5]}"
-                        )
+                tagged = [p for p, _ in find_tagged(af.tree)]
+                if tagged and not allow_unknown:
+                    raise CheckFailed(
+                        f"undeserialised tagged nodes: {tagged[:5]}"
+                    )
+                if args.expect_unknown_tags and not tagged:
+                    raise CheckFailed(
+                        "no undeserialised tagged nodes; the file's foreign "
+                        "tags did not survive"
+                    )
                 if args.expect_history:
                     history = af.tree.get("history")
                     if not isinstance(history, dict):
@@ -173,13 +184,24 @@ def compare_values(path, a, b):
             raise CheckFailed(f"{path}: {a!r} vs {b!r}")
         return
     if a != b:
+        # A tag Python asdf deserialises into a plain object without an
+        # `__eq__` (asdf.tags.core.Constant, for one) would otherwise compare
+        # by identity, which two separately read files never share
+        if (
+            type(a) is type(b)
+            and getattr(a, "__dict__", None) is not None
+            and vars(a) == vars(b)
+        ):
+            return
         raise CheckFailed(f"{path}: {a!r} vs {b!r}")
 
 
 def do_compare(args):
     try:
-        with open_file(args.original, not args.no_validate_checksums) as af1, \
-             open_file(args.copy, not args.no_validate_checksums) as af2:
+        checksums = not args.no_validate_checksums
+        unknown = args.allow_unknown_tags
+        with open_file(args.original, checksums, unknown) as af1, \
+             open_file(args.copy, checksums, unknown) as af2:
             skip = set(args.skip)
             values1 = {
                 p: v
@@ -223,6 +245,12 @@ def main(argv):
     p.add_argument("--root-tag", help="expected tag on the '---' line")
     p.add_argument("--ndarray-tag", help="the only allowed core/ndarray tag")
     p.add_argument("--allow-unknown-tags", action="store_true")
+    p.add_argument(
+        "--expect-unknown-tags",
+        action="store_true",
+        help="implies --allow-unknown-tags, and additionally requires that "
+        "at least one node kept a tag Python asdf does not know",
+    )
     p.add_argument("--expect-history", action="store_true")
     p.add_argument(
         "--no-validate-checksums",
@@ -236,6 +264,7 @@ def main(argv):
     p.add_argument("original")
     p.add_argument("copy")
     p.add_argument("--skip", action="append", default=[])
+    p.add_argument("--allow-unknown-tags", action="store_true")
     p.add_argument("--no-validate-checksums", action="store_true")
     p.set_defaults(func=do_compare)
 
