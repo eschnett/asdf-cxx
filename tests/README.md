@@ -19,7 +19,9 @@ corpus of files, is fetched or generated instead:
 ## Running the conformance tests
 
 Both extra test families are opt-in through CMake cache variables, so a
-plain `cmake -B build` still configures and passes:
+plain `cmake -B build` still configures and passes — it registers 133
+tests and none of the `ref-*` or `py-*` ones. With both variables set,
+about 840 tests are registered.
 
 ```bash
 python3 -m venv asdf-env
@@ -30,9 +32,40 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
 cmake --build build && ctest --test-dir build --output-on-failure
 ```
 
-`asdf==5.3.*` needs Python 3.11 or newer. `ASDF_REFERENCE_VERSIONS`
-selects which standard versions the `ref-*` tests cover (all seven by
-default).
+`ASDF_REFERENCE_VERSIONS` selects which standard versions the `ref-*`
+tests cover (all seven by default); a version whose directory is missing
+is skipped with a warning.
+
+### The Python environment
+
+`ASDF_PYTHON` is any interpreter that can import what
+`requirements.txt` lists. `asdf==5.3.*` needs Python 3.11 or newer, so a
+`python3 -m venv` only works where the system interpreter is recent
+enough; otherwise create the environment with conda/mamba, for example
+
+```bash
+mamba create -p ./asdf-env -c conda-forge python=3.12 asdf lz4
+```
+
+The `lz4` package is only needed to *regenerate* `lz4.asdf` with
+`make_fixtures.py`, not to run the tests. CI builds the environment with
+`pip` from `requirements.txt`.
+
+### The reference files
+
+`fetch-reference-files.sh` does a sparse, depth-1 clone of
+`asdf-format/asdf-standard` into `./asdf-standard` (or the directory
+given as its argument) at the commit in `asdf-standard.pin`, and prints
+the `reference_files` path on stdout. Re-running it is a no-op once the
+clone is at the pin. The files are deliberately not committed; the
+checkout is about 1 MB.
+
+To move to a newer upstream commit, put its SHA in `asdf-standard.pin`,
+re-run the script, and re-run the test suite: new reference files show
+up as new `ref-*` tests automatically, but a file that must fail cleanly
+(currently `exploded` and `stream`) has to be listed in
+`ASDF_REF_UNSUPPORTED` in `conformance.cmake`, and one whose values are
+pinned in `ASDF_REF_VALUES` needs an expected-output file (below).
 
 ## Helpers
 
@@ -67,12 +100,22 @@ default).
 ## Expected outputs
 
 `expected/*.txt` are `asdf-read-check` outputs, one per file whose values
-a `values-*` test pins: the reference files `basic`, `compressed`,
-`endian`, `float`, `int` and `shared` (their content is the same in every
-standard version, so one file covers all seven), `fixture-abc.txt` for
-the three Python-written fixtures that share the same three arrays,
-`demo.txt`, `bigendian.txt`, `float16.txt` and `rank0.txt`. Regenerate one
-with
+a `values-*` test pins:
+
+- the reference files named in `ASDF_REF_VALUES` — `ascii`, `basic`,
+  `compressed`, `endian`, `float`, `int`, `shared`, `structured`,
+  `unicode_bmp` and `unicode_spp`. Their content is the same in every
+  standard version, so one expected file covers all seven, and each is
+  checked both on the original and on asdf-cxx's copy of it
+  (`-values` / `-values2`);
+- `fixture-abc.txt` for the three Python-written fixtures that share the
+  same three arrays (`padded.asdf`, `python-default.asdf`, `lz4.asdf`);
+  `fixture-strings.txt` for `strings.asdf` in block and inline form and
+  for its copies; `fixture-structured.txt` for `structured.asdf`;
+- `demo.txt`, `bigendian.txt`, `float16.txt`, `rank0.txt` and
+  `roman-like.txt`.
+
+Regenerate one with
 
 ```bash
 build/asdf-read-check <file> > tests/expected/<name>.txt

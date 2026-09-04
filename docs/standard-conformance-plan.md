@@ -14,7 +14,7 @@ the end is what the reviewer will run. Repository: `/Users/eschnett/src/asdf-cxx
 | 2 — version table, write options, CLI | done | [#24](https://github.com/eschnett/asdf-cxx/pull/24) |
 | 3 — lossless reader | done | [#25](https://github.com/eschnett/asdf-cxx/pull/25) |
 | 4 — local complex tags | done | [#26](https://github.com/eschnett/asdf-cxx/pull/26) |
-| 5 — documentation | not started | |
+| 5 — documentation | done | [#27](https://github.com/eschnett/asdf-cxx/pull/27) |
 
 Deviations from this plan are recorded in the PR that made them, and the
 ones that change what a later phase has to do are repeated here.

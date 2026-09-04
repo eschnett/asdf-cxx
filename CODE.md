@@ -6,9 +6,11 @@ gotchas you will trip over. This complements `README.md` (user-facing
 overview and standard conformance) and is not a substitute for reading
 the headers, which are short.
 
-Snapshot: project version 8.0.0 (`CMakeLists.txt`), claims ASDF
-standard 1.2.0, ASDF file-format version 1.0.0. ~5,800 lines total
-including demos and the SWIG file.
+Snapshot: project version 8.0.0 (`CMakeLists.txt`), ASDF file-format
+version 1.0.0. ASDF standard versions 1.0.0 to 1.6.0 are read and
+written; which one a given file declares is decided per write (§4.9,
+§6), not compiled in. ~5,800 lines total including demos and the SWIG
+file.
 
 ---
 
@@ -101,6 +103,8 @@ Every header ends with a `#define <GUARD>_DONE` and a trailing
 - `CODE_COVERAGE=ON` adds `--coverage` (used by CI).
 - `ASDF_REQUIRE_ALL_DEPENDENCIES=ON` turns a missing optional dependency
   into a configure error (CI uses it so every code path is tested).
+- `ASDF_REFERENCE_FILES_DIR` and `ASDF_PYTHON` switch on the two opt-in
+  conformance test families (§9); a plain configure needs neither.
 - Install: headers to `include/asdf/`, library to `lib/`, executables
   to `bin/`, `asdf-cxx.pc` to `lib/pkgconfig/`.
 - SWIG/Python: the `find_package(PythonInterp/PythonLibs)` calls are
@@ -823,11 +827,23 @@ still passes:
   comes back fully deserialised, `compare` checks that a copy holds the
   same data as its original.
 
+The test families and what each pins down:
+
+| Family | What it checks |
+|---|---|
+| `header-*` | `tests/check-header.sh` on a written file: the `#ASDF`/`#ASDF_STANDARD` lines, the root tag on the `---` line, and the `core/ndarray` tag version |
+| `values-*` | `asdf-read-check` output diffed against `tests/expected/*.txt` — the oracle for byte order, offset and stride handling |
+| `error-*` | `tests/expect-error.sh`: exit status 1, `error:` on stderr, and the required message substrings |
+| `ref-<version>-<name>-*` | the ASDF standard's reference files, per version and per file: `-ls`, `-copy`, `-ls2`, `-header`, sometimes `-values`/`-values2`, and `-unsupported` for the ones that must fail cleanly |
+| `py-*` | `tests/python_check.py validate` / `compare` against the Python reference implementation |
+
+A plain configure registers 133 tests and no `ref-*` or `py-*`; with
+both cache variables set it registers about 840.
+
 `tests/README.md` documents the helper scripts, the fixtures and the
 rule for what may be committed (under ~4 KB, and only what asdf-cxx
 cannot write itself). `docs/standard-conformance-plan.md` is the plan
-these tests are being built out for; `tests/conformance.cmake` notes
-which phase switches on each family that is still dormant.
+these tests were built out for.
 
 ### CI (`.github/workflows/CI.yml`)
 
@@ -903,6 +919,17 @@ literal `{…}` directory; harmless.
     each registers its own write task, so the copy holds two independent
     blocks with the same content. Deduplicating would mean keying
     `writer::add_task` on the memoized state pointer.
+13. **A file whose declared version and tags disagree is read, but its
+    default copy may fail.** `classify_core_tag` accepts any version's
+    core tag regardless of the `#ASDF_STANDARD` line, so such a file is
+    read. `asdf-copy`'s default `input` mode then asks for the declared
+    version, and if the content needs a higher one — a `float16` array
+    in a file that declares 1.2.0 — `prepare_write` raises the
+    "requires" error. `--standard-version=minimal` writes it. A copy is
+    therefore always internally consistent, or there is no copy.
+14. **YAML anchors and aliases are expanded by a copy.** yaml-cpp
+    resolves them when loading, so the copy holds equal but no longer
+    shared nodes (`tests/alias.asdf`).
 
 ---
 
@@ -936,6 +963,16 @@ string ↔ id, `yaml_decode`/`yaml_encode`, `parse_scalar`,
 `ASDF_ERROR("message")` unconditionally; the message may be a
 `std::string` expression and is only evaluated on failure. Reserve
 `assert` for invariants that cannot be caused by input.
+
+**Add a standard version**: append an entry to `standard_versions()` in
+`src/version.cxx` (the tags it uses, and the two `bool`s for float16 and
+`history.extensions`), extend `standard_info_t` in `version.hxx` if the
+new version differs in a way the struct does not yet express, and adjust
+`latest_standard_version()` if it becomes the newest. Anything that has
+to *choose* a version lives in `asdf::resolve_standard_version` and
+`content_requirements::minimum_version` (§6); nothing else may spell a
+core tag. Then add the version to `ASDF_REFERENCE_VERSIONS` in
+`tests/conformance.cmake`.
 
 **Add a Python-written fixture**: extend `tests/make_fixtures.py`, run it
 with an environment that has `asdf` and `numpy`, and register ctest
