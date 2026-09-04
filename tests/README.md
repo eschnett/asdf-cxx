@@ -47,9 +47,12 @@ enough; otherwise create the environment with conda/mamba, for example
 mamba create -p ./asdf-env -c conda-forge python=3.12 asdf lz4
 ```
 
-The `lz4` package is only needed to *regenerate* `lz4.asdf` with
-`make_fixtures.py`, not to run the tests. CI builds the environment with
-`pip` from `requirements.txt`.
+Install everything `requirements.txt` lists, `lz4` included: Python asdf
+opens files with `lazy_load=False`, so `py-compare-lz4` and
+`py-validate-compression-lz4` decompress an lz4 block at open time and
+fail with an `ImportError` without it. `make_fixtures.py` needs it as
+well, to write `lz4.asdf`. CI builds the environment with `pip` from
+`requirements.txt`.
 
 ### The reference files
 

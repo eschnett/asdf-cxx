@@ -35,10 +35,13 @@ writes, what it refuses, and what it will only do when asked explicitly.
 
 ### What is read
 
-- **Any file header.** The first two lines must be `#ASDF` and
-  `#ASDF_STANDARD`; the version they declare does not have to be one this
-  library knows. A file declaring a future version is read normally, and
+- **Any file header.** The `#ASDF` magic is the only part that is
+  required. The `#ASDF_STANDARD` line may be absent, or may name a
+  version this library does not know; either way the file is read, and
   only a *copy* of it has to settle on a version that can be written.
+  Both header lines are recognised on the first two lines of the file
+  only, so a `#ASDF_STANDARD`-looking comment further down is an
+  ordinary YAML comment and does not override the header.
 - **The core tags of every standard version:** `core/asdf-1.0.0` and
   `core/asdf-1.1.0` as the root tag, `core/ndarray-1.0.0` and
   `core/ndarray-1.1.0`, `core/software-1.0.0`, and `core/complex-1.0.0`.
@@ -156,13 +159,17 @@ tools print the message and exit with status 1, and nothing is written.
 | Exploded file (`source` names a file) | `This array's "source" is "…", the name of an external file; exploded files are not supported` |
 | Masked array (`mask` key) | `This array has a "mask"; masked arrays are not supported` |
 | Masked element (`null` in inline data) | `This inline array has a "null" element, which marks a masked value; masked arrays are not supported` |
-| Input file, or an external file a reference names, cannot be opened | `Cannot open file "…"` |
+| Input file cannot be opened | `Cannot open file "…"` |
+| An external file a reference names cannot be opened | `Cannot open the external file "…" referenced from "…"` |
 | Inline `float16`, `complex32` or `int128` value on a build whose compiler lacks the type | `Cannot parse float16 values: this build has no 16-bit …` |
 | Block compressed with a codec this build does not have | `Block uses compression "…", which is not available in this build` |
 
-Writing a streamed or masked array is likewise refused. Full URI
-references between files *are* supported (`demo/demo-external.cxx`); it
-is only the ndarray `source`-as-file-name form that is not.
+The messages are quoted without the `[file.cxx:NNN]` source location
+that `ASDF::error` appends to every message and the tools print. Writing
+a masked array is refused too; a streamed array cannot be built in the
+first place, as no constructor accepts one. Full URI references between
+files *are* supported (`demo/demo-external.cxx`); it is only the ndarray
+`source`-as-file-name form that is not.
 
 ### Nonstandard content (opt-in)
 
