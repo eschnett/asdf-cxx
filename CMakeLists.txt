@@ -166,6 +166,11 @@ set(ASDF_SOURCES
 
 add_library(asdf-cxx ${ASDF_HEADERS} ${ASDF_SOURCES})
 set_property(TARGET asdf-cxx PROPERTY POSITION_INDEPENDENT_CODE TRUE)
+# Only used for a shared library (`-DBUILD_SHARED_LIBS=ON`), where they give
+# the soname `libasdf-cxx.so.8`; ignored for the static default
+set_target_properties(asdf-cxx PROPERTIES
+  VERSION ${PROJECT_VERSION}
+  SOVERSION ${PROJECT_VERSION_MAJOR})
 target_compile_features(asdf-cxx PUBLIC cxx_std_17)
 target_include_directories(asdf-cxx PUBLIC include/asdf)
 target_link_libraries(asdf-cxx ${LIBS})
@@ -339,7 +344,8 @@ if(BZip2_FOUND)
   set(PKG_CONFIG_LIBS "${PKG_CONFIG_LIBS} -lbz2")
 endif()
 if(LIBLZ4_FOUND)
-  set(PKG_CONFIG_REQUIRES "${PKG_CONFIG_REQUIRES} lz4")
+  # lz4 installs its pkg-config file as `liblz4.pc`
+  set(PKG_CONFIG_REQUIRES "${PKG_CONFIG_REQUIRES} liblz4")
   set(PKG_CONFIG_LIBS "${PKG_CONFIG_LIBS} -llz4")
 endif()
 if(LIBZSTD_FOUND)
@@ -347,8 +353,10 @@ if(LIBZSTD_FOUND)
   set(PKG_CONFIG_LIBS "${PKG_CONFIG_LIBS} -lzstd")
 endif()
 if(OPENSSL_FOUND)
-  set(PKG_CONFIG_REQUIRES "${PKG_CONFIG_REQUIRES} libssl")
-  set(PKG_CONFIG_LIBS "${PKG_CONFIG_LIBS} -lssl")
+  # The checksums use the EVP digest API, which lives in libcrypto; that is
+  # also what `LIBS` links (`OPENSSL_CRYPTO_LIBRARY` above)
+  set(PKG_CONFIG_REQUIRES "${PKG_CONFIG_REQUIRES} libcrypto")
+  set(PKG_CONFIG_LIBS "${PKG_CONFIG_LIBS} -lcrypto")
 endif()
 if(ZLIB_FOUND)
   set(PKG_CONFIG_REQUIRES "${PKG_CONFIG_REQUIRES} zlib")
