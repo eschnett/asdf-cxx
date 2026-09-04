@@ -121,7 +121,8 @@ that also pins the exact spelling that a copy has to preserve.
 | `alias.asdf` | YAML anchors and aliases; yaml-cpp resolves them on load and a copy expands them |
 | `untagged-root.asdf` | a bare `---` root, which the standard allows |
 | `header-comment.asdf` | a YAML comment inside the tree that looks like the `#ASDF_STANDARD` header line; only the first two lines declare the versions |
-| `scalar-types.asdf` | scalars whose YAML spelling decides their type: quoted `"42"`/`"1.0"`/`"true"`/`"0x10"`/`"1e3"`/`"no"`, plain `y`/`n` as axis names, and an inline array that omits `shape` |
+| `scalar-types.asdf` | scalars whose YAML spelling decides their type: quoted `"42"`/`"1.0"`/`"true"`/`"0x10"`/`"1e3"`/`"no"`, plain `1.0`/`-2.0`/`1.0e+17`/`3.0e-10` floats, plain `y`/`n` as axis names, and an inline array that omits `shape` |
+| `old-complex.asdf` | complex numbers spelled `.nan`/`.inf`/`-.inf`, as asdf-cxx wrote them before it followed the `core/complex-1.0.0` grammar. The file stays readable and its copy comes out in the spelling the schema prescribes, which Python asdf can then read (the original it cannot) |
 | `bad-software.asdf` | a `core/software` node without the `version` its schema requires |
 
 ### Deliberately broken files

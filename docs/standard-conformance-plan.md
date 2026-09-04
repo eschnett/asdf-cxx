@@ -13,7 +13,7 @@ the end is what the reviewer will run. Repository: `/Users/eschnett/src/asdf-cxx
 | 1b — string datatypes | done | [#23](https://github.com/eschnett/asdf-cxx/pull/23) |
 | 2 — version table, write options, CLI | done | [#24](https://github.com/eschnett/asdf-cxx/pull/24) |
 | 3 — lossless reader | done | [#25](https://github.com/eschnett/asdf-cxx/pull/25) |
-| 4 — local complex tags | not started | |
+| 4 — local complex tags | done | [#26](https://github.com/eschnett/asdf-cxx/pull/26) |
 | 5 — documentation | not started | |
 
 Deviations from this plan are recorded in the PR that made them, and the
@@ -296,7 +296,68 @@ also spell the elements of inline float arrays, so changing them here would
 change the bytes of every file this library writes and would split a spelling
 decision across two phases. Phase 4 already reworks scalar emission
 (`emit_node`, the `nan`/`inf` spelling); this belongs with it. Recorded as
-known gap 9 in CODE.md.
+known gap 9 in CODE.md. **Fixed in Phase 4** (PR #26).
+
+**Phase 4** (PR #26) deviations:
+
+- The float and complex spellings are **template helpers in `io.hxx`**
+  (`format_float`, `format_complex`), not logic inside
+  `yaml_encode`/`yaml_encode_complex` alone. The writer's `operator<<` for
+  `std::complex<T>` is a template in the header and has to spell a complex
+  number exactly the way `yaml_encode_complex` in `src/datatype.cxx` does, so
+  the two share one definition. Both normalise the sign of a NaN.
+- `emit_node` is used for `datatype->to_yaml()` as well, as the plan asks,
+  although a datatype node carries no tag; what it needs from `emit_node` is
+  the flow style of `[ascii, 3]`. `ref-*-structured` and the new
+  `header-strings-copy` cover it.
+- The plan's "verify flow-style propagation" turned out to need `Flow` *before*
+  `BeginSeq`; yaml-cpp's own `EmitFromEvents` emits it after, which works only
+  because the emitter applies the manipulator to the group it is inside.
+- `yaml_decode_complex` now uses `strtod` rather than `stod`, so an
+  out-of-range literal saturates to infinity (what Python does) instead of
+  throwing a `std::out_of_range` that is not an `ASDF::error`. Its regex
+  captures one group per component instead of seven.
+- Added beyond the plan: `tests/old-complex.asdf`, a text fixture in the
+  `.nan`/`.inf` spelling earlier versions of this library wrote, with
+  `old-complex-ls`, `old-complex-copy`, `old-complex-ls2`,
+  `header-old-complex-copy` and `py-validate-old-complex`; a
+  `header-nonstandard-flow` and a `header-strings-copy` for the flow style
+  `emit_node` has to preserve; `header-demo-nodes` / `header-demo2-nodes` for
+  the local tag spelling; `header-strided-complex`;
+  `ref-<v>-complex-inline-header`; and
+  `ref-<v>-float-inline-{copy,ls,py-compare,header}`, which is where the
+  plan's "verify `.inf`/`.nan` scalars" item ended up: a plain float keeps
+  YAML's own `.nan`/`.inf` spelling (only a complex component drops the dot),
+  and `-0.0` stays `-0.0`.
+- `tests/python_check.py`'s `compare_values` gained a scalar type check.
+  `1.0 == 1` and `True == 1` in Python, so the retyping this phase fixes
+  would otherwise pass `py-compare-scalar-types` unnoticed.
+- `demo/demo-strided.cxx` compares NaN elements with a `same_value` helper
+  rather than `==`, and gained `check_complex_spelling` /
+  `check_float_spelling`, which assert the exact emitted text and that both
+  complex spellings parse.
+
+Review of Phase 4 found one issue, fixed in the same PR:
+
+- **A float whose shortest spelling carries an exponent was still retyped**,
+  to a *string* rather than to an integer. The first `format_float` appended
+  `.0` only when every character after the sign was a digit, so `1e+17` and
+  `3e-10` were left as yaml-cpp wrote them -- and YAML 1.1 resolves a scalar
+  to a float only if its mantissa carries a decimal point, so Python asdf
+  read them back as `str`. This is the same defect the phase set out to
+  close, in a different spelling, and equally pre-existing on `main`. The
+  `.0` now goes before the exponent (`1.0e+17`), which is what Python asdf
+  writes itself. Inline float array elements were unaffected in practice,
+  because the array's declared `datatype` governs parsing; the impact was on
+  tree and metadata scalars. `tests/scalar-types.asdf` gained `bigfloat`
+  and `smallfloat`, asserted in `header-scalar-types-copy` and caught by
+  `py-compare-scalar-types`, and `check_float_spelling` gained exponent
+  cases. How many digits yaml-cpp prints is its own business and differs
+  between its versions (the CI machines' yaml-cpp spells `1e-5` with 16
+  significant digits, the maintainer's with 17), so `check_float_spelling`
+  asserts an exact text only for values whose shortest decimal is the same
+  at every precision, and checks the others for the property this library
+  owes: a decimal point in the mantissa.
 
 ---
 

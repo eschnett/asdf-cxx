@@ -1,0 +1,14 @@
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+legacy: !core/ndarray-1.0.0
+  data:
+    - !core/complex-1.0.0 .nan+.nani
+    - !core/complex-1.0.0 .inf-.infi
+    - !core/complex-1.0.0 1.5-.infi
+    - !core/complex-1.0.0 -.inf+2.5i
+  datatype: complex128
+  shape: [4]
+...

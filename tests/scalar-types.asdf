@@ -13,6 +13,10 @@ quoted:
 plain:
   int: 42
   bool: true
+  float: 1.0
+  negfloat: -2.0
+  bigfloat: 1.0e+17
+  smallfloat: 3.0e-10
   axes: [x, y, n]
 noshape: !core/ndarray-1.0.0
   data: [1, 2, 3]

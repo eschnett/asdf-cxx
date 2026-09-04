@@ -146,6 +146,50 @@ if(ASDF_REFERENCE_FILES_DIR)
       asdf_test_depends(${prefix}-header ${prefix}-copy)
     endforeach()
 
+    # The reference `complex.asdf` files hold nan, inf and -0.0 in both
+    # components and both byte orders. Written inline, every element goes
+    # through the `core/complex-1.0.0` spelling, and the Python comparison is
+    # the proof that the reference implementation parses what asdf-cxx wrote.
+    set(complex_inline "ref-${version}-complex-inline.asdf")
+    add_test(NAME ref-${version}-complex-inline-copy
+      COMMAND ./asdf-copy --array=inline "${dir}/complex.asdf"
+      "${complex_inline}")
+    add_test(NAME ref-${version}-complex-inline-ls
+      COMMAND ./asdf-ls "${complex_inline}")
+    asdf_test_depends(ref-${version}-complex-inline-ls
+      ref-${version}-complex-inline-copy)
+    asdf_add_python_test(ref-${version}-complex-inline-py-compare
+      compare "${dir}/complex.asdf" "${complex_inline}")
+    asdf_test_depends(ref-${version}-complex-inline-py-compare
+      ref-${version}-complex-inline-copy)
+    # The local tag spelling of the standard's own examples, and no `.nan`
+    asdf_add_header_test(ref-${version}-complex-inline-header
+      "${complex_inline}" --present "!core/complex-1.0.0 nan+nani"
+      --absent "!<tag:" --absent ".nan" --absent ".inf")
+    asdf_test_depends(ref-${version}-complex-inline-header
+      ref-${version}-complex-inline-copy)
+
+    # `float.asdf` holds NaN, both infinities and -0.0. Written inline, the
+    # elements are plain YAML floats, which keep YAML's own `.nan` / `.inf`
+    # spelling -- unlike the components of a complex number -- and keep the
+    # `.0` that tells a reader they are not integers.
+    set(float_inline "ref-${version}-float-inline.asdf")
+    add_test(NAME ref-${version}-float-inline-copy
+      COMMAND ./asdf-copy --array=inline "${dir}/float.asdf" "${float_inline}")
+    add_test(NAME ref-${version}-float-inline-ls
+      COMMAND ./asdf-ls "${float_inline}")
+    asdf_test_depends(ref-${version}-float-inline-ls
+      ref-${version}-float-inline-copy)
+    asdf_add_python_test(ref-${version}-float-inline-py-compare
+      compare "${dir}/float.asdf" "${float_inline}")
+    asdf_test_depends(ref-${version}-float-inline-py-compare
+      ref-${version}-float-inline-copy)
+    asdf_add_header_test(ref-${version}-float-inline-header "${float_inline}"
+      --present "- .nan" --present "- .inf" --present "- -.inf"
+      --present "- -0.0" --present "- 0.0")
+    asdf_test_depends(ref-${version}-float-inline-header
+      ref-${version}-float-inline-copy)
+
     # `shared.asdf` holds a second view of one block: `subset` is
     # `base[1::2]`, which needs both an offset and explicit strides
     if(version STREQUAL "1.6.0")
@@ -341,6 +385,13 @@ asdf_test_depends(strided-ls2 strided-copy)
 asdf_add_python_test(py-compare-strided
   compare strided.asdf strided2.asdf)
 asdf_test_depends(py-compare-strided strided-copy)
+# The non-finite complex elements are spelled the way the
+# `core/complex-1.0.0` grammar prescribes, not the way YAML spells them
+asdf_add_header_test(header-strided-complex strided.asdf
+  --present "!core/complex-1.0.0 nan+infi"
+  --present "!core/complex-1.0.0 -inf+1i"
+  --absent "!<tag:" --absent ".nan" --absent ".inf")
+asdf_test_depends(header-strided-complex demo-strided)
 
 # strings.asdf: `ascii` and `ucs4` arrays as blocks (little-endian, and
 # big-endian so that the 4-byte code units have to be swapped) and inline,
@@ -366,6 +417,11 @@ asdf_test_depends(py-compare-strings strings-copy)
 asdf_add_python_test(py-compare-strings-inline
   compare "${ASDF_TESTS_DIR}/strings.asdf" strings-inline.asdf)
 asdf_test_depends(py-compare-strings-inline strings-inline-copy)
+# The two-element string datatype is a flow sequence in the `YAML::Node`
+# `datatype_t::to_yaml` builds, and `emit_node` has to keep it one
+asdf_add_header_test(header-strings-copy strings2.asdf
+  --present "datatype: [ascii, 3]" --present "datatype: [ucs4, 2]")
+asdf_test_depends(header-strings-copy strings-copy)
 
 # rank0.asdf: rank-0 arrays (`shape: []`) as blocks, which the core/ndarray
 # schema allows and Python asdf writes. Reading, copying and reading the values
@@ -447,6 +503,16 @@ asdf_add_header_test(header-demo demo.asdf --standard 1.2.0
   --root-tag core/asdf-1.1.0 --ndarray-tag core/ndarray-1.0.0
   --absent "offset: 0" --absent "strides:")
 asdf_test_depends(header-demo demo)
+# A core tag inside a `YAML::Node` (the elements of an inline complex array)
+# is emitted in the local form the standard's examples use, not as a verbatim
+# `!<tag:...>`; and an inline `float64` element keeps its fractional part, so
+# that a reader does not see an integer
+asdf_add_header_test(header-demo-nodes demo.asdf
+  --present "!core/complex-1.0.0 1+0i" --absent "!<tag:" --present "- 1.0")
+asdf_test_depends(header-demo-nodes demo)
+asdf_add_header_test(header-demo2-nodes demo2.asdf
+  --present "!core/complex-1.0.0 1+0i" --absent "!<tag:" --present "- 1.0")
+asdf_test_depends(header-demo2-nodes copy)
 # demo.asdf declares 1.2.0, so the default (preserving) copy keeps it
 asdf_add_header_test(header-demo2 demo2.asdf --standard 1.2.0
   --root-tag core/asdf-1.1.0 --ndarray-tag core/ndarray-1.0.0
@@ -462,6 +528,11 @@ else()
   asdf_add_version_test(header-nonstandard nonstandard.asdf 1.2.0)
 endif()
 asdf_test_depends(header-nonstandard demo-nonstandard)
+# `emit_node` keeps the flow style a `YAML::Node` carries: the records of an
+# inline structured array, and their `float64` field with its fractional part
+asdf_add_header_test(header-nonstandard-flow nonstandard.asdf
+  --present "- [2, 3.0, [10, 11]]" --absent "!<tag:")
+asdf_test_depends(header-nonstandard-flow demo-nonstandard)
 
 # --standard-version=X.Y.Z writes that version, with its tags
 add_test(NAME demo-1.6.0-copy
@@ -686,8 +757,10 @@ asdf_test_depends(py-compare-roman-like roman-like-copy)
 # scalar-types.asdf: the YAML spelling of a scalar decides its type, and a
 # copy must not retype it. A quoted scalar is a string however it looks; a
 # plain `y` or `n` is a string too, because that is what PyYAML resolves it to
-# (yaml-cpp follows the YAML 1.1 type repository and would say `true`). The
-# fixture also has an inline array with no `shape`, which is inferred.
+# (yaml-cpp follows the YAML 1.1 type repository and would say `true`). A
+# float needs a decimal point in its mantissa to stay a float, with an
+# exponent as much as without one. The fixture also has an inline array with
+# no `shape`, which is inferred.
 add_test(NAME scalar-types-ls
   COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/scalar-types.asdf")
 add_test(NAME scalar-types-copy
@@ -699,11 +772,35 @@ asdf_add_header_test(header-scalar-types-copy scalar-types2.asdf
   --present "bool: \"true\"" --present "hex: \"0x10\""
   --present "exponent: \"1e3\"" --present "no: \"no\""
   --present "- \"y\"" --present "- \"n\""
+  --present "float: 1.0" --present "negfloat: -2.0"
+  --present "bigfloat: 1.0e+17" --present "smallfloat: 3.0e-10"
   --present "shape: [3]")
 asdf_test_depends(header-scalar-types-copy scalar-types-copy)
 asdf_add_python_test(py-compare-scalar-types
   compare "${ASDF_TESTS_DIR}/scalar-types.asdf" scalar-types2.asdf)
 asdf_test_depends(py-compare-scalar-types scalar-types-copy)
+
+# old-complex.asdf: complex numbers in the spelling asdf-cxx used before it
+# followed the `core/complex-1.0.0` grammar (`.nan`, `.inf`, `-.inf`). Such a
+# file has to stay readable, and its copy has to come out in the spelling the
+# schema prescribes -- which Python asdf, unlike the original, can then read.
+add_test(NAME old-complex-ls
+  COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/old-complex.asdf")
+add_test(NAME old-complex-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/old-complex.asdf" old-complex2.asdf)
+add_test(NAME old-complex-ls2 COMMAND ./asdf-ls old-complex2.asdf)
+asdf_test_depends(old-complex-ls2 old-complex-copy)
+asdf_add_header_test(header-old-complex-copy old-complex2.asdf
+  --present "!core/complex-1.0.0 nan+nani"
+  --present "!core/complex-1.0.0 inf-infi"
+  --present "!core/complex-1.0.0 1.5-infi"
+  --present "!core/complex-1.0.0 -inf+2.5i"
+  --absent ".nan" --absent ".inf")
+asdf_test_depends(header-old-complex-copy old-complex-copy)
+asdf_add_python_test(py-validate-old-complex validate --standard 1.5.0
+  --root-tag core/asdf-1.1.0 --ndarray-tag core/ndarray-1.0.0
+  old-complex2.asdf)
+asdf_test_depends(py-validate-old-complex old-complex-copy)
 
 # A `core/software` node without the keys the schema requires must be named
 # as such, not tripped up by a yaml-cpp "invalid node" message

@@ -388,8 +388,11 @@ tool: !core/software-1.0.0 {name: foo}
 """,
     # Scalars whose YAML spelling decides their type. A quoted scalar is a
     # string however it looks; a plain `y` or `n` is a string too, because
-    # that is what the reference implementation's parser resolves it to. An
-    # inline array may omit `shape`, which is inferred from the data.
+    # that is what the reference implementation's parser resolves it to; a
+    # plain `1.0` is a float and must not come back as an int, and neither
+    # may `1.0e+17` come back as a string (YAML 1.1 resolves a float only
+    # with a decimal point in the mantissa). An inline array may omit
+    # `shape`, which is inferred from the data.
     "scalar-types.asdf": """\
 #ASDF 1.0.0
 #ASDF_STANDARD 1.5.0
@@ -406,10 +409,35 @@ quoted:
 plain:
   int: 42
   bool: true
+  float: 1.0
+  negfloat: -2.0
+  bigfloat: 1.0e+17
+  smallfloat: 3.0e-10
   axes: [x, y, n]
 noshape: !core/ndarray-1.0.0
   data: [1, 2, 3]
   datatype: int64
+...
+""",
+    # Complex numbers in the spelling asdf-cxx used before it followed the
+    # `core/complex-1.0.0` grammar: YAML's `.nan`, `.inf` and `-.inf`, which
+    # that grammar's pattern rejects (Python asdf cannot open this file).
+    # Such files have to stay readable, and a copy of them has to come out in
+    # the spelling the schema prescribes.
+    "old-complex.asdf": """\
+#ASDF 1.0.0
+#ASDF_STANDARD 1.5.0
+%YAML 1.1
+%TAG ! tag:stsci.edu:asdf/
+--- !core/asdf-1.1.0
+legacy: !core/ndarray-1.0.0
+  data:
+    - !core/complex-1.0.0 .nan+.nani
+    - !core/complex-1.0.0 .inf-.infi
+    - !core/complex-1.0.0 1.5-.infi
+    - !core/complex-1.0.0 -.inf+2.5i
+  datatype: complex128
+  shape: [4]
 ...
 """,
 }

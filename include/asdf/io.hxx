@@ -8,6 +8,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <cassert>
+#include <cmath>
 #include <complex>
 #include <functional>
 #include <iostream>
@@ -91,6 +92,65 @@ struct write_options {
 // Set `version_mode` and `explicit_version` from a
 // "minimal"|"latest"|"input"|"X.Y.Z" specification
 void set_standard_version(write_options &options, const string &spec);
+
+// Scalar spellings
+//
+// yaml-cpp emits a floating-point value the way C++ streams do, which loses
+// two distinctions ASDF cares about: a value with no fractional part comes
+// out as an integer (`1.0` as `1`), and non-finite values come out in YAML's
+// own spelling (`.inf`, `.nan`), which the `core/complex-1.0.0` grammar does
+// not accept.
+
+namespace detail {
+// yaml-cpp's spelling of a floating-point value, with the sign of a NaN
+// normalised so that every platform writes the same file
+template <typename T> string emit_float(T value) {
+  if (std::isnan(value))
+    return ".nan";
+  YAML::Emitter em;
+  em << value;
+  return string(em.c_str());
+}
+} // namespace detail
+
+// The YAML spelling of a floating-point value. YAML 1.1 resolves a scalar to
+// a float only if its mantissa carries a decimal point, so a mantissa of
+// digits only gains a `.0`: `1` becomes `1.0` and `1e+17` becomes `1.0e+17`.
+// Without it a metadata scalar written `1.0` copies out as `1` and is read
+// back as an integer, and one written `3.0e-10` copies out as `3e-10` and is
+// read back as a string.
+template <typename T> string format_float(T value) {
+  string str = detail::emit_float(value);
+  // Everything before an `e`/`E` exponent; the whole string when there is
+  // none. `.inf` and `.nan` have a dot and are left alone.
+  const size_t mantissa = str.find_first_of("eE");
+  const size_t end = mantissa == string::npos ? str.size() : mantissa;
+  const size_t start = end > 0 && (str[0] == '-' || str[0] == '+') ? 1 : 0;
+  bool integral = start < end;
+  for (size_t i = start; i < end; ++i)
+    integral = integral && str[i] >= '0' && str[i] <= '9';
+  if (integral)
+    str.insert(end, ".0");
+  return str;
+}
+
+// The `core/complex-1.0.0` spelling of a complex number,
+// `<real><sign><imag>i`. That schema's grammar writes the non-finite
+// components `inf`, `-inf` and `nan`, without the leading dot YAML itself
+// uses, and takes the imaginary part's sign from the separator.
+template <typename T> string format_complex(const complex<T> &value) {
+  const auto component = [](T val) {
+    string str = detail::emit_float(val);
+    const size_t dot = str.find('.');
+    if (dot != string::npos && dot + 1 < str.size() &&
+        (str[dot + 1] == 'i' || str[dot + 1] == 'n'))
+      str.erase(dot, 1);
+    return str;
+  };
+  const string re = component(value.real());
+  const string im = component(value.imag());
+  return re + (!im.empty() && im[0] == '-' ? "" : "+") + im + "i";
+}
 
 class block_t;
 struct block_info_t;
@@ -176,18 +236,9 @@ public:
 
   template <typename T>
   friend writer &operator<<(writer &w, const std::complex<T> &value) {
-    // see `yaml_encode(const complex<T> &val)`
-    YAML::Emitter re;
-    re << value.real();
-    YAML::Emitter im;
-    im << value.imag();
-    ostringstream buf;
-    buf << re.c_str();
-    if (im.c_str()[0] != '-')
-      buf << "+";
-    buf << im.c_str() << "i";
-
-    w << YAML::LocalTag(w.standard().complex_tag) << buf.str();
+    // see `yaml_encode(const complex<T> &val)`, which spells the number the
+    // same way but has no writer to take the tag from
+    w << YAML::LocalTag(w.standard().complex_tag) << format_complex(value);
     return w;
   }
 
@@ -211,6 +262,13 @@ bool is_trivial_tag(const string &full_tag);
 // this library writes has; everything else becomes a verbatim tag
 // (`!<asdf://example.org/foo-1.0.0>`).
 writer &emit_tag(writer &w, const string &full_tag);
+
+// Emit a whole `YAML::Node` tree through the Emitter. yaml-cpp's own
+// `Emitter << Node` goes through `EmitFromEvents`, which spells every tag
+// verbatim (`!<tag:stsci.edu:asdf/core/complex-1.0.0>`); this uses
+// `emit_tag` instead, so a core tag comes out in the local form the
+// standard's examples use. Flow and block style are preserved.
+writer &emit_node(writer &w, const YAML::Node &node);
 
 } // namespace ASDF
 

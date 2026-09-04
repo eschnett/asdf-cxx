@@ -2,6 +2,8 @@
 #include <asdf/datatype.hxx>
 #include <asdf/stl.hxx>
 
+#include <cctype>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <regex>
@@ -319,20 +321,38 @@ void yaml_decode(const YAML::Node &node, float64_t &val) {
   val = node.as<float64_t>();
 }
 namespace {
+// One component of a complex number, in either spelling: the
+// `core/complex-1.0.0` grammar's `inf`, `-inf`, `nan`, and the `.inf`,
+// `-.inf`, `.nan` that yaml-cpp -- and hence every file asdf-cxx wrote
+// before this -- produces. `strtod` understands neither leading dot.
+template <typename T> T parse_complex_component(string str) {
+  const size_t dot = str.find('.');
+  if (dot != string::npos && dot + 1 < str.size() &&
+      (tolower(static_cast<unsigned char>(str[dot + 1])) == 'i' ||
+       tolower(static_cast<unsigned char>(str[dot + 1])) == 'n'))
+    str.erase(dot, 1);
+  // `strtod`, not `stod`: an out-of-range literal saturates to +-infinity
+  // instead of throwing, which is what the reference implementation does
+  return static_cast<T>(strtod(str.c_str(), nullptr));
+}
+
 template <typename T>
 void yaml_decode_complex(const YAML::Node &node, complex<T> &val) {
   ASDF_CHECK(classify_core_tag(node.Tag()) == core_tag_t::complex_,
              "Expected tag core/complex-1.0.0, found \"" + node.Tag() + "\"");
-  static const string ieee = "([-+]?[0-9]*\\.?[0-9]+(e[-+]?[0-9]+)?|inf|nan)";
-  static const regex cmplx("\\(?(" + ieee + ")?((" + ieee + ")[ij])?\\)?",
+  // A signed number, `inf` or `nan`, with the leading dot of YAML's own
+  // `.inf`/`.nan` allowed. One capturing group per component.
+  static const string ieee =
+      "([-+]?(?:(?:[0-9]*\\.?[0-9]+(?:e[-+]?[0-9]+)?)|(?:\\.?(?:inf|nan))))";
+  static const regex cmplx("\\(?" + ieee + "?(?:" + ieee + "[ij])?\\)?",
                            regex::icase | regex::optimize);
-  assert(cmplx.mark_count() == 7);
+  assert(cmplx.mark_count() == 2);
   const auto &str = node.Scalar();
   smatch m;
   bool didmatch = regex_match(str, m, cmplx);
   ASDF_CHECK(didmatch, "Cannot parse complex number \"" + str + "\"");
-  const T re = m[1].matched ? static_cast<T>(stod(m[1].str())) : 0;
-  const T im = m[6].matched ? static_cast<T>(stod(m[6].str())) : 0;
+  const T re = m[1].matched ? parse_complex_component<T>(m[1].str()) : 0;
+  const T im = m[2].matched ? parse_complex_component<T>(m[2].str()) : 0;
   val = {re, im};
 }
 } // namespace
@@ -416,42 +436,32 @@ YAML::Node yaml_encode(uint128_t val) {
 #endif
 #ifdef ASDF_HAVE_FLOAT16
 YAML::Node yaml_encode(float16_t val) {
-  YAML::Node node;
   // yaml-cpp does not support `float16_t`
-  node = float32_t(val);
-  return node;
+  return yaml_encode(float32_t(val));
 }
 #endif
 YAML::Node yaml_encode(float32_t val) {
   YAML::Node node;
-  node = val;
+  // `format_float`, not the value itself: yaml-cpp writes a value with no
+  // fractional part as an integer, and a reader would then see an `int`
+  node = format_float(val);
   return node;
 }
 YAML::Node yaml_encode(float64_t val) {
   YAML::Node node;
-  node = val;
+  node = format_float(val);
   return node;
 }
 namespace {
 template <typename T> YAML::Node yaml_encode_complex(const complex<T> &val) {
-  // Work around libstdc++ const-handling bug in gcc 4.8
-  auto val1(val);
-  YAML::Emitter re;
-  re << val1.real();
-  YAML::Emitter im;
-  im << val1.imag();
-  ostringstream buf;
-  buf << re.c_str();
-  if (im.c_str()[0] != '-')
-    buf << "+";
-  buf << im.c_str() << "i";
-
   YAML::Node node;
-  // TODO (Phase 4): emit a local tag; a `YAML::Node` tag is always emitted
-  // verbatim, so this is the one place that still spells the full URI
+  // The tag is stored as the full URI; `emit_node` turns it back into the
+  // local `!core/complex-1.0.0` form when the node is written. `core/complex`
+  // is at version 1.0.0 in every version of the standard, so taking it from
+  // the latest one describes every file this library writes.
   node.SetTag(string(asdf_tag_prefix) +
               standard_info(latest_standard_version()).complex_tag);
-  node = buf.str();
+  node = format_complex(val);
   return node;
 }
 } // namespace
