@@ -183,6 +183,15 @@ def compare_values(path, a, b):
         if not (a == b or (np.isnan(a) and np.isnan(b))):
             raise CheckFailed(f"{path}: {a!r} vs {b!r}")
         return
+    if isinstance(a, (bool, int, float)) and isinstance(b, (bool, int, float)):
+        # `1.0 == 1` and `True == 1` in Python, so plain equality would not
+        # notice a copy that retyped a tree scalar
+        if isinstance(a, float) != isinstance(b, float) or isinstance(
+            a, bool
+        ) != isinstance(b, bool):
+            raise CheckFailed(
+                f"{path}: {type(a).__name__} {a!r} vs {type(b).__name__} {b!r}"
+            )
     if a != b:
         # A tag Python asdf deserialises into a plain object without an
         # `__eq__` (asdf.tags.core.Constant, for one) would otherwise compare

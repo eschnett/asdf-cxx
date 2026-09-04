@@ -360,7 +360,7 @@ and returns `{memoized<block_t>, block_info_t}` (§5.2).
   describes
 - `operator<<` forwards to the emitter, with a special overload for
   `std::complex<T>` that emits the local `core/complex-…` tag from
-  `standard()`
+  `standard()` and the number through `format_complex`
 - `add_task(fn(ostream&))` queues a block-writing closure and returns
   its index — this index **is** the `source:` value in the YAML
 - `flush()` emits `EndDoc`, checks `emitter.good()` (yaml-cpp otherwise
@@ -368,6 +368,33 @@ and returns `{memoized<block_t>, block_info_t}` (§5.2).
   `ASDF::error`, then runs the queued tasks in order (writing the binary
   blocks and recording their offsets) and writes the block index
 - the destructor asserts that `flush()` was called
+
+`emit_tag(w, full_tag)` writes a tag that was read from a file: nothing
+for a trivial tag, a local `!core/…` for anything under
+`asdf_tag_prefix`, a verbatim `!<…>` otherwise. `emit_node(w, node)`
+re-emits a whole `YAML::Node` tree through the Emitter, using `emit_tag`
+for each node's tag and preserving flow/block style. yaml-cpp's own
+`Emitter << Node` goes through `EmitFromEvents`, which spells every tag
+verbatim, so any node that carries a core tag — the elements of an inline
+complex array — has to take this path. `ndarray::to_yaml` uses it for the
+`emit_inline_array` result and for `datatype->to_yaml()`, and
+`asdf::to_yaml` for the user-supplied `nodes`.
+
+Two spelling helpers in `io.hxx` decide how a floating-point value is
+written; both are templates, so the `writer` overloads and
+`src/datatype.cxx` share them:
+- `format_float(v)` is yaml-cpp's spelling plus a trailing `.0` when the
+  value has no fractional part. Without it a metadata scalar written
+  `1.0` copies out as `1` and is read back as an integer, and so is every
+  element of an inline float array.
+- `format_complex(v)` is `<real><sign><imag>i`, with the non-finite
+  components written `inf`, `-inf` and `nan`. That is what the
+  `core/complex-1.0.0` grammar's pattern accepts; YAML's own `.inf` /
+  `.nan` is not. `yaml_decode_complex` reads both spellings, so files
+  earlier versions of this library wrote stay readable
+  (`tests/old-complex.asdf`).
+- Both normalise the sign of a NaN, so that every platform writes the
+  same bytes.
 
 `copy_state` is a small struct of `set_X` / `X` pairs for block format,
 compression and compression level. `ndarray(cs, arr)` applies the set
@@ -601,7 +628,9 @@ an `ofstream` (binary, truncate) and calls `write(ostream&, options)`:
    captures a copy of the ndarray in a closure, registers it with
    `w.add_task(...)`, and writes the returned index as `source:`. For
    inline format it emits nested YAML sequences via `emit_inline_array`
-   (honouring `strides` and `offset`). It always writes `datatype` and
+   (honouring `strides` and `offset`) and hands the resulting node to
+   `emit_node`, which is what turns the `core/complex-1.0.0` tag of each
+   element of a complex array into the local `!core/complex-1.0.0`. It always writes `datatype` and
    `shape`; `byteorder` only for block format, and `offset` and
    `strides` only for block format and only when they differ from their
    defaults (nonzero offset, non-C-contiguous strides).
@@ -850,39 +879,25 @@ literal `{…}` directory; harmless.
    accepts it.
 8. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).
-9. **A plain float scalar in the tree loses its type on a copy.** A
-    metadata value written `1.0` is emitted as `1`, because
-    `yaml_encode(float64_t)` hands yaml-cpp a double and yaml-cpp drops
-    the fractional part. The value is unchanged, but Python asdf reads
-    the copy's `1` as an `int`. The same `yaml_encode` overloads spell
-    the elements of inline float arrays, so the fix belongs with Phase 4,
-    which reworks scalar emission (`emit_node`, the complex spelling)
-    rather than splitting the decision across two phases. Quoted strings
-    and plain `y`/`n` scalars are unaffected (§5.3).
-10. **A tagged scalar spelled `~` comes back quoted.** Its text is stored
+9. **A tagged scalar spelled `~` comes back quoted.** Its text is stored
     and re-emitted, and yaml-cpp quotes `~` so that it stays a string.
     The file is stable under further copies, but the null-ness of a
     tagged null is not preserved. No ASDF schema uses one.
-11. Blosc and blosc2 code paths compile only where those libraries are
+10. Blosc and blosc2 code paths compile only where those libraries are
     found. CI requires them (`ASDF_REQUIRE_ALL_DEPENDENCIES`), but a
     development machine without them silently skips those paths, so guard
     demo usage with `have_compression_blosc()` and test with both. blosc2
     needs `blosc2_init()` before its schunk API; `ndarray.cxx` does this
     once per process.
-12. **External:** Python asdf 5.3 with numpy 2 cannot read inline
+11. **External:** Python asdf 5.3 with numpy 2 cannot read inline
     structured arrays, its own included. Block-format structured arrays
     round-trip fine. Keep `demo.asdf` free of inline structured arrays.
-13. **A block shared by two arrays is duplicated on copy.** Two
+12. **A block shared by two arrays is duplicated on copy.** Two
     `ndarray`s can describe different views of one block
     (asdf-standard's `shared.asdf` does), and both read correctly, but
     each registers its own write task, so the copy holds two independent
     blocks with the same content. Deduplicating would mean keying
     `writer::add_task` on the memoized state pointer.
-14. **External:** Python asdf cannot read an inline complex array that
-    contains NaN or infinity. yaml-cpp emits the YAML 1.1 spellings
-    `.nan` / `.inf`, which Python's `core/complex-1.0.0` parser rejects,
-    so the tagged scalars come back as plain strings and validation
-    fails. Block-format complex arrays are unaffected.
 
 ---
 

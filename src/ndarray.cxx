@@ -1157,15 +1157,20 @@ writer &ndarray::to_yaml(writer &w) const {
     w << YAML::Key << "source" << YAML::Value << idx;
   } else {
     // data
-    w << YAML::Key << "data" << YAML::Value
-      << emit_inline_array(
-             static_cast<const unsigned char *>(get_data()->ptr()) + offset,
-             datatype, byteorder, shape, strides);
+    w << YAML::Key << "data" << YAML::Value;
+    // `emit_node`, not `w << node`: the inline form of a complex array holds
+    // a `core/complex-1.0.0` tag on every element, and yaml-cpp's own node
+    // emission would spell each of them as a verbatim `!<tag:...>`
+    emit_node(
+        w, emit_inline_array(
+               static_cast<const unsigned char *>(get_data()->ptr()) + offset,
+               datatype, byteorder, shape, strides));
   }
   // mask
   ASDF_CHECK(mask.empty(), "Writing masked arrays is not supported");
   // datatype
-  w << YAML::Key << "datatype" << YAML::Value << datatype->to_yaml(w);
+  w << YAML::Key << "datatype" << YAML::Value;
+  emit_node(w, datatype->to_yaml(w));
   if (block_format == block_format_t::block) {
     // byteorder
     w << YAML::Key << "byteorder" << YAML::Value << yaml_encode(byteorder);

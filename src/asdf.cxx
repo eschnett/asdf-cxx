@@ -60,8 +60,10 @@ writer &asdf::to_yaml(writer &w) const {
       }
       w << YAML::Key << key << YAML::Value << *value;
     }
-  for (const auto &kv : nodes)
-    w << YAML::Key << kv.first << YAML::Value << kv.second;
+  for (const auto &kv : nodes) {
+    w << YAML::Key << kv.first << YAML::Value;
+    emit_node(w, kv.second);
+  }
   for (const auto &kv : writers) {
     w << YAML::Key << kv.first << YAML::Value;
     kv.second(w);

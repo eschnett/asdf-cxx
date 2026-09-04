@@ -47,8 +47,15 @@ are:
 A scalar's YAML spelling decides its type and survives a copy: a quoted
 scalar stays a string however it looks (`"42"` does not become an
 integer), and a plain `y` or `n` stays a string too, matching what the
-reference implementation's parser resolves it to. A plain float written
-`1.0` is currently emitted as `1`, which Python asdf reads as an integer.
+reference implementation's parser resolves it to. A plain float keeps its
+fractional part, so a value written `1.0` is not copied out as `1` and
+read back as an integer.
+
+Complex numbers are written the way the `core/complex-1.0.0` grammar
+prescribes, `1.5-2.25i`, with the non-finite components spelled `inf`,
+`-inf` and `nan` rather than in YAML's own `.inf` / `.nan` form (which
+that grammar rejects). Both spellings are read, so files written by
+earlier versions of this library stay readable.
 
 Tags that asdf-cxx does not interpret — an extension's, another
 project's, or a future version of a core tag — are read and written back

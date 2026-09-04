@@ -149,6 +149,47 @@ writer &emit_tag(writer &w, const string &full_tag) {
   return w << YAML::VerbatimTag(full_tag);
 }
 
+writer &emit_node(writer &w, const YAML::Node &node) {
+  ASDF_CHECK(node.IsDefined(), "Cannot emit an undefined YAML node");
+  emit_tag(w, node.Tag());
+  // `Flow` and `Block` have to reach the emitter before the collection they
+  // apply to begins
+  const auto emit_style = [&w](const YAML::Node &n) {
+    if (n.Style() == YAML::EmitterStyle::Flow)
+      w << YAML::Flow;
+    else if (n.Style() == YAML::EmitterStyle::Block)
+      w << YAML::Block;
+  };
+  switch (node.Type()) {
+  case YAML::NodeType::Null:
+    return w << YAML::Null;
+  case YAML::NodeType::Scalar:
+    // The emitter quotes the text where YAML requires it, which is what
+    // `EmitFromEvents` does as well
+    return w << node.Scalar();
+  case YAML::NodeType::Sequence:
+    emit_style(node);
+    w << YAML::BeginSeq;
+    for (const auto &elem : node)
+      emit_node(w, elem);
+    w << YAML::EndSeq;
+    return w;
+  case YAML::NodeType::Map:
+    emit_style(node);
+    w << YAML::BeginMap;
+    for (const auto &key_value : node) {
+      w << YAML::Key;
+      emit_node(w, key_value.first);
+      w << YAML::Value;
+      emit_node(w, key_value.second);
+    }
+    w << YAML::EndMap;
+    return w;
+  default:
+    ASDF_ERROR("Cannot emit a YAML node of unknown type");
+  }
+}
+
 // Standard version selection
 
 version_t content_requirements::minimum_version() const {

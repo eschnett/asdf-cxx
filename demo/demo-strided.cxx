@@ -11,13 +11,16 @@
 
 #include <asdf/asdf.hxx>
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace std;
@@ -48,6 +51,19 @@ byteorder_t other_byteorder() {
                                                  : byteorder_t::little;
 }
 
+// NaN is not equal to itself, but an element written as NaN has to read back
+// as NaN
+template <typename T> bool same_value(T read, T expected) {
+  return read == expected;
+}
+bool same_value(float64_t read, float64_t expected) {
+  return read == expected || (std::isnan(read) && std::isnan(expected));
+}
+bool same_value(complex128_t read, complex128_t expected) {
+  return same_value(read.real(), expected.real()) &&
+         same_value(read.imag(), expected.imag());
+}
+
 template <typename T>
 void check_values(const string &name, const ndarray &arr,
                   const vector<T> &expected) {
@@ -55,9 +71,12 @@ void check_values(const string &name, const ndarray &arr,
   ASDF_CHECK(values.size() == expected.size(),
              name + ": read back " + std::to_string(values.size()) +
                  " elements, expected " + std::to_string(expected.size()));
-  for (size_t i = 0; i < values.size(); ++i)
-    ASDF_CHECK(values.at(i) == expected.at(i),
+  for (size_t i = 0; i < values.size(); ++i) {
+    // `vector<bool>` hands out a proxy, so take copies of both elements
+    const T value = values.at(i), want = expected.at(i);
+    ASDF_CHECK(same_value(value, want),
                name + ": element " + std::to_string(i) + " differs");
+  }
   cout << "  " << name << ": " << values.size() << " elements ok\n";
 }
 
@@ -85,6 +104,78 @@ void check_scalar_roundtrip(const string &name, const T &value,
              name + ": emit_scalar/parse_scalar do not round-trip in a "
                     "foreign byte order");
   cout << "  " << name << ": scalar round trip ok\n";
+}
+
+// The tag every `core/complex-1.0.0` node carries, as the full URI a
+// `YAML::Node` stores. Taken from the version table, never spelled here.
+string complex_tag() {
+  return string(asdf_tag_prefix) +
+         standard_info(latest_standard_version()).complex_tag;
+}
+
+// The `core/complex-1.0.0` grammar spells the non-finite components `inf`,
+// `-inf` and `nan`, without the leading dot that YAML -- and hence every file
+// asdf-cxx wrote before this -- uses. `emit_scalar` has to produce the first
+// spelling, and `parse_scalar` has to accept both.
+void check_complex_spelling() {
+  const auto emit = [](complex128_t value) {
+    const auto bytes = htox(value, host_byteorder());
+    return emit_scalar(bytes.data(), id_complex128, host_byteorder()).Scalar();
+  };
+  const auto parse = [](const string &text) {
+    YAML::Node node;
+    node.SetTag(complex_tag());
+    node = text;
+    complex128_t value;
+    parse_scalar(node, reinterpret_cast<unsigned char *>(&value), id_complex128,
+                 host_byteorder());
+    return value;
+  };
+
+  const float64_t nan_value = std::numeric_limits<float64_t>::quiet_NaN();
+  const float64_t inf_value = std::numeric_limits<float64_t>::infinity();
+  const vector<pair<complex128_t, string>> spellings{
+      {{1.0, 0.0}, "1+0i"},
+      {{-2.5, 0.5}, "-2.5+0.5i"},
+      {{1.5, -inf_value}, "1.5-infi"},
+      {{nan_value, inf_value}, "nan+infi"},
+      {{-inf_value, nan_value}, "-inf+nani"},
+      {{0.0, -0.0}, "0-0i"}};
+  for (const auto &[value, text] : spellings) {
+    const string emitted = emit(value);
+    ASDF_CHECK(emitted == text, "complex spelling: emitted \"" + emitted +
+                                    "\", expected \"" + text + "\"");
+    ASDF_CHECK(same_value(parse(text), value),
+               "complex spelling: \"" + text + "\" did not read back");
+  }
+
+  // yaml-cpp's spelling, which older asdf-cxx versions wrote
+  ASDF_CHECK(
+      same_value(parse(".nan+.nani"), complex128_t(nan_value, nan_value)),
+      "complex spelling: \".nan+.nani\" did not read back");
+  ASDF_CHECK(same_value(parse("-.inf+1.5i"), complex128_t(-inf_value, 1.5)),
+             "complex spelling: \"-.inf+1.5i\" did not read back");
+  ASDF_CHECK(
+      same_value(parse(".inf-.infi"), complex128_t(inf_value, -inf_value)),
+      "complex spelling: \".inf-.infi\" did not read back");
+  cout << "  complex spelling ok\n";
+}
+
+// A plain float keeps its fractional part, so that a reader does not turn it
+// into an integer
+void check_float_spelling() {
+  const auto emit = [](float64_t value) {
+    const auto bytes = htox(value, host_byteorder());
+    return emit_scalar(bytes.data(), id_float64, host_byteorder()).Scalar();
+  };
+  const vector<pair<float64_t, string>> spellings{
+      {1.0, "1.0"}, {-2.0, "-2.0"}, {0.0, "0.0"}, {-0.0, "-0.0"}, {1.5, "1.5"}};
+  for (const auto &[value, text] : spellings) {
+    const string emitted = emit(value);
+    ASDF_CHECK(emitted == text, "float spelling: emitted \"" + emitted +
+                                    "\", expected \"" + text + "\"");
+  }
+  cout << "  float spelling ok\n";
 }
 
 shared_ptr<ndarray> get_array(const shared_ptr<group> &grp,
@@ -191,9 +282,15 @@ int run(int argc, char **argv) {
 
   // A big-endian complex128 array. Real and imaginary part are swapped
   // independently; reversing all sixteen bytes of an element would exchange
-  // them, so the values below are deliberately asymmetric.
+  // them, so the values below are deliberately asymmetric. The last three
+  // elements are non-finite: the `core/complex-1.0.0` grammar spells those
+  // `nan`, `inf` and `-inf`, and the inline form below has to write and read
+  // back exactly that.
+  const float64_t nan_value = std::numeric_limits<float64_t>::quiet_NaN();
+  const float64_t inf_value = std::numeric_limits<float64_t>::infinity();
   const vector<complex128_t> complex_expected{
-      {1.5, -2.25}, {-3.75, 4.5}, {0.0, 6.125}};
+      {1.5, -2.25},           {-3.75, 4.5},      {0.0, 6.125},
+      {nan_value, inf_value}, {-inf_value, 1.0}, {nan_value, nan_value}};
   auto complex_block = make_shared<ndarray>(
       make_block(encode(complex_expected, foreign)), optional<block_info_t>(),
       block_format_t::block, compression_t::none, 0, vector<bool>(),
@@ -254,6 +351,9 @@ int run(int argc, char **argv) {
   check_scalar_roundtrip<complex128_t>("complex128", {1.5, -2.25}, foreign);
   check_scalar_roundtrip<float64_t>("float64", 1.5, foreign);
   check_scalar_roundtrip<int32_t>("int32", -123456, foreign);
+
+  check_complex_spelling();
+  check_float_spelling();
 
   // Only the densely packed arrays are C-contiguous
   const auto check_contiguous = [&](const string &name, bool expected) {
