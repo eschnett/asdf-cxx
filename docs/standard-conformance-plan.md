@@ -12,7 +12,7 @@ the end is what the reviewer will run. Repository: `/Users/eschnett/src/asdf-cxx
 | 1 — data access correctness | done | [#21](https://github.com/eschnett/asdf-cxx/pull/21) |
 | 1b — string datatypes | done | [#23](https://github.com/eschnett/asdf-cxx/pull/23) |
 | 2 — version table, write options, CLI | done | [#24](https://github.com/eschnett/asdf-cxx/pull/24) |
-| 3 — lossless reader | not started | |
+| 3 — lossless reader | done | [#25](https://github.com/eschnett/asdf-cxx/pull/25) |
 | 4 — local complex tags | not started | |
 | 5 — documentation | not started | |
 
@@ -220,6 +220,53 @@ Review of Phase 2 found four issues, all fixed in the same PR:
 - `--compression-level=N` accepted only a single digit, rejecting an in-range
   `05`; it now parses the number and range-checks it. CODE.md's known gap 7
   described the fixed behaviour and was reworded.
+
+**Phase 3** (PR #25) deviations:
+
+- `header-untagged-root-copy` asserts standard **1.5.0**, not the 1.2.0 the
+  plan names. `untagged-root.asdf` declares 1.5.0 on line 2, and since Phase 2
+  `asdf-copy` preserves the input's version; the root tag is
+  `core/asdf-1.1.0` either way, which is what the item is about. The same
+  applies to `unknown-tags.asdf` (also 1.5.0).
+- `py-validate-unknown-tags2` and `py-validate-roman-like2` use a new
+  `--expect-unknown-tags` flag rather than `--allow-unknown-tags`. The plan
+  asks separately that "opening `unknown-tags2.asdf` with
+  `AsdfConversionWarning` as error must raise"; that is not a check a passing
+  test can express directly, because `--allow-unknown-tags` has to switch the
+  escalation off (every foreign tag raises the same warning, so
+  `py-compare-roman-like` could not open either file otherwise). The new flag
+  implies `--allow-unknown-tags` and additionally requires that Python asdf
+  hand back at least one undeserialised tagged node, which is the same proof
+  stated positively.
+- `python_check.py compare` gained `--allow-unknown-tags`, and
+  `compare_values` falls back to comparing `vars(a) == vars(b)` for two
+  objects of the same type that are unequal. Python asdf deserialises
+  `!core/constant-1.0.0` into an `asdf.tags.core.Constant`, which has no
+  `__eq__`, so `unknown-tags.asdf` would otherwise compare by identity and
+  never match.
+- **A bare `y` or `n` was read as a boolean.** yaml-cpp follows the YAML 1.1
+  type repository here and PyYAML does not, so `axes_names: [x, y]` in
+  `roman-like.asdf`'s gwcs frame came back as `["x", true]` and
+  `py-compare-roman-like` failed. `make_entry` now skips the boolean
+  conversion for a one-character `y`/`n` scalar. This is a reader bug the new
+  fixture exposed rather than something the plan lists.
+- **`copy`, `ls`, `ls2`, `ls3` and `compare-demo` had no `DEPENDS`.** They
+  read files the `demo` and `copy` tests write, and only ever passed because
+  ctest happened to schedule them in registration order; the phase's extra
+  tests changed that schedule and they failed under `-j8`. Fixed in
+  `CMakeLists.txt`.
+- `error-missing-file` is registered beyond the plan's list, for the
+  `Cannot open` row of the contract table. `asdf-ls` opens the file itself
+  before handing it to `asdf(filename)`, so the check exists in both places.
+- A tagged scalar spelled `~` round-trips as `!<tag> "~"`: the text is
+  preserved and the file is stable under further copies, but yaml-cpp quotes
+  `~` to keep it a string, so the null-ness of a tagged null is lost. No ASDF
+  schema uses one; recorded as known gap 9 in CODE.md.
+- `ref-1.5.0/1.6.0-basic-history` is registered here. The plan lists it under
+  Phase 0 "Extra", but `history` was dropped on read until this phase.
+- `software(rs, node)` now requires `name` and `version` to be present, as
+  3c asks. Nothing else in 3c changed the accepted root tags beyond what is
+  written there.
 
 ---
 

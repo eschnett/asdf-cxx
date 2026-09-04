@@ -173,21 +173,20 @@ the codebase (see §8, Conventions):
 |---|---|
 | `asdf(tags, shared_ptr<group>)` | Build for writing from a tree |
 | `asdf(tags, map<string,YAML::Node>)` / `asdf(tags, map<string, fn(writer&)>)` | Write raw YAML or custom emitters at the root |
-| `asdf(const string &filename, readers={})` / `asdf(shared_ptr<istream>, filename, readers={})` | Read from disk / stream |
-| `asdf(shared_ptr<reader_state>, YAML::Node, readers={})` | Read from an already-parsed tree |
+| `asdf(const string &filename)` / `asdf(shared_ptr<istream>, filename)` | Read from disk / stream |
+| `asdf(shared_ptr<reader_state>, YAML::Node)` | Read from an already-parsed tree |
 | `asdf(const copy_state &, const asdf &)` | Copy with altered block format/compression |
 
 Key methods: `write(ostream&)` / `write(filename)`, `copy(copy_state)`,
 `get_group()`, `static from_yaml(istream&)` (reads the YAML head of a
 file, see §5.2), `to_yaml(writer&)`.
 
-The `readers` parameter (custom tag → callback) is accepted but
-`assert(readers.empty())` — it is not implemented.
-
 ### 4.2 `entry` hierarchy (`entry.hxx`, `src/entry.cxx`)
 
 `entry` is an abstract base with:
 - `get_entry_type()` → `entry_type_t` enum
+- `get_tag()` / `set_tag()` → the full resolved tag URI of a tag this
+  library does not interpret; empty otherwise (§5.3)
 - `copy(const copy_state&)` → deep copy
 - `to_yaml(writer&)` and friend `operator<<(writer&, ...)`
 - a family of `get_maybe_*()` virtuals returning `std::optional` or a
@@ -434,6 +433,8 @@ error listing the supported ones), `default_standard_version()` is
 1.2.0, `latest_standard_version()` is 1.6.0, and
 `classify_core_tag(full_tag)` maps a full tag URI to `core_tag_t` for
 any known version — that is what the readers dispatch on.
+`is_core_asdf_tag(full_tag)` is the looser test the root tag uses: any
+`core/asdf-` version, including one this table does not list.
 
 ---
 
@@ -472,20 +473,54 @@ any known version — that is what the readers dispatch on.
 
 ### 5.3 Tree construction: `make_entry(rs, node)`
 
-`asdf(rs, node)` asserts the root tag is `core/asdf-1.0.0`, `1.1.0` or
-`1.2.0` and builds the root `group` from every key except `history`,
-which is skipped (history entries are unsupported, and their tagged
-extension metadata would otherwise be rejected as unknown tags). Each
-value goes through `make_entry`. Dispatch order in `src/entry.cxx`:
+`asdf(rs, node)` accepts an untagged root, any `core/asdf` tag in the
+version table, and any other `tag:stsci.edu:asdf/core/asdf-` version (a
+file written against a newer standard is still read); anything else
+throws `Root tag "…" is not a core/asdf tag`. Every key of the root
+mapping becomes an entry, `history` included. Each value goes through
+`make_entry`. Dispatch order in `src/entry.cxx`:
 
 1. **By tag**: `core/complex-1.0.0` → `complex_entry`;
    `core/software-1.0.0` → `software`; `core/ndarray-1.0.0` or
-   `core/ndarray-1.1.0` → `ndarray_entry`. Any other non-empty tag throws.
+   `core/ndarray-1.1.0` → `ndarray_entry`.
 2. **Null** node → `null_entry`.
-3. **Scalar**: try `as<bool>`, then `as<int64_t>`, then `as<double>`,
-   else `string_entry`.
+3. **Scalar**: a node carrying a tag this library does not interpret
+   becomes a `string_entry` holding the scalar text verbatim, with the
+   `plain` flag set (see below). An untagged scalar is typed: try
+   `as<bool>`, then `as<int64_t>`, then `as<double>`, else `string_entry`.
 4. **Sequence** → `sequence`.
 5. **Map** with a `$ref` key → `reference_entry`, otherwise `group`.
+
+Steps 2 to 5 run for a tagged node too; the entry then records the full
+resolved tag URI in `entry::tag_` (`get_tag()` / `set_tag()`), which every
+`copy()` and `(cs, other)` constructor carries over, and which
+`emit_tag(w, tag_)` (`io.cxx`) writes back out. `emit_tag` emits nothing
+for a trivial tag (empty, `?`, `!`, `tag:yaml.org,2002:…`), a
+`YAML::LocalTag` for a tag under `asdf_tag_prefix` whose suffix yaml-cpp
+accepts (`!time/time-1.1.0`), and a `YAML::VerbatimTag` otherwise
+(`!<asdf://example.org/foo-1.0.0>`; an unresolved shorthand `!foo`
+becomes `!<!foo>`, which is valid YAML and which PyYAML reads back). It
+is called from `to_yaml` of `null_entry`, `bool_entry`, `int_entry`,
+`float_entry`, `string_entry`, `sequence`, `group` and `reference_entry`
+— never from `complex_entry`, `software` or `ndarray_entry`, whose tags
+come from the version table and which would otherwise emit two tags and
+put the emitter into its error state.
+
+The `plain` flag on `string_entry` picks the emitter's default scalar
+style instead of double quotes, so a tagged scalar's text survives
+unchanged: `!<asdf://example.org/scalar-1.0.0> 1.0` stays `1.0` rather
+than becoming an int, and `!time/time-1.1.0 2027-01-01T00:00:00.000`
+gains no quotes.
+
+`group::to_yaml` refuses to write a tagged map that has an integer
+`source` unless `allow_nonstandard` is set: such a node is an array
+flavour this library does not know, its block is not copied, and the
+`source` index in the copy would point at an unrelated block.
+
+Untagged scalars are read with yaml-cpp's own conversions, with one
+exception: a bare `y` or `n` is *not* a boolean. yaml-cpp follows the
+YAML 1.1 type repository here, PyYAML does not, and the difference would
+turn an axis name `y` into `true` on a copy.
 
 ### 5.4 `ndarray(rs, node)`
 
@@ -504,7 +539,11 @@ value goes through `make_entry`. Dispatch order in `src/entry.cxx`:
   as int64, then float64, then complex128. Data is parsed into a
   `typed_block_t<unsigned char>` in host byte order. `compression` is
   `none`, so converting to block format yields an uncompressed block.
-- `mask:` is ignored on read.
+- `mask:` is refused on read (`mask`, `not supported`), as is a `*` in
+  `shape` (streamed array), a `source` that is a file name rather than a
+  block index (exploded file), and a `null` element in inline data
+  (a masked value). The wording of each is fixed by the error-message
+  contract in `docs/standard-conformance-plan.md`.
 
 ### 5.5 `read_block_data` (lazy block load)
 
@@ -778,11 +817,16 @@ literal `{…}` directory; harmless.
 
 ## 11. Known gaps and gotchas (from reading the code)
 
-1. **Masks are not supported.** Read ignores `mask:`; write asserts
-   the mask is empty.
-2. **Only the core tags in the version table are recognised**
-   (`classify_core_tag`); any other unknown tag throws. `history` is
-   dropped on read.
+1. **Masks are not supported.** Reading a `mask:` key, or a `null`
+   element in inline data, is an error; write asserts the mask is empty.
+2. **Tags outside the version table are preserved, not interpreted.**
+   `classify_core_tag` recognises the core tags; every other tag is
+   stored on the entry and emitted again unchanged (§5.3), so a copy
+   round-trips it. A tagged map with an integer `source` is the one case
+   that is refused on write, because its block is not copied.
+   `history` is an ordinary part of the tree; writing to a target below
+   standard 1.2.0, which has no `history.extensions`, keeps only its
+   `entries` list and otherwise drops the key.
 3. **`lz4f` blocks are asdf-cxx specific.** Use `compression_t::lz4` for
    files other implementations must read (§7).
 4. **Compression level is not stored** in the file. Every compressed
@@ -796,9 +840,12 @@ literal `{…}` directory; harmless.
    `asdf-copy` range-checks `--compression-level=N` against 0 to 9, but
    what a level means is codec-specific and nothing checks that a codec
    accepts it.
-8. The `asdf(readers=...)` hook for custom tags throws if non-empty.
-9. yaml-cpp emits YAML 1.2 syntax while the header declares
+8. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).
+9. **A tagged scalar spelled `~` comes back quoted.** Its text is stored
+    and re-emitted, and yaml-cpp quotes `~` so that it stays a string.
+    The file is stable under further copies, but the null-ness of a
+    tagged null is not preserved. No ASDF schema uses one.
 10. Blosc and blosc2 code paths compile only where those libraries are
     found. CI requires them (`ASDF_REQUIRE_ALL_DEPENDENCIES`), but a
     development machine without them silently skips those paths, so guard

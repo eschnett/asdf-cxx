@@ -11,8 +11,7 @@
 #   ASDF_PYTHON               a Python interpreter with the packages in
 #                             tests/requirements.txt
 #
-# See docs/standard-conformance-plan.md; the tests each later phase switches
-# on are marked "Phase N" below.
+# See docs/standard-conformance-plan.md.
 
 set(ASDF_REFERENCE_FILES_DIR "" CACHE PATH
   "The asdf-standard reference_files directory (see tests/fetch-reference-files.sh)")
@@ -156,12 +155,24 @@ if(ASDF_REFERENCE_FILES_DIR)
       asdf_test_depends(ref-${version}-shared-strides ref-${version}-shared-copy)
     endif()
 
+    # A recognised but unsupported feature must be refused with the wording
+    # the error-message contract prescribes, never with a yaml-cpp message
+    set(exploded_messages -m exploded -m external -m "not supported")
+    set(stream_messages -m stream -m "not supported")
     foreach(name ${ASDF_REF_UNSUPPORTED})
-      # Phase 3 adds the error-message contract substrings (-m ...) here.
       add_test(NAME ref-${version}-${name}-unsupported
-        COMMAND "${ASDF_TESTS_DIR}/expect-error.sh"
+        COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" ${${name}_messages}
         ./asdf-ls "${dir}/${name}.asdf")
     endforeach()
+
+    # `history` is preserved, so a copy of a 1.5.0 or 1.6.0 reference file
+    # still carries the extension metadata Python asdf wrote
+    if(version STREQUAL "1.5.0" OR version STREQUAL "1.6.0")
+      asdf_add_header_test(ref-${version}-basic-history
+        "ref-${version}-basic.asdf"
+        --present "history:" --present "extension_metadata")
+      asdf_test_depends(ref-${version}-basic-history ref-${version}-basic-copy)
+    endif()
   endforeach()
 endif()
 
@@ -193,9 +204,8 @@ asdf_test_depends(py-compare-padded padded-copy)
 asdf_add_python_test(py-compare-python-default
   compare "${ASDF_TESTS_DIR}/python-default.asdf" python-default2.asdf)
 asdf_test_depends(py-compare-python-default python-default-copy)
-# Phase 3 preserves `history`, so this gains --expect-history
 asdf_add_python_test(py-validate-python-default2
-  validate ${ASDF_WRITTEN_TAGS_1_6_0} python-default2.asdf)
+  validate ${ASDF_WRITTEN_TAGS_1_6_0} --expect-history python-default2.asdf)
 asdf_test_depends(py-validate-python-default2 python-default-copy)
 
 if(LIBLZ4_FOUND)
@@ -483,7 +493,9 @@ asdf_test_depends(header-demo-latest demo-latest-copy)
 
 # tests/python-default.asdf declares 1.6.0: the default copy keeps it, and
 # --standard-version=minimal falls back to the default 1.2.0
-asdf_add_version_test(header-python-default2 python-default2.asdf 1.6.0)
+asdf_add_version_test(header-python-default2 python-default2.asdf 1.6.0
+  --present "history:" --present "extension_metadata"
+  --present "extension_uri")
 asdf_test_depends(header-python-default2 python-default-copy)
 add_test(NAME python-default-minimal-copy
   COMMAND ./asdf-copy --standard-version=minimal
@@ -562,9 +574,119 @@ add_test(NAME float16-1.0.0-allowed-copy
 asdf_add_version_test(header-float16-1.0.0 float16-1.0.0.asdf 1.0.0)
 asdf_test_depends(header-float16-1.0.0 float16-1.0.0-allowed-copy)
 
-# The remaining fixtures are switched on by the phase that makes them work:
+# The lossless reader ##########################################################
 #
-#   Phase 3   masked.asdf (must become an error; it is silently read today),
-#             unknown-tags.asdf, untagged-root.asdf, roman-like.asdf
-#
-# See docs/standard-conformance-plan.md.
+# A tag this library does not interpret, and the node under it, survive a copy
+# unchanged; `history` is an ordinary part of the tree; the root tag may be
+# absent or of an unknown `core/asdf` version; and every feature that is
+# recognised but unsupported is refused with the wording of the error-message
+# contract in docs/standard-conformance-plan.md.
+
+# unknown-tags.asdf: foreign tags on a map, a nested map, and three scalars,
+# plus a tag from a `core/` extension this library does not know. Both tag
+# spellings (`!time/time-1.1.0` and `!<asdf://example.org/foo-1.0.0>`) have to
+# come out again, and a tagged scalar keeps its text: `1.0` must not become
+# `1`, and a timestamp must not gain quotes.
+add_test(NAME unknown-tags-ls
+  COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/unknown-tags.asdf")
+add_test(NAME unknown-tags-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/unknown-tags.asdf" unknown-tags2.asdf)
+add_test(NAME unknown-tags-ls2 COMMAND ./asdf-ls unknown-tags2.asdf)
+asdf_test_depends(unknown-tags-ls2 unknown-tags-copy)
+asdf_add_header_test(header-unknown-tags-copy unknown-tags2.asdf
+  --present "core/constant-1.0.0"
+  --present "asdf://example.org/foo-1.0.0"
+  --present "asdf://example.org/bar-1.0.0"
+  --present "!time/time-1.1.0 2027-01-01T00:00:00.000"
+  --present "!unit/unit-1.0.0 DN"
+  --present "asdf://example.org/scalar-1.0.0> 1.0")
+asdf_test_depends(header-unknown-tags-copy unknown-tags-copy)
+# --expect-unknown-tags is the proof that the tags survived: Python asdf has
+# to hand back undeserialised tagged nodes
+asdf_add_python_test(py-validate-unknown-tags2
+  validate --expect-unknown-tags unknown-tags2.asdf)
+asdf_test_depends(py-validate-unknown-tags2 unknown-tags-copy)
+asdf_add_python_test(py-compare-unknown-tags compare --allow-unknown-tags
+  "${ASDF_TESTS_DIR}/unknown-tags.asdf" unknown-tags2.asdf)
+asdf_test_depends(py-compare-unknown-tags unknown-tags-copy)
+
+# YAML anchors are resolved on load, so the copy holds two equal expansions
+# and no anchor
+asdf_add_header_test(header-alias-copy alias2.asdf
+  --absent "&f" --present "name:")
+asdf_test_depends(header-alias-copy fixture-alias-copy)
+
+# untagged-root.asdf has a bare `---`; the copy gets the root tag of the
+# version it declares (1.5.0, which asdf-copy preserves)
+add_test(NAME untagged-root-ls
+  COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/untagged-root.asdf")
+add_test(NAME untagged-root-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/untagged-root.asdf"
+  untagged-root2.asdf)
+asdf_add_version_test(header-untagged-root-copy untagged-root2.asdf 1.5.0)
+asdf_test_depends(header-untagged-root-copy untagged-root-copy)
+asdf_add_python_test(py-validate-untagged-root2
+  validate --standard 1.5.0 --root-tag core/asdf-1.1.0
+  --ndarray-tag core/ndarray-1.0.0 untagged-root2.asdf)
+asdf_test_depends(py-validate-untagged-root2 untagged-root-copy)
+
+# corrupt-tag.asdf has a `!core/ndarray-9.9.9` node with `source: 0`. Reading
+# preserves it, but writing it would leave the `source` pointing at a block
+# that was never copied, so the copy is refused unless it is allowed
+add_test(NAME unknown-tag-ls
+  COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/corrupt-tag.asdf")
+add_test(NAME error-unknown-tag-copy
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m ndarray-9.9.9 -m block
+  ./asdf-copy "${ASDF_TESTS_DIR}/corrupt-tag.asdf" unknown-tag-refused.asdf)
+add_test(NAME unknown-tag-allowed-copy
+  COMMAND ./asdf-copy --allow-nonstandard "${ASDF_TESTS_DIR}/corrupt-tag.asdf"
+  unknown-tag2.asdf)
+
+# Standard 1.0.0 has no `history.extensions`, so the extension metadata is
+# dropped rather than written under a version that forbids it
+add_test(NAME python-default-1.0.0-copy
+  COMMAND ./asdf-copy --standard-version=1.0.0
+  "${ASDF_TESTS_DIR}/python-default.asdf" python-default-1.0.0.asdf)
+asdf_add_version_test(header-python-default-1.0.0 python-default-1.0.0.asdf
+  1.0.0 --absent "extensions:" --absent "history:")
+asdf_test_depends(header-python-default-1.0.0 python-default-1.0.0-copy)
+asdf_add_python_test(py-validate-python-default-1.0.0 validate --standard 1.0.0
+  --root-tag core/asdf-1.0.0 --ndarray-tag core/ndarray-1.0.0
+  python-default-1.0.0.asdf)
+asdf_test_depends(py-validate-python-default-1.0.0 python-default-1.0.0-copy)
+
+# roman-like.asdf combines the Roman WFI feature set: a float16 block, a
+# `[ucs4, 16]` structured field, foreign tagged maps with nested ndarrays, a
+# `core/column` inside an astropy table, tagged time and unit scalars, a YAML
+# alias between two gwcs steps, and `history.extensions`
+add_test(NAME roman-like-ls
+  COMMAND ./asdf-ls "${ASDF_TESTS_DIR}/roman-like.asdf")
+add_test(NAME roman-like-copy
+  COMMAND ./asdf-copy "${ASDF_TESTS_DIR}/roman-like.asdf" roman-like2.asdf)
+add_test(NAME roman-like-ls2 COMMAND ./asdf-ls roman-like2.asdf)
+asdf_test_depends(roman-like-ls2 roman-like-copy)
+asdf_add_header_test(header-roman-like-copy roman-like2.asdf
+  --standard 1.6.0 --root-tag core/asdf-1.1.0
+  --ndarray-tag core/ndarray-1.1.0
+  --present "wfi_image" --present "gwcs/wcs" --present "core/column-1.0.0"
+  --present "history:")
+asdf_test_depends(header-roman-like-copy roman-like-copy)
+asdf_add_values_test(values-roman-like roman-like.txt
+  "${ASDF_TESTS_DIR}/roman-like.asdf")
+asdf_add_values_test(values-roman-like2 roman-like.txt roman-like2.asdf)
+asdf_test_depends(values-roman-like2 roman-like-copy)
+asdf_add_python_test(py-validate-roman-like2
+  validate ${ASDF_WRITTEN_TAGS_1_6_0} --expect-unknown-tags --expect-history
+  roman-like2.asdf)
+asdf_test_depends(py-validate-roman-like2 roman-like-copy)
+asdf_add_python_test(py-compare-roman-like compare --allow-unknown-tags
+  "${ASDF_TESTS_DIR}/roman-like.asdf" roman-like2.asdf)
+asdf_test_depends(py-compare-roman-like roman-like-copy)
+
+# Features that are recognised but not supported, and a file that is not there
+add_test(NAME error-masked
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m mask -m "not supported"
+  ./asdf-ls "${ASDF_TESTS_DIR}/masked.asdf")
+add_test(NAME error-missing-file
+  COMMAND "${ASDF_TESTS_DIR}/expect-error.sh" -m "Cannot open"
+  ./asdf-ls no-such-file.asdf)

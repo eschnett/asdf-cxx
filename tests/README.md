@@ -130,6 +130,11 @@ that also pins the exact spelling that a copy has to preserve.
 one array a structured field whose sub-array `shape` multiplies to 2^64,
 which an unchecked element-size computation would turn into zero; it has no
 block index, because the longer datatype moves every block.
+`corrupt-tag.asdf` is no longer broken from the reader's point of view: its
+`!core/ndarray-9.9.9` node is preserved like any other unknown tag, so
+`asdf-ls` reads it. It is `asdf-copy` that refuses it, because the node has an
+integer `source` whose block would not be copied (`error-unknown-tag-copy`),
+and `--allow-nonstandard` writes it anyway.
 `zero-size-datatype.asdf` (`[ascii, 0]`) and `bad-string-length.asdf`
 (`[ucs4, abc]`) are written as literal text; they are datatypes a file may
 claim but no writer produces, and each must be refused with an
@@ -138,6 +143,18 @@ bounds-checked container throwing `vector`. The `error-*` tests run `asdf-ls` or
 through `expect-error.sh`, which requires exit status 1 and an `error:`
 message on stderr, so a crash does not count as passing.
 `error-checksum` only runs when asdf-cxx was built with OpenSSL.
+
+## Python checks of files with foreign tags
+
+`python_check.py`'s `validate` escalates `AsdfConversionWarning` to an error,
+because that is how Python asdf signals a tree whose tag versions disagree
+with the declared standard version. A file that carries foreign tags on
+purpose raises the same warning for each of them, so `--allow-unknown-tags`
+turns the escalation off and also permits the `TaggedDict`/`TaggedList`/
+`TaggedString` nodes that come back. `--expect-unknown-tags` implies it and
+additionally *requires* at least one such node, which is the positive proof
+that a copy kept the tags (`py-validate-unknown-tags2`,
+`py-validate-roman-like2`). `compare` takes `--allow-unknown-tags` too.
 
 ## Note on block checksums
 

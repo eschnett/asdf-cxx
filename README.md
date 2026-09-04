@@ -32,14 +32,29 @@ APIs.
 asdf-cxx supports most of the "core" ASDF standard. Notable exceptions
 are:
 
-- History entries are not supported (i.e. are not written, and are
-  ignored when reading).
+- `history` is preserved and round-trips unchanged; asdf-cxx adds no
+  history entry of its own. Writing to standard 1.0.0 or 1.1.0, which
+  have no `history.extensions`, keeps only the `entries` list.
+- Masked arrays are not supported: a `mask` key, or a `null` element in
+  inline data, is an error.
 - Simple ndarray references to other files (e.g. "exploded files") are
   not supported. (Full URI references are supported.)
 - Streaming writes and reading streamed datasets is not supported.
 - Errors (malformed files, unsupported features, failing compression
   libraries) are reported by throwing `ASDF::error`. The command line
   tools print the message and exit with status 1.
+
+Tags that asdf-cxx does not interpret — an extension's, another
+project's, or a future version of a core tag — are read and written back
+unchanged, with the node under them, so a copy round-trips them
+silently. A tagged scalar keeps its text exactly as it stands, so a
+timestamp gains no quotes and `1.0` does not become `1`. Nested
+`core/ndarray` nodes inside such a map (a quantity's value, a table
+column) are parsed as arrays and their blocks are copied as usual. The
+one thing that is refused is writing a map under an unknown tag that has
+an integer `source`: it refers to a binary block that asdf-cxx does not
+know how to copy, so the `source` in the copy would point at the wrong
+block. `--allow-nonstandard` writes it anyway.
 
 String datatypes are supported: the standard's `[ascii, N]` (N bytes per
 element) and `[ucs4, N]` (N four-byte code units in the array's byte order)

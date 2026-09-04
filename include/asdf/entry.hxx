@@ -35,7 +35,6 @@ enum class entry_type_t {
   complex128,
   string,
   software,
-  history_entry,
   ndarray,
   reference,
   sequence,
@@ -51,17 +50,33 @@ class float_entry;
 class complex128_entry;
 class string_entry;
 class software;
-// class history_entry;
 class ndarray_entry;
 class reference_entry;
 class sequence;
 class group;
 
 class entry {
+protected:
+  // The full resolved tag URI this entry was read with, for a tag this
+  // library does not interpret itself. Such a tag is preserved verbatim so
+  // that a copy round-trips it; the core tags come from the version table
+  // instead and are never stored here. Empty for an entry built in memory.
+  std::string tag_;
+
+  // Give a freshly built copy this entry's tag
+  template <typename T>
+  const std::shared_ptr<T> &copy_tag_to(const std::shared_ptr<T> &ent) const {
+    static_cast<entry *>(ent.get())->tag_ = tag_;
+    return ent;
+  }
+
 public:
   virtual ~entry() {}
 
   virtual entry_type_t get_entry_type() const = 0;
+
+  const std::string &get_tag() const { return tag_; }
+  void set_tag(std::string tag) { tag_ = std::move(tag); }
 
   virtual std::shared_ptr<entry> copy(const copy_state &cs) const = 0;
 
@@ -124,7 +139,7 @@ public:
   }
 
   virtual std::shared_ptr<entry> copy(const copy_state &cs) const override {
-    return std::make_shared<null_entry>();
+    return copy_tag_to(std::make_shared<null_entry>());
   }
 
   virtual writer &to_yaml(writer &w) const override;
@@ -160,7 +175,7 @@ public:
   }
 
   virtual std::shared_ptr<entry> copy(const copy_state &cs) const override {
-    return std::make_shared<bool_entry>(value);
+    return copy_tag_to(std::make_shared<bool_entry>(value));
   }
 
   virtual writer &to_yaml(writer &w) const override;
@@ -194,7 +209,7 @@ public:
   }
 
   virtual std::shared_ptr<entry> copy(const copy_state &cs) const override {
-    return std::make_shared<int_entry>(value);
+    return copy_tag_to(std::make_shared<int_entry>(value));
   }
 
   virtual writer &to_yaml(writer &w) const override;
@@ -230,7 +245,7 @@ public:
   }
 
   virtual std::shared_ptr<entry> copy(const copy_state &cs) const override {
-    return std::make_shared<float_entry>(value);
+    return copy_tag_to(std::make_shared<float_entry>(value));
   }
 
   virtual writer &to_yaml(writer &w) const override;
@@ -266,7 +281,7 @@ public:
   }
 
   virtual std::shared_ptr<entry> copy(const copy_state &cs) const override {
-    return std::make_shared<complex_entry>(value);
+    return copy_tag_to(std::make_shared<complex_entry>(value));
   }
 
   virtual writer &to_yaml(writer &w) const override;
@@ -284,6 +299,11 @@ public:
 
 class string_entry : public entry {
   std::string value;
+  // Emit the text in the emitter's default style instead of double-quoting
+  // it. Set for a scalar that carried a tag this library does not interpret:
+  // the tag's schema describes the text, so it has to come out unchanged
+  // (`1.0` must not become `1`, a timestamp must not gain quotes).
+  bool plain = false;
 
 public:
   using value_type = std::string;
@@ -297,13 +317,17 @@ public:
   virtual ~string_entry() {}
 
   string_entry(std::string value) : value(std::move(value)) {}
+  string_entry(std::string value, bool plain)
+      : value(std::move(value)), plain(plain) {}
+
+  bool is_plain() const { return plain; }
 
   virtual entry_type_t get_entry_type() const override {
     return entry_type_t::string;
   }
 
   virtual std::shared_ptr<entry> copy(const copy_state &cs) const override {
-    return std::make_shared<string_entry>(value);
+    return copy_tag_to(std::make_shared<string_entry>(value, plain));
   }
 
   virtual writer &to_yaml(writer &w) const override;
@@ -369,8 +393,6 @@ public:
     return {name, author, homepage, version};
   }
 };
-
-// class history_entry : public entry {};
 
 class ndarray_entry : public entry {
   std::shared_ptr<ndarray> value;

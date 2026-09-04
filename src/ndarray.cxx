@@ -100,6 +100,10 @@ void parse_inline_array_nd(const YAML::Node &node,
   assert(rank >= 0);
   assert(shape.size() >= static_cast<size_t>(rank));
   if (rank == 0) {
+    // `null` marks a masked element
+    ASDF_CHECK(!node.IsNull(),
+               "This inline array has a \"null\" element, which marks a "
+               "masked value; masked arrays are not supported");
     // A scalar element is a YAML scalar, a structured element is a YAML
     // sequence with one entry per field
     ASDF_CHECK(
@@ -968,6 +972,15 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
   ASDF_CHECK(classify_core_tag(node.Tag()) == core_tag_t::ndarray,
              "Expected tag core/ndarray-1.0.0 or -1.1.0, found \"" +
                  node.Tag() + "\"");
+  ASDF_CHECK(!node["mask"].IsDefined(),
+             "This array has a \"mask\"; masked arrays are not supported");
+  // A `*` in the shape marks a streamed array, whose block grows to the end
+  // of the file
+  if (node["shape"].IsSequence())
+    for (const auto &extent : node["shape"])
+      ASDF_CHECK(!(extent.IsScalar() && extent.Scalar() == "*"),
+                 "This array has \"*\" in its shape; streamed arrays are not "
+                 "supported");
   if (node["source"].IsDefined())
     block_format = block_format_t::block;
   else if (node["data"].IsDefined())
@@ -978,6 +991,21 @@ ndarray::ndarray(const shared_ptr<reader_state> &rs, const YAML::Node &node)
   switch (block_format) {
 
   case block_format_t::block: {
+    // An integer `source` is a block index; a string names an external file
+    // holding the block, i.e. an "exploded" ASDF file
+    bool is_block_index = false;
+    if (node["source"].IsScalar()) {
+      try {
+        node["source"].as<int64_t>();
+        is_block_index = true;
+      } catch (const YAML::RepresentationException &) {
+        // not a number
+      }
+    }
+    ASDF_CHECK(is_block_index,
+               "This array's \"source\" is \"" + node["source"].Scalar() +
+                   "\", the name of an external file; exploded files are not "
+                   "supported");
     int64_t source;
     yaml_decode(node["source"], source);
     datatype = make_shared<datatype_t>(rs, node["datatype"]);
