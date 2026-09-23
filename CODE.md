@@ -6,7 +6,7 @@ gotchas you will trip over. This complements `README.md` (user-facing
 overview and standard conformance) and is not a substitute for reading
 the headers, which are short.
 
-Snapshot: project version 8.0.0 (`CMakeLists.txt`), ASDF file-format
+Snapshot: project version 8.0.1 (`CMakeLists.txt`), ASDF file-format
 version 1.0.0. ASDF standard versions 1.0.0 to 1.6.0 are read and
 written; which one a given file declares is decided per write (§4.9,
 §6), not compiled in. ~5,800 lines total including demos and the SWIG
@@ -91,7 +91,12 @@ Every header ends with a `#define <GUARD>_DONE` and a trailing
   sets a `HAVE_*` CMake variable that becomes `ASDF_HAVE_*` in the
   generated `config.hxx`.
 - `check_cxx_source_compiles` probes for `_Float16` and `__int128`,
-  setting `ASDF_HAVE_FLOAT16` / `ASDF_HAVE_INT128`.
+  setting `ASDF_HAVE_FLOAT16` / `ASDF_HAVE_INT128`. `CMAKE_CXX_STANDARD`
+  defaults to 17 so the probes run in the dialect the targets are built
+  in. The `__int128` probe also requires `std::is_integral` and
+  `is_signed` / `is_unsigned` to accept the type, which libstdc++ does
+  only in `gnu++` mode; under `CMAKE_CXX_EXTENSIONS=OFF` with GCC,
+  int128 is therefore off.
 - `include/asdf/config.hxx.in` → `${build}/include/asdf/config.hxx`.
   Both `include/` and `${build}/include/` are on the include path; code
   always includes as `<asdf/xxx.hxx>`.
@@ -834,11 +839,13 @@ The test families and what each pins down:
 | `header-*` | `tests/check-header.sh` on a written file: the `#ASDF`/`#ASDF_STANDARD` lines, the root tag on the `---` line, and the `core/ndarray` tag version |
 | `values-*` | `asdf-read-check` output diffed against `tests/expected/*.txt` — the oracle for byte order, offset and stride handling |
 | `error-*` | `tests/expect-error.sh`: exit status 1, `error:` on stderr, and the required message substrings |
+| `level0-<codec>`, `compare-level0-<codec>` | an `asdf-copy --compression-level=0` copy of `demo.asdf` with each available codec, compared with the original |
 | `ref-<version>-<name>-*` | the ASDF standard's reference files, per version and per file: `-ls`, `-copy`, `-ls2`, `-header`, sometimes `-values`/`-values2`, and `-unsupported` for the ones that must fail cleanly |
 | `py-*` | `tests/python_check.py validate` / `compare` against the Python reference implementation |
 
-A plain configure registers 133 tests and no `ref-*` or `py-*`; with
-both cache variables set it registers about 840.
+A plain configure registers about 145 tests (the compression tests
+depend on which libraries are found) and no `ref-*` or `py-*`; with
+both cache variables set it registers about 860.
 
 `tests/README.md` documents the helper scripts, the fixtures and the
 rule for what may be committed (under ~4 KB, and only what asdf-cxx
@@ -894,10 +901,12 @@ literal `{…}` directory; harmless.
    string) files are unsupported.
 6. **YAML head is read line-by-line until `...`** and buffered as text.
    A file whose YAML lacks the `...` terminator throws.
-7. **Compression levels are not validated against the compressor.**
-   `asdf-copy` range-checks `--compression-level=N` against 0 to 9, but
-   what a level means is codec-specific and nothing checks that a codec
-   accepts it.
+7. **What a compression level means is codec-specific.** `asdf-copy`
+   accepts `--compression-level=0..9`, and every codec takes that range:
+   bzip2 maps 0 to its smallest block size, 1. Levels outside a codec's
+   own range are an error for blosc and blosc2 (0 to 9), bzip2 (0 to 9)
+   and zlib (-1 to 9); lz4, lz4f and zstd define every level, where 0
+   (lz4: below 1) is their default.
 8. yaml-cpp emits YAML 1.2 syntax while the header declares
     `%YAML 1.1` (documented in README).
 9. **A tagged scalar spelled `~` comes back quoted.** Its text is stored

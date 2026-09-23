@@ -40,7 +40,7 @@ trip the ASDF standard's own reference files for all seven standard
 versions; `ASDF_PYTHON` (an interpreter with `tests/requirements.txt`,
 needs Python 3.11+) switches on the `py-*` tests, which cross-check
 against the Python reference implementation. Without them ctest
-registers 133 tests and passes; with them, about 840. See
+registers about 145 tests and passes; with them, about 860. See
 `tests/README.md`.
 
 The fixtures in `tests/` were written by the Python reference

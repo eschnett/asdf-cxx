@@ -19,9 +19,10 @@ corpus of files, is fetched or generated instead:
 ## Running the conformance tests
 
 Both extra test families are opt-in through CMake cache variables, so a
-plain `cmake -B build` still configures and passes — it registers 133
-tests and none of the `ref-*` or `py-*` ones. With both variables set,
-about 840 tests are registered.
+plain `cmake -B build` still configures and passes — it registers about
+145 tests, depending on which compression libraries are found, and none
+of the `ref-*` or `py-*` ones. With both variables set, about 860 tests
+are registered.
 
 ```bash
 python3 -m venv asdf-env

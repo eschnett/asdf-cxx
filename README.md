@@ -260,8 +260,7 @@ see `tests/README.md`.
 - Output files cannot be padded.
 - A block that two arrays share is read correctly by both, but a copy
   writes it twice, once per array.
-- Compression levels are not validated against the compressor, and the
-  level a block was compressed with is not stored in the file.
+- The level a block was compressed with is not stored in the file.
 - The ASDF standard requires that certain maps are output in a certain
   order, and that certain elements are output in a certain style
   ("block" or "flow"). However, it also requires that an ASDF reader

@@ -94,9 +94,8 @@ struct get_scalar_type_id
                                : sizeof(T) == 4 ? id_uint32
                                : sizeof(T) == 8 ? id_uint64
 #ifdef ASDF_HAVE_INT128
-
-#endif
                                : sizeof(T) == 16 ? id_uint128
+#endif
                                                  : id_error)
 #ifdef ASDF_HAVE_FLOAT16
                             : // float16_t is not officially a floating-point
