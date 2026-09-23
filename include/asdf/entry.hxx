@@ -506,13 +506,6 @@ public:
   sequence(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   sequence(const copy_state &cs, const sequence &from);
 
-  // template <typename T>
-  // sequence(const std::vector<std::shared_ptr<T>> &data,
-  //          const std::function<entry(const T &)> &f) {
-  //   for (const auto &v : data)
-  //     entries->push_back(f(*v));
-  // }
-
   virtual entry_type_t get_entry_type() const override {
     return entry_type_t::sequence;
   }
@@ -571,13 +564,6 @@ public:
       : group(std::make_shared<std::map<std::string, std::shared_ptr<entry>>>(
             std::move(entries))) {}
   group() : group(std::map<std::string, std::shared_ptr<entry>>()) {}
-
-  template <typename T>
-  group(const map<string, shared_ptr<T>> &data,
-        const function<entry(const T &)> &f) {
-    for (const auto &kv : data)
-      entries[kv.first] = f(*kv.second);
-  }
 
   group(const shared_ptr<reader_state> &rs, const YAML::Node &node);
   group(const copy_state &cs, const group &grp);
