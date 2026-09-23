@@ -127,28 +127,38 @@ endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(CheckCXXSourceCompiles)
-  check_cxx_source_compiles(
-    "
-      int main() {
-        _Float16 f16;
-      }
-    "
-    ASDF_HAVE_FLOAT16)
-  # `get_scalar_type_id` needs the standard library to treat `__int128` as
-  # an integer type. libstdc++ does so only in `gnu++` mode, not under a
-  # strict `-std=c++17`, although the compiler still accepts the type.
-  check_cxx_source_compiles(
-    "
-      #include <type_traits>
-      static_assert(std::is_integral<__int128>::value &&
-                    std::is_signed<__int128>::value, \"\");
-      static_assert(std::is_integral<unsigned __int128>::value &&
-                    std::is_unsigned<unsigned __int128>::value, \"\");
-      int main() {
-        __int128 i128;
-      }
-    "
-    ASDF_HAVE_INT128)
+# A compiler can accept `_Float16` while the target's runtime lacks the
+# helpers it calls to convert: Clang on x86_64 calls `__extendhfsf2` and
+# `__truncsfhf2`, which the libSystem of older macOS SDKs does not provide.
+# The probe therefore performs the `float` <-> `_Float16` conversions the
+# library uses, and `volatile` keeps them from being folded away. It is
+# linked but never run, so it also works when cross-compiling; it tests
+# nothing, however, if `CMAKE_TRY_COMPILE_TARGET_TYPE` is `STATIC_LIBRARY`.
+check_cxx_source_compiles(
+  "
+    int main() {
+      volatile float f = 1.0f;
+      volatile _Float16 h = f;
+      volatile float g = h;
+      return g != 1.0f;
+    }
+  "
+  ASDF_HAVE_FLOAT16)
+# `get_scalar_type_id` needs the standard library to treat `__int128` as
+# an integer type. libstdc++ does so only in `gnu++` mode, not under a
+# strict `-std=c++17`, although the compiler still accepts the type.
+check_cxx_source_compiles(
+  "
+    #include <type_traits>
+    static_assert(std::is_integral<__int128>::value &&
+                  std::is_signed<__int128>::value, \"\");
+    static_assert(std::is_integral<unsigned __int128>::value &&
+                  std::is_unsigned<unsigned __int128>::value, \"\");
+    int main() {
+      __int128 i128;
+    }
+  "
+  ASDF_HAVE_INT128)
 
 configure_file(
   "${PROJECT_SOURCE_DIR}/include/asdf/config.hxx.in"
