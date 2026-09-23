@@ -49,6 +49,29 @@ std::string compression_name(compression_t compression) {
   buf << compression;
   return buf.str();
 }
+
+// Runs `f` when the scope is left, also by an exception, so that a codec's
+// state is released on every path
+template <typename F> class scope_exit {
+  F f;
+
+public:
+  explicit scope_exit(F f1) : f(std::move(f1)) {}
+  scope_exit(const scope_exit &) = delete;
+  scope_exit &operator=(const scope_exit &) = delete;
+  ~scope_exit() { f(); }
+};
+
+// Codecs that do not define every level reject the others here, instead of
+// failing later with an opaque library error code
+void check_compression_level(compression_t compression, int level,
+                             int min_level, int max_level) {
+  ASDF_CHECK(min_level <= level && level <= max_level,
+             "Compression level " + std::to_string(level) +
+                 " is out of range for " + compression_name(compression) +
+                 " (" + std::to_string(min_level) + " to " +
+                 std::to_string(max_level) + ")");
+}
 } // namespace
 
 #ifdef ASDF_HAVE_OPENSSL
@@ -313,6 +336,8 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     // TODO: Don't copy the data
     blosc2_schunk *const schunk =
         blosc2_schunk_from_buffer(indata.data(), indata.size(), false);
+    ASDF_CHECK(schunk, "blosc2 decompression failed: invalid frame");
+    const scope_exit free_schunk([&] { blosc2_schunk_free(schunk); });
     blosc2_schunk_avoid_cframe_free(schunk, true);
     data.resize(data_space);
     uint8_t *output_ptr = data.data();
@@ -327,7 +352,8 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
       output_ptr += output_size;
       total_output_size -= output_size;
     }
-    blosc2_schunk_free(schunk);
+    ASDF_CHECK(total_output_size == 0,
+               "blosc2: decompressed size does not match the block header");
     break;
   }
 #endif
@@ -339,7 +365,10 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     strm.bzalloc = NULL;
     strm.bzfree = NULL;
     strm.opaque = NULL;
-    BZ2_bzDecompressInit(&strm, 0, 0);
+    const int iret = BZ2_bzDecompressInit(&strm, 0, 0);
+    ASDF_CHECK(iret == BZ_OK, "bzip2: BZ2_bzDecompressInit failed with error " +
+                                  std::to_string(iret));
+    const scope_exit end_stream([&] { BZ2_bzDecompressEnd(&strm); });
     strm.next_in =
         reinterpret_cast<char *>(const_cast<unsigned char *>(indata.data()));
     strm.next_out = reinterpret_cast<char *>(data.data());
@@ -360,7 +389,6 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
       ASDF_CHECK(iret == BZ_OK, "bzip2 decompression failed with error " +
                                     std::to_string(iret));
     }
-    BZ2_bzDecompressEnd(&strm);
     ASDF_CHECK(avail_in == 0 && avail_out == 0,
                "bzip2: decompressed size does not match the block header");
     break;
@@ -422,6 +450,7 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     ASDF_CHECK(!LZ4F_isError(ierr),
                "lz4f: cannot create decompression context");
     assert(dctx);
+    const scope_exit free_dctx([&] { LZ4F_freeDecompressionContext(dctx); });
 
     size_t dstSize = data.size();
     size_t srcSize = indata.size();
@@ -429,9 +458,6 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
         dctx, data.data(), &dstSize, indata.data(), &srcSize, &dOpt);
     ASDF_CHECK(nbytes_expected == 0,
                "lz4f decompression failed or the frame is incomplete");
-
-    ierr = LZ4F_freeDecompressionContext(dctx);
-    ASDF_CHECK(!LZ4F_isError(ierr), "lz4f: cannot free decompression context");
     break;
   }
 #endif
@@ -457,7 +483,10 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
     strm.zalloc = NULL;
     strm.zfree = NULL;
     strm.opaque = NULL;
-    inflateInit(&strm);
+    const int iret = inflateInit(&strm);
+    ASDF_CHECK(iret == Z_OK,
+               "zlib: inflateInit failed with error " + std::to_string(iret));
+    const scope_exit end_stream([&] { inflateEnd(&strm); });
     strm.next_in = const_cast<unsigned char *>(indata.data());
     strm.next_out = data.data();
     uint64_t avail_in = indata.size();
@@ -477,7 +506,6 @@ read_block_data(const shared_ptr<istream> &pis, streamoff block_begin,
       ASDF_CHECK(iret == Z_OK, "zlib decompression failed with error " +
                                    std::to_string(iret));
     }
-    inflateEnd(&strm);
     ASDF_CHECK(avail_in == 0 && avail_out == 0,
                "zlib: decompressed size does not match the block header");
     break;
@@ -650,6 +678,7 @@ void ndarray::write_block(ostream &os) const {
 #ifdef ASDF_HAVE_BLOSC
   case compression_t::blosc: {
     comp = {'b', 'l', 's', 'c'};
+    check_compression_level(compression, compression_level, 0, 9);
     const int level = compression_level;
     const int doshuffle = BLOSC_BITSHUFFLE;
     // The shuffle filter works on fixed-size items; a structured datatype has
@@ -684,6 +713,7 @@ void ndarray::write_block(ostream &os) const {
 #ifdef ASDF_HAVE_BLOSC2
   case compression_t::blosc2: {
     comp = {'b', 'l', 's', '2'};
+    check_compression_level(compression, compression_level, 0, 9);
     ensure_blosc2_initialized();
 
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -700,6 +730,8 @@ void ndarray::write_block(ostream &os) const {
     storage.cparams = &cparams;
 
     blosc2_schunk *const schunk = blosc2_schunk_new(&storage);
+    ASDF_CHECK(schunk, "blosc2: cannot create a super-chunk");
+    const scope_exit free_schunk([&] { blosc2_schunk_free(schunk); });
 
     const int64_t chunk_size = INT_MAX - BLOSC2_MAX_OVERHEAD;
     uint8_t *input_ptr = static_cast<uint8_t *>(get_data()->ptr());
@@ -717,15 +749,16 @@ void ndarray::write_block(ostream &os) const {
     uint8_t *cframe;
     bool needs_free;
     const int64_t size = blosc2_schunk_to_buffer(schunk, &cframe, &needs_free);
+    ASDF_CHECK(size >= 0, "blosc2: cannot serialise the super-chunk");
+    const scope_exit free_cframe([&] {
+      if (needs_free)
+        std::free(cframe);
+    });
 
     // TODO: Reuse `cframe`, at least if `needs_free== true`
     outdata =
         make_shared<typed_block_t<unsigned char>>(vector<unsigned char>(size));
     std::memcpy(outdata->ptr(), cframe, outdata->nbytes());
-
-    blosc2_schunk_free(schunk);
-    if (needs_free)
-      std::free(cframe);
 
     break;
   }
@@ -737,12 +770,18 @@ void ndarray::write_block(ostream &os) const {
     // Allocate 600 bytes plus 1% more
     outdata = make_shared<typed_block_t<unsigned char>>(vector<unsigned char>(
         600 + get_data()->nbytes() + (get_data()->nbytes() + 99) / 100));
-    const int level = compression_level;
+    // bzip2 knows only the block sizes 1 to 9 (in units of 100 kB); take the
+    // smallest one for level 0
+    check_compression_level(compression, compression_level, 0, 9);
+    const int level = max(1, compression_level);
     bz_stream strm;
     strm.bzalloc = NULL;
     strm.bzfree = NULL;
     strm.opaque = NULL;
-    BZ2_bzCompressInit(&strm, level, 0, 0);
+    const int iret = BZ2_bzCompressInit(&strm, level, 0, 0);
+    ASDF_CHECK(iret == BZ_OK, "bzip2: BZ2_bzCompressInit failed with error " +
+                                  std::to_string(iret));
+    const scope_exit end_stream([&] { BZ2_bzCompressEnd(&strm); });
     strm.next_in =
         reinterpret_cast<char *>(const_cast<void *>(get_data()->ptr()));
     strm.next_out = reinterpret_cast<char *>(outdata->ptr());
@@ -826,6 +865,8 @@ void ndarray::write_block(ostream &os) const {
     const size_t nbytes =
         LZ4F_compressFrame(outdata->ptr(), outdata->nbytes(), get_data()->ptr(),
                            get_data()->nbytes(), &preferences);
+    ASDF_CHECK(!LZ4F_isError(nbytes), std::string("lz4f compression failed: ") +
+                                          LZ4F_getErrorName(nbytes));
     outdata->resize(nbytes);
     break;
   }
@@ -866,13 +907,17 @@ void ndarray::write_block(ostream &os) const {
     outdata = make_shared<typed_block_t<unsigned char>>(
         vector<unsigned char>((6 + get_data()->nbytes() +
                                (get_data()->nbytes() + 16383) / 16384 * 5)));
+    // zlib's -1 is its default level (`Z_DEFAULT_COMPRESSION`)
+    check_compression_level(compression, compression_level, -1, 9);
     const int level = compression_level;
     z_stream strm;
     strm.zalloc = Z_NULL;
     strm.zfree = Z_NULL;
     strm.opaque = Z_NULL;
     int iret = deflateInit(&strm, level);
-    ASDF_CHECK(iret == Z_OK, "zlib: deflateInit failed");
+    ASDF_CHECK(iret == Z_OK,
+               "zlib: deflateInit failed with error " + std::to_string(iret));
+    const scope_exit end_stream([&] { deflateEnd(&strm); });
     strm.next_in = reinterpret_cast<unsigned char *>(
         const_cast<void *>(get_data()->ptr()));
     strm.next_out = reinterpret_cast<unsigned char *>(outdata->ptr());

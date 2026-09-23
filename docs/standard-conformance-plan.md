@@ -536,6 +536,7 @@ these words; the exact sentence is the implementer's choice.
 | Unknown or unsupported `--standard-version` | `set_standard_version` / `asdf::write` | `standard version` |
 | Unknown-tagged node with integer `source` on write | `group::to_yaml` | the tag, `block` |
 | Bad `asdf-copy` option | `utils/copy.cxx` check lambda | `error:` prefix plus the option text |
+| Compression level outside what the codec takes | `ndarray::write_block` | `compression level`, the codec name |
 
 Phases are separately reviewable PRs, in this order. Phase 0 first because it
 supplies the harness the later phases are verified with; it registers only

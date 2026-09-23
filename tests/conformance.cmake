@@ -621,6 +621,32 @@ add_test(NAME error-compression-level
   ./asdf-copy --compression-level=10 demo.asdf bad-level.asdf)
 set_tests_properties(error-compression-level PROPERTIES DEPENDS demo)
 
+# Every level asdf-copy accepts works with every codec, also level 0 with
+# bzip2, which has no level 0 of its own
+foreach(codec_have blosc:BLOSC blosc2:BLOSC2 bzip2:BZIP2 lz4:LIBLZ4
+    lz4f:LIBLZ4 libzstd:LIBZSTD zlib:ZLIB)
+  string(REPLACE ":" ";" codec_have "${codec_have}")
+  list(GET codec_have 0 codec)
+  list(GET codec_have 1 have)
+  if(HAVE_${have})
+    add_test(NAME level0-${codec}
+      COMMAND ./asdf-copy --compression=${codec} --compression-level=0
+      demo.asdf demo-level0-${codec}.asdf)
+    set_tests_properties(level0-${codec} PROPERTIES DEPENDS demo)
+    add_test(NAME compare-level0-${codec}
+      COMMAND ${CMAKE_SOURCE_DIR}/diff-commands.sh
+      "./asdf-ls demo.asdf" "./asdf-ls demo-level0-${codec}.asdf")
+    set_tests_properties(compare-level0-${codec}
+      PROPERTIES DEPENDS level0-${codec})
+    # Python reads the standard codecs only
+    if(codec MATCHES "^(bzip2|lz4|zlib)$")
+      asdf_add_python_test(py-compare-level0-${codec}
+        compare demo.asdf demo-level0-${codec}.asdf)
+      asdf_test_depends(py-compare-level0-${codec} demo level0-${codec})
+    endif()
+  endif()
+endforeach()
+
 # float16 is a legitimate feature of standard 1.6.0, never "nonstandard": a
 # copy of a float16 file stays 1.6.0, even at --standard-version=minimal, and
 # an explicitly requested older version is an error rather than a silent
