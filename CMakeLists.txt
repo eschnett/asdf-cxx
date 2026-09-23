@@ -115,6 +115,17 @@ endif()
 
 # Main project
 
+# Build in, and probe below in, the same dialect. `target_compile_features`
+# alone does not reach `check_cxx_source_compiles`, which would then run in
+# the compiler's default dialect (`gnu++14` for GCC 8), and it adds no flag
+# when that default already suffices, even under `CMAKE_CXX_EXTENSIONS=OFF`.
+# Setting the standard makes the targets and the checks agree, including on
+# `CMAKE_CXX_EXTENSIONS`.
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 include(CheckCXXSourceCompiles)
   check_cxx_source_compiles(
     "
@@ -123,8 +134,16 @@ include(CheckCXXSourceCompiles)
       }
     "
     ASDF_HAVE_FLOAT16)
+  # `get_scalar_type_id` needs the standard library to treat `__int128` as
+  # an integer type. libstdc++ does so only in `gnu++` mode, not under a
+  # strict `-std=c++17`, although the compiler still accepts the type.
   check_cxx_source_compiles(
     "
+      #include <type_traits>
+      static_assert(std::is_integral<__int128>::value &&
+                    std::is_signed<__int128>::value, \"\");
+      static_assert(std::is_integral<unsigned __int128>::value &&
+                    std::is_unsigned<unsigned __int128>::value, \"\");
       int main() {
         __int128 i128;
       }

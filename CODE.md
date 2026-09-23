@@ -91,7 +91,12 @@ Every header ends with a `#define <GUARD>_DONE` and a trailing
   sets a `HAVE_*` CMake variable that becomes `ASDF_HAVE_*` in the
   generated `config.hxx`.
 - `check_cxx_source_compiles` probes for `_Float16` and `__int128`,
-  setting `ASDF_HAVE_FLOAT16` / `ASDF_HAVE_INT128`.
+  setting `ASDF_HAVE_FLOAT16` / `ASDF_HAVE_INT128`. `CMAKE_CXX_STANDARD`
+  defaults to 17 so the probes run in the dialect the targets are built
+  in. The `__int128` probe also requires `std::is_integral` and
+  `is_signed` / `is_unsigned` to accept the type, which libstdc++ does
+  only in `gnu++` mode; under `CMAKE_CXX_EXTENSIONS=OFF` with GCC,
+  int128 is therefore off.
 - `include/asdf/config.hxx.in` → `${build}/include/asdf/config.hxx`.
   Both `include/` and `${build}/include/` are on the include path; code
   always includes as `<asdf/xxx.hxx>`.
