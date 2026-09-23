@@ -6,7 +6,7 @@ gotchas you will trip over. This complements `README.md` (user-facing
 overview and standard conformance) and is not a substitute for reading
 the headers, which are short.
 
-Snapshot: project version 8.0.1 (`CMakeLists.txt`), ASDF file-format
+Snapshot: project version 8.0.2 (`CMakeLists.txt`), ASDF file-format
 version 1.0.0. ASDF standard versions 1.0.0 to 1.6.0 are read and
 written; which one a given file declares is decided per write (§4.9,
 §6), not compiled in. ~5,800 lines total including demos and the SWIG
